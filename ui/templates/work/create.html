@@ -1,0 +1,176 @@
+{% extends "shell/app.html" %}
+
+{% block content %}
+<div class="container-xl">
+
+  <!-- Page Header -->
+  <div class="page-header d-flex align-items-center justify-content-between mb-4">
+    <div>
+      <h1 class="page-title">Create Work Context</h1>
+      <p class="page-subtitle text-muted">
+        Define the operational context for inspections and quality checks
+      </p>
+    </div>
+  </div>
+
+  <div class="row justify-content-center">
+    <div class="col-lg-8 col-xl-7">
+
+      <div class="card shadow-sm">
+        <div class="card-header">
+          <h2 class="card-title mb-0">Work Context Details</h2>
+        </div>
+
+        <div class="card-body">
+          <form method="post">
+            {% csrf_token %}
+
+            <!-- Line + Shop -->
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label required">Line</label>
+                <select name="line" class="form-select" required>
+                  <option value="">Select line</option>
+                  {% for line in lines %}
+                    <option value="{{ line.id }}">{{ line.code }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label required">Shop</label>
+                <select name="shop" class="form-select" required>
+                  <option value="">Select shop</option>
+                  {% for shop in shops %}
+                    <option value="{{ shop.id }}">{{ shop.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+
+            <!-- Product + Variant -->
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label required">Model / Product</label>
+                <select name="product" class="form-select" required>
+                  <option value="">Select model</option>
+                  {% for p in products %}
+                    <option value="{{ p.id }}">{{ p.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label">Model Color / Variant</label>
+                <input
+                  type="text"
+                  name="model_color"
+                  class="form-control"
+                  placeholder="Optional (e.g. Red, Blue, Rev-B)"
+                >
+              </div>
+            </div>
+
+            <!-- Shift + Date -->
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <label class="form-label required">Shift</label>
+                <select name="shift" class="form-select" required>
+                  <option value="DAY">Day Shift</option>
+                  <option value="NIGHT">Night Shift</option>
+                </select>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label required">Work Date</label>
+                <input
+                  type="date"
+                  name="work_date"
+                  class="form-control"
+                  required
+                >
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="d-flex justify-content-end gap-2">
+              <a href="javascript:history.back()" class="btn btn-light">
+                Cancel
+              </a>
+              <button type="submit" class="btn btn-primary">
+                Create Work Context
+              </button>
+            </div>
+
+          </form>
+        </div>
+      </div>
+
+      <!-- Info Card -->
+      <div class="card info-card mt-4">
+        <div class="card-body">
+          <h3 class="card-title">What is a Work Context?</h3>
+          <p class="text-muted">
+            A work context defines the environment in which inspections are performed.
+          </p>
+
+          <ul class="info-list">
+            <li><strong>Line & Shop</strong> – Physical production location</li>
+            <li><strong>Model</strong> – Product being inspected</li>
+            <li><strong>Shift & Date</strong> – Time reference</li>
+          </ul>
+
+          <p class="text-muted mb-0">
+            Once created, the system automatically loads the correct quality checklists.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.page-title {
+  font-size: 1.8rem;
+  font-weight: 600;
+}
+.page-subtitle {
+  font-size: 0.95rem;
+}
+.form-label.required::after {
+  content: " *";
+  color: #dc3545;
+}
+.card {
+  border-radius: 12px;
+}
+.card-header {
+  background: transparent;
+  border-bottom: 1px solid #e9ecef;
+}
+.info-card {
+  background: linear-gradient(180deg, #f8fbff, #ffffff);
+  border-left: 4px solid var(--primary-color);
+}
+.info-list {
+  padding-left: 1.2rem;
+}
+.info-list li {
+  margin-bottom: 0.6rem;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const dateInput = document.querySelector('input[name="work_date"]');
+  if (dateInput && !dateInput.value) {
+    dateInput.value = new Date().toISOString().split("T")[0];
+  }
+});
+</script>
+{% endblock %}

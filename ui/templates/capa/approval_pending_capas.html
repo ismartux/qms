@@ -1,0 +1,329 @@
+{% extends "shell/app.html" %}
+{% block title %}CAPA Approval Pending{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto pb-24 space-y-8 px-4 sm:px-6">
+
+  <!-- ================= HEADER ================= -->
+  <header class="sticky top-0 z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-4 bg-white/90 backdrop-blur-md border-b border-gray-200">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-sm">
+        <i class="fas fa-clipboard-check"></i>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold text-gray-900">CAPA Approval Pending</h1>
+        <p class="text-xs text-gray-500">Awaiting PQE verification</p>
+      </div>
+    </div>
+  </header>
+
+  {% if capas %}
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+    {% for capa in capas %}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 hover:shadow-lg transition flex flex-col">
+
+      <!-- Accent -->
+      <div class="h-1.5 w-full bg-indigo-500"></div>
+
+      <div class="p-6 flex flex-col h-full">
+
+        <!-- ================= TITLE ================= -->
+        <div class="mb-4">
+          <h3 class="text-lg font-bold text-gray-900 leading-snug">
+            {{ capa.submission.template_version.template.name }}
+          </h3>
+          <p class="text-xs text-gray-400">
+            CAPA ID: {{ capa.capa_id|truncatechars:8 }}
+          </p>
+        </div>
+
+        <!-- ================= DETAILS ================= -->
+        <div class="text-sm text-gray-600 space-y-2 mb-4">
+
+          <div class="flex justify-between">
+            <span class="text-gray-400">RCA Role</span>
+            <span class="font-medium text-gray-900">
+              {{ capa.rca_role.name|default:"—" }}
+            </span>
+          </div>
+
+          <div class="flex justify-between">
+            <span class="text-gray-400">CAPA Role</span>
+            <span class="font-medium text-gray-900">
+              {{ capa.capa_role.name|default:"—" }}
+            </span>
+          </div>
+
+          <div class="flex justify-between">
+            <span class="text-gray-400">Model</span>
+            <span class="font-medium text-gray-900 text-right max-w-[55%] truncate">
+              {{ capa.submission.work_context.product.name }}
+            </span>
+          </div>
+
+          <div class="flex justify-between">
+            <span class="text-gray-400">Due Date</span>
+            <span class="font-medium
+              {% if capa.due_date and capa.due_date < today %}
+                text-red-600
+              {% else %}
+                text-gray-900
+              {% endif %}">
+              {{ capa.due_date|date:"d M Y" }}
+            </span>
+          </div>
+
+        </div>
+
+        <!-- ================= COMPLETION STATUS ================= -->
+        <div class="mb-4 space-y-2">
+
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-semibold">RCA</span>
+            {% if capa.rca_summary %}
+              <span class="px-2 py-1 rounded-full bg-green-100 text-green-700 font-bold">
+                Completed
+              </span>
+            {% else %}
+              <span class="px-2 py-1 rounded-full bg-red-100 text-red-700 font-bold">
+                Not Submitted
+              </span>
+            {% endif %}
+          </div>
+
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-semibold">CAPA</span>
+            {% if capa.capa_plan %}
+              <span class="px-2 py-1 rounded-full bg-green-100 text-green-700 font-bold">
+                Completed
+              </span>
+            {% else %}
+              <span class="px-2 py-1 rounded-full bg-red-100 text-red-700 font-bold">
+                Not Submitted
+              </span>
+            {% endif %}
+          </div>
+
+        </div>
+
+        <!-- ================= STATUS ================= -->
+        <div class="mb-4">
+          <span class="px-3 py-1 text-xs font-bold rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200">
+            WAITING APPROVAL
+          </span>
+        </div>
+
+        <!-- ================= ACTIONS ================= -->
+        <div class="mt-auto border-t pt-4 space-y-3">
+
+          <!-- 🔥 QUICK VIEW POPUP -->
+          <button type="button"
+            onclick="openCapaModal('{{ capa.capa_id }}')"
+            class="w-full text-xs font-bold text-sky-600 hover:text-sky-800 transition">
+            Quick View
+          </button>
+
+          <!-- Approve -->
+          <form method="post" action="{% url 'capa:capa_approve' capa.capa_id %}">
+            {% csrf_token %}
+            <button type="submit"
+               class="w-full px-4 py-2 bg-green-600 text-white text-xs font-bold rounded-xl hover:bg-green-700 transition shadow-sm">
+              Approve & Close
+            </button>
+          </form>
+
+          <!-- Reject -->
+          <form method="post" action="{% url 'capa:capa_reject' capa.capa_id %}">
+            {% csrf_token %}
+            <textarea name="rejection_reason"
+                      rows="2"
+                      required
+                      placeholder="Enter rejection reason..."
+                      class="w-full border border-red-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-red-500 focus:outline-none resize-none"></textarea>
+
+            <button type="submit"
+               class="mt-2 w-full px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition shadow-sm">
+              Reject
+            </button>
+          </form>
+
+        </div>
+
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="flex flex-col items-center justify-center py-24 text-gray-400">
+    <i class="fas fa-check-double text-3xl mb-3"></i>
+    <h3 class="text-lg font-bold text-gray-600">No Pending Approvals</h3>
+    <p class="text-sm mt-2">All CAPAs verified ✔</p>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- ================= MODAL ================= -->
+<div id="capaOverlay"
+     class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-[9999]">
+
+  <div id="capaModalBox"
+       class="bg-white w-full max-w-4xl mx-4 rounded-3xl shadow-2xl
+              transform scale-95 opacity-0 transition-all duration-300
+              max-h-[90vh] overflow-y-auto">
+
+    <div class="flex justify-between items-center px-6 py-4 border-b">
+      <h3 class="text-sm font-bold uppercase text-gray-700">CAPA Details</h3>
+      <button onclick="closeCapaModal()"
+              class="text-gray-400 hover:text-gray-700 text-xl font-bold">
+        &times;
+      </button>
+    </div>
+
+    <div id="capaModalContent" class="p-6"></div>
+  </div>
+</div>
+
+<!-- ================= IMAGE PREVIEW MODAL ================= -->
+<div id="imagePreviewOverlay"
+     class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center z-[9999]">
+
+  <div class="relative max-w-5xl w-full mx-4">
+
+    <button onclick="closeImagePreview()"
+            class="absolute -top-10 right-0 text-white text-3xl font-bold">
+      &times;
+    </button>
+
+    <img id="imagePreview"
+         src=""
+         class="w-full max-h-[85vh] object-contain rounded-xl shadow-2xl bg-black">
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+
+/* =========================================================
+   🔥 MOVE ALL MODALS TO GLOBAL ROOT (CRITICAL FIX)
+   ========================================================= */
+document.addEventListener("DOMContentLoaded", function () {
+  const root = document.getElementById("modal-root");
+
+  const capaOverlay = document.getElementById("capaOverlay");
+  if (root && capaOverlay && capaOverlay.parentElement !== root) {
+    root.appendChild(capaOverlay);
+  }
+
+  const imageOverlay = document.getElementById("imagePreviewOverlay");
+  if (root && imageOverlay && imageOverlay.parentElement !== root) {
+    root.appendChild(imageOverlay);
+  }
+});
+
+/* =========================================================
+   CAPA QUICK VIEW MODAL
+   ========================================================= */
+function openCapaModal(capaId) {
+
+  const overlay = document.getElementById("capaOverlay");
+  const box = document.getElementById("capaModalBox");
+  const content = document.getElementById("capaModalContent");
+
+  content.innerHTML = `
+    <div class="flex flex-col items-center justify-center py-12 text-gray-400">
+      <i class="fas fa-circle-notch fa-spin text-2xl mb-3 text-indigo-500"></i>
+      <p class="text-sm font-semibold">Loading CAPA details...</p>
+    </div>`;
+
+  overlay.classList.remove("hidden");
+  overlay.classList.add("flex");
+
+  setTimeout(() => {
+    box.classList.remove("scale-95", "opacity-0");
+    box.classList.add("scale-100", "opacity-100");
+  }, 50);
+
+  fetch(`/capa/${capaId}/popup/`)
+    .then(r => r.text())
+    .then(html => content.innerHTML = html)
+    .catch(() => {
+      content.innerHTML = `
+        <div class="text-center py-12 text-red-500">
+          <i class="fas fa-exclamation-triangle text-2xl mb-3"></i>
+          <p class="font-semibold">Failed to load CAPA details.</p>
+        </div>`;
+    });
+}
+
+function closeCapaModal() {
+  const overlay = document.getElementById("capaOverlay");
+  const box = document.getElementById("capaModalBox");
+
+  box.classList.remove("scale-100", "opacity-100");
+  box.classList.add("scale-95", "opacity-0");
+
+  setTimeout(() => {
+    overlay.classList.add("hidden");
+    overlay.classList.remove("flex");
+  }, 250);
+}
+
+/* Close CAPA modal on outside click */
+document.getElementById("capaOverlay")?.addEventListener("click", function (e) {
+  if (e.target.id === "capaOverlay") closeCapaModal();
+});
+
+
+/* =========================================================
+   IMAGE PREVIEW MODAL
+   ========================================================= */
+function openImagePreview(src) {
+  const overlay = document.getElementById("imagePreviewOverlay");
+  const img = document.getElementById("imagePreview");
+
+  img.src = src;
+  overlay.classList.remove("hidden");
+  overlay.classList.add("flex");
+}
+
+function closeImagePreview() {
+  const overlay = document.getElementById("imagePreviewOverlay");
+  const img = document.getElementById("imagePreview");
+
+  img.src = "";
+  overlay.classList.add("hidden");
+  overlay.classList.remove("flex");
+}
+
+/* Close image preview on outside click */
+document.getElementById("imagePreviewOverlay")?.addEventListener("click", function (e) {
+  if (e.target === this) closeImagePreview();
+});
+
+
+/* =========================================================
+   ESC KEY HANDLING (IMAGE → CAPA → PAGE)
+   ========================================================= */
+document.addEventListener("keydown", function (e) {
+  if (e.key !== "Escape") return;
+
+  const imageOverlay = document.getElementById("imagePreviewOverlay");
+  const capaOverlay = document.getElementById("capaOverlay");
+
+  if (imageOverlay && !imageOverlay.classList.contains("hidden")) {
+    closeImagePreview();
+    return;
+  }
+
+  if (capaOverlay && !capaOverlay.classList.contains("hidden")) {
+    closeCapaModal();
+  }
+});
+
+</script>
+{% endblock %}

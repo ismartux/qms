@@ -1,0 +1,53 @@
+{% extends "shell/app.html" %}
+{% block content %}
+
+<div class="max-w-md mx-auto mt-12">
+    <div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+
+        <!-- HEADER -->
+        <div class="bg-sky-600 p-6 text-center">
+            <h1 class="text-2xl font-bold text-white">Create New Version</h1>
+            <p class="text-sky-100 text-sm mt-1">
+                Template: <strong>{{ template.code }}</strong>
+            </p>
+        </div>
+
+        <!-- BODY -->
+        <div class="p-6 space-y-6">
+
+            <!-- INFO (AUTO-GENERATED) -->
+            <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+                <ul class="space-y-1">
+                    <li>• Version number will be <strong>auto-generated</strong></li>
+                    <li>• New version will be created as <strong>Draft</strong></li>
+                    <li>• You can edit sections and items after creation</li>
+                    <li>• Only one version can be active at a time</li>
+                </ul>
+            </div>
+
+            <!-- FORM -->
+            <form method="post">
+                {% csrf_token %}
+
+                <!-- SAFETY CONFIRM -->
+                <div class="flex items-center mb-4">
+                    <input
+                        type="checkbox"
+                        required
+                        class="w-4 h-4 text-sky-600 border-gray-300 rounded focus:ring-sky-500">
+                    <label class="ml-2 text-sm text-gray-700">
+                        I understand this will create a new draft version
+                    </label>
+                </div>
+
+                <button
+                    class="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                    <i class="fas fa-plus-circle mr-2"></i>
+                    Create Version
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

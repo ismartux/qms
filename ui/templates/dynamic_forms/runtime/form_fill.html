@@ -1,0 +1,323 @@
+{% extends "shell/app.html" %}
+{% load static %}
+{% load dynamic_form_extras %}
+{% block content %}
+
+<div class="max-w-4xl mx-auto space-y-10">
+
+  <!-- ================= HEADER ================= -->
+  <div class="bg-white rounded-2xl shadow-sm p-6 border">
+    <h1 class="text-2xl font-semibold text-gray-800">
+      {{ schema.template_name }}
+    </h1>
+    <p class="text-sm text-gray-500 mt-1">
+      Version {{ schema.version }}
+    </p>
+  </div>
+
+  <!-- ================= FORM ================= -->
+  <form id="dynamic-form"
+        method="post"
+        action="{% url 'dynamic_forms:form_submit' submission.submission_id %}">
+    {% csrf_token %}
+
+    <div class="space-y-8">
+
+      {% for field in schema.fields %}
+      <div class="field-wrapper
+                  bg-white rounded-xl border shadow-sm
+                  p-6 relative transition-all
+                  focus-within:ring-2 focus-within:ring-blue-100"
+           data-field-id="{{ field.id }}"
+           {% if field.dependency %}
+             data-depends-on="{{ field.dependency.depends_on }}"
+           {% endif %}>
+
+        <!-- LEFT ACCENT -->
+        <div class="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl
+                    {% if field.required %}bg-blue-500{% else %}bg-gray-200{% endif %}">
+        </div>
+
+        <!-- LABEL -->
+        <div class="flex items-center justify-between mb-1">
+          <label class="font-medium text-gray-800">
+            {{ field.label }}
+            {% if field.required %}
+              <span class="text-red-500">*</span>
+            {% endif %}
+          </label>
+
+          {% if field.dependency %}
+            <span class="text-xs text-gray-400">
+              Depends on field {{ field.dependency.depends_on }}
+            </span>
+          {% endif %}
+        </div>
+
+        <!-- HELP -->
+        {% if field.help_text %}
+          <p class="text-sm text-gray-500 mb-3">
+            {{ field.help_text }}
+          </p>
+        {% endif %}
+
+        <!-- INPUT -->
+        {% if field.type == "TEXT" %}
+          <input type="text"
+                 name="field_{{ field.id }}"
+                 value="{{ responses|get_item:field.id }}"
+                 class="input w-full focus:border-blue-400">
+
+        {% elif field.type == "NUMBER" %}
+          <input type="number"
+                 name="field_{{ field.id }}"
+                 min="{{ field.min }}"
+                 max="{{ field.max }}"
+                 value="{{ responses|get_item:field.id }}"
+                 class="input w-full focus:border-blue-400">
+
+        {% elif field.type == "DROPDOWN" %}
+          <select name="field_{{ field.id }}"
+                  class="input w-full focus:border-blue-400"
+                  data-dropdown
+                  {% if field.dependency and not responses|get_item:field.dependency.depends_on %}
+                    disabled
+                  {% endif %}>
+            <option value="">— Select —</option>
+            {% for opt in field.options %}
+              <option value="{{ opt }}"
+                {% if responses|get_item:field.id == opt %}selected{% endif %}>
+                {{ opt }}
+              </option>
+            {% endfor %}
+          </select>
+
+          <p class="text-xs text-gray-400 mt-1 hidden"
+             data-loading>
+            ⏳ Loading options…
+          </p>
+
+        {% elif field.type == "BOOLEAN" %}
+          <select name="field_{{ field.id }}"
+                  class="input w-full focus:border-blue-400">
+            <option value="">— Select —</option>
+            <option value="true"
+              {% if responses|get_item:field.id == "true" %}selected{% endif %}>
+              Yes
+            </option>
+            <option value="false"
+              {% if responses|get_item:field.id == "false" %}selected{% endif %}>
+              No
+            </option>
+          </select>
+
+        {% elif field.type == "IMAGE" %}
+          <input type="url"
+                 name="field_{{ field.id }}"
+                 placeholder="https://example.com/image.jpg"
+                 value="{{ responses|get_item:field.id }}"
+                 class="input w-full focus:border-blue-400">
+        {% endif %}
+
+        <!-- STANDARD VALUE -->
+        <div class="mt-3 hidden" data-standard-value>
+          <div class="flex items-center gap-2
+                      bg-blue-50 border border-blue-200
+                      text-blue-700 text-sm
+                      px-3 py-2 rounded-lg">
+            <span>📌</span>
+            <span data-standard-text></span>
+          </div>
+        </div>
+
+        <!-- ERROR -->
+        <div class="mt-2 hidden" data-standard-error>
+          <div class="flex items-center gap-2
+                      bg-red-50 border border-red-200
+                      text-red-700 text-sm
+                      px-3 py-2 rounded-lg">
+            <span>❌</span>
+            <span data-error-text></span>
+          </div>
+        </div>
+
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- ACTIONS -->
+    <div class="flex justify-end pt-10">
+      <button type="submit"
+              id="submit-btn"
+              class="btn-primary px-10 py-2 rounded-lg">
+        Submit
+      </button>
+    </div>
+
+  </form>
+</div>
+
+<!-- ================= SCRIPT ================= -->
+<script>
+(function () {
+
+  const form = document.getElementById("dynamic-form");
+  const csrfToken = form.querySelector(
+    'input[name="csrfmiddlewaretoken"]'
+  ).value;
+
+  function collectResponses() {
+    const data = {};
+    document.querySelectorAll(".field-wrapper").forEach(w => {
+      const input = w.querySelector("input, select");
+      if (input && input.value !== "") {
+        data[w.dataset.fieldId] = input.value;
+      }
+    });
+    return data;
+  }
+
+  function setFieldError(wrapper, message) {
+    wrapper.classList.add("ring-2", "ring-red-200");
+    const box = wrapper.querySelector("[data-standard-error]");
+    const text = box?.querySelector("[data-error-text]");
+    if (box && text) {
+      text.textContent = message;
+      box.classList.remove("hidden");
+    }
+  }
+
+  function clearFieldError(wrapper) {
+    wrapper.classList.remove("ring-2", "ring-red-200");
+    const box = wrapper.querySelector("[data-standard-error]");
+    if (box) box.classList.add("hidden");
+  }
+
+  function setStandardValue(wrapper, message) {
+    const box = wrapper.querySelector("[data-standard-value]");
+    const text = wrapper.querySelector("[data-standard-text]");
+    if (!box || !text) return;
+    text.textContent = message;
+    box.classList.remove("hidden");
+  }
+
+  function clearStandardValue(wrapper) {
+    const box = wrapper.querySelector("[data-standard-value]");
+    if (box) box.classList.add("hidden");
+  }
+
+  function updateDropdown(wrapper, clearValue = true) {
+    const fieldId = wrapper.dataset.fieldId;
+    const select = wrapper.querySelector("select");
+    const loader = wrapper.querySelector("[data-loading]");
+    const responses = collectResponses();
+
+    if (!select) return;
+
+    select.disabled = true;
+    loader?.classList.remove("hidden");
+    if (clearValue) select.value = "";
+
+    fetch("{% url 'dynamic_forms:resolve_field_dependency' template.id %}", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": csrfToken,
+      },
+      body: JSON.stringify({
+        field_id: fieldId,
+        mode: "dropdown",
+        responses: responses,
+      }),
+    })
+    .then(r => r.json())
+    .then(data => {
+      select.innerHTML = '<option value="">— Select —</option>';
+      (data.options || []).forEach(opt => {
+        const o = document.createElement("option");
+        o.value = opt;
+        o.textContent = opt;
+        select.appendChild(o);
+      });
+      select.disabled = false;
+    })
+    .finally(() => loader?.classList.add("hidden"));
+  }
+
+  function evaluateStandardRules() {
+    const responses = collectResponses();
+
+    fetch("{% url 'dynamic_forms:resolve_field_dependency' template.id %}", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": csrfToken,
+      },
+      body: JSON.stringify({
+        mode: "standard",
+        responses: responses,
+      }),
+    })
+    .then(r => r.json())
+    .then(data => {
+
+      document.querySelectorAll(".field-wrapper").forEach(clearFieldError);
+
+      const fieldsWithStandard = new Set();
+      let hasError = false;
+
+      (data.results || []).forEach(r => {
+        const wrapper = document.querySelector(
+          `[data-field-id="${r.field_id}"]`
+        );
+        if (!wrapper) return;
+
+        fieldsWithStandard.add(String(r.field_id));
+
+        setStandardValue(
+          wrapper,
+          `Standard (${r.source === "BITABLE" ? "Auto" : "Manual"}): ${r.standard}`
+        );
+
+        if (!r.passed) {
+          hasError = true;
+          setFieldError(
+            wrapper,
+            `Entered value ${r.actual} must be ${r.operator} ${r.standard}`
+          );
+        }
+      });
+
+      document.querySelectorAll(".field-wrapper").forEach(w => {
+        if (!fieldsWithStandard.has(w.dataset.fieldId)) {
+          clearStandardValue(w);
+        }
+      });
+
+      document.getElementById("submit-btn").disabled = hasError;
+    });
+  }
+
+  // EVENTS
+  document.querySelectorAll("input, select").forEach(el => {
+    el.addEventListener("change", () => {
+      document.querySelectorAll(".field-wrapper").forEach(w => {
+        if (w.dataset.dependsOn === el.name.replace("field_", "")) {
+          updateDropdown(w, true);
+        }
+      });
+      evaluateStandardRules();
+    });
+  });
+
+  // INITIAL LOAD
+  document.querySelectorAll(".field-wrapper").forEach(w => {
+    if (w.dataset.dependsOn) updateDropdown(w, false);
+  });
+
+  evaluateStandardRules();
+
+})();
+</script>
+
+{% endblock %}

@@ -1,0 +1,162 @@
+{% load form_extras %}
+
+<div class="space-y-8 pt-4">
+
+<!-- ================= HEADER ================= -->
+<div class="flex justify-between items-center mb-6">
+  <div>
+    <h2 class="text-xl font-bold text-gray-900">
+      Submission Details
+    </h2>
+    <p class="text-xs text-gray-500 mt-0.5">
+      {{ submission.version.template.name }}
+    </p>
+  </div>
+
+  <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full
+               text-xs font-bold uppercase tracking-wide border
+    {% if submission.status == "SUBMITTED" %}
+      bg-sky-100 text-sky-700 border-sky-200
+    {% elif submission.status == "UNDER_REVIEW" %}
+      bg-amber-100 text-amber-700 border-amber-200
+    {% elif submission.status == "APPROVED" %}
+      bg-green-100 text-green-700 border-green-200
+    {% elif submission.status == "REJECTED" %}
+      bg-red-100 text-red-700 border-red-200
+    {% else %}
+      bg-gray-100 text-gray-600 border-gray-200
+    {% endif %}">
+    {{ submission.status }}
+  </span>
+</div>
+
+
+<!-- ================= BASIC INFO ================= -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-gray-600 mb-6">
+
+  <div>
+    <span class="font-semibold text-gray-400 uppercase">Reported By</span>
+    <div class="text-gray-900 font-medium mt-1">
+      {{ submission.reported_by.get_full_name|default:submission.reported_by.username }}
+    </div>
+  </div>
+
+  <div>
+    <span class="font-semibold text-gray-400 uppercase">Plant</span>
+    <div class="text-gray-900 font-medium mt-1">
+      {{ submission.plant.name }}
+    </div>
+  </div>
+
+  <div>
+    <span class="font-semibold text-gray-400 uppercase">Created At</span>
+    <div class="text-gray-900 font-medium mt-1">
+      {{ submission.created_at|date:"d M Y, H:i" }}
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ================= SECTIONS ================= -->
+{% for section in sections %}
+<div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+
+  <div class="px-6 py-5 border-b border-gray-100 bg-gray-50/80 flex justify-between items-center">
+    <div class="flex items-center gap-3">
+      <div class="w-1.5 h-6 bg-sky-500 rounded-full"></div>
+      <h3 class="text-lg font-bold text-gray-900 tracking-tight">
+        {{ section.title }}
+      </h3>
+    </div>
+    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
+      {{ section.items.count }} Items
+    </span>
+  </div>
+
+  <div class="p-6 md:p-8 space-y-8">
+
+    {% for item in section.items.all %}
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-x-8 gap-y-4 pb-8 border-b border-gray-100 last:border-0 last:pb-0">
+
+      <!-- Label -->
+      <div class="md:col-span-4">
+        <label class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
+          Check Item
+        </label>
+        <div class="text-gray-900 font-semibold leading-snug">
+          {{ item.label }}
+        </div>
+      </div>
+
+      <!-- Content -->
+      <div class="md:col-span-8 space-y-5">
+
+        <!-- Result -->
+        <div>
+          <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+            Result
+          </span>
+          <div class="px-4 py-2.5 rounded-lg bg-gray-50 border border-gray-100 inline-flex items-center w-fit">
+            {% with key=item.id|stringformat:"s" %}
+              <span class="text-gray-900 font-medium text-lg">
+                {{ answers|get_item:key|default:"—" }}
+              </span>
+            {% endwith %}
+          </div>
+        </div>
+
+        <!-- Remark -->
+        {% with key=item.id|stringformat:"s" %}
+        {% with response=responses|get_item:key %}
+        {% if response and response.remark %}
+        <div class="relative rounded-lg bg-amber-50 border border-amber-100 px-4 py-3">
+          <div class="absolute left-0 top-0 bottom-0 w-1 bg-amber-400"></div>
+          <div class="flex items-start gap-2">
+            <i class="fas fa-sticky-note text-amber-500 mt-0.5 text-sm"></i>
+            <div>
+              <span class="text-xs font-bold text-amber-800 uppercase tracking-wide">
+                Remark
+              </span>
+              <p class="text-sm text-amber-900 mt-1">
+                {{ response.remark }}
+              </p>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+        {% endwith %}
+        {% endwith %}
+
+        <!-- Photo Evidence -->
+        {% with key=item.id|stringformat:"s" %}
+        {% with response=responses|get_item:key %}
+        {% if response and response.photo %}
+        <div class="space-y-3">
+          <span class="text-xs font-bold text-gray-400 uppercase tracking-wider block">
+            Evidence
+          </span>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="relative aspect-square bg-gray-100 rounded-xl overflow-hidden border border-gray-200 shadow-sm cursor-pointer hover:shadow-md hover:border-sky-300 transition-all duration-300"
+                 data-preview="{{ response.photo.url }}">
+
+              <img src="{{ response.photo.url }}"
+                   class="w-full h-full object-cover"
+                   alt="Evidence">
+            </div>
+          </div>
+        </div>
+        {% endif %}
+        {% endwith %}
+        {% endwith %}
+
+      </div>
+    </div>
+    {% endfor %}
+
+  </div>
+</div>
+{% endfor %}
+
+</div>

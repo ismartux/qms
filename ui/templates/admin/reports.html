@@ -1,0 +1,59 @@
+{% extends "shell/app.html" %}
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+    <h1 class="text-2xl font-bold text-gray-900">Reports Generator</h1>
+    
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 md:p-8">
+        <form id="reportForm" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Report Type</label>
+                    <select id="reportType" class="w-full rounded-lg border-gray-300 bg-gray-50 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500">
+                        <option value="submissions">Submissions</option>
+                        <option value="capas">CAPAs</option>
+                        <option value="nc_items">Non-Conformance Items</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Plant</label>
+                    <select id="plant" class="w-full rounded-lg border-gray-300 bg-gray-50 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500">
+                        <option value="">All Plants</option>
+                        {% for plant in plants %}<option value="{{ plant.id }}">{{ plant.name }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
+                    <select id="dateRange" class="w-full rounded-lg border-gray-300 bg-gray-50 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500">
+                        <option value="month" selected>This Month</option>
+                        <option value="year">This Year</option>
+                    </select>
+                </div>
+            </div>
+            <button type="submit" class="w-full md:w-auto px-6 py-2.5 bg-sky-600 text-white font-medium rounded-lg hover:bg-sky-700 shadow-sm">
+                Generate Report
+            </button>
+        </form>
+    </div>
+
+    <div id="reportPreview" class="hidden">
+        <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+            <div id="reportContent"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('reportForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    const params = new URLSearchParams(new FormData(this)).toString();
+    fetch(`/admin/reports/generate/?${params}`)
+        .then(r=>r.json())
+        .then(d=>{
+            if(d.success){
+                document.getElementById('reportContent').innerHTML = d.html;
+                document.getElementById('reportPreview').classList.remove('hidden');
+            }
+        });
+});
+</script>
+{% endblock %}

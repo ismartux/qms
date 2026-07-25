@@ -1,0 +1,40 @@
+<!-- ui/templates/shell/operator.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TranssFlow - {% block title %}Operator Dashboard{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">TranssFlow</div>
+    <div class="status-indicators">
+      <span id="net-status" class="net-status online">
+        <span class="status-dot"></span> Online
+      </span>
+      <div class="user-info">
+        <span class="user-avatar">{{ request.user.username|make_list|first|upper }}</span>
+        <span>{{ request.user.username }}</span>
+      </div>
+    </div>
+  </header>
+  <main class="app-content">
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="app-footer">
+    <span>© {% now "Y" %} TranssFlow - Manufacturing WPA Platform</span>
+  </footer>
+  <script src="/static/js/offline.js"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

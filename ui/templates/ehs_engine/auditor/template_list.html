@@ -1,0 +1,142 @@
+{% extends "shell/app.html" %}
+{% load static %}
+{% block title %}EHS Forms{% endblock %}
+{% block content %}
+
+<style>
+  :root {
+    --primary-grad: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+    --success-grad: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    --surface-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05),
+                      0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    --hover-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+                    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  }
+
+  .dashboard-card {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid rgba(229, 231, 235, 0.8);
+    background: white;
+    overflow: hidden;
+  }
+
+  .dashboard-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--hover-shadow);
+    border-color: rgba(14, 165, 233, 0.3);
+  }
+
+  .btn-action {
+    transition: all 0.2s ease;
+  }
+
+  .btn-action:active {
+    transform: scale(0.97);
+  }
+
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+</style>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 space-y-6 pb-12 pt-2">
+
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div class="flex items-center gap-4">
+      <div class="h-14 w-14 rounded-full bg-gradient-to-tr from-sky-400 to-blue-600 flex items-center justify-center text-white text-xl font-bold shadow-md ring-4 ring-white">
+        {{ request.user.first_name|default:request.user.username|slice:":1"|upper }}
+      </div>
+      <div>
+        <h1 class="text-2xl font-extrabold text-gray-900 tracking-tight leading-tight">
+          EHS Audit Forms
+        </h1>
+        <p class="text-gray-500 text-sm mt-1 font-medium">
+          <i class="fas fa-shield-alt text-sky-500 mr-1"></i>
+          Select a form to begin inspection
+        </p>
+      </div>
+    </div>
+
+    <div class="text-right hidden sm:block">
+      <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+        Available Forms
+      </div>
+      <div class="text-xl font-bold text-sky-600">
+        {{ templates|length }}
+      </div>
+    </div>
+  </div>
+
+  <!-- Template Grid -->
+  {% if templates %}
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+
+    {% for template in templates %}
+    <div class="dashboard-card rounded-2xl p-6 flex flex-col justify-between relative">
+
+      <!-- Top Accent -->
+      <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-sky-400 to-blue-500"></div>
+
+      <div>
+        <!-- Code Badge -->
+        <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">
+          {{ template.code }}
+        </div>
+
+        <!-- Title -->
+        <h2 class="text-lg font-extrabold text-gray-900 tracking-tight mb-2">
+          {{ template.name }}
+        </h2>
+
+        <!-- Description -->
+        <p class="text-sm text-gray-500 line-clamp-2 leading-relaxed">
+          {{ template.description|default:"No description provided." }}
+        </p>
+
+        <!-- Type + Recurrence -->
+        <div class="mt-4 flex flex-wrap gap-2">
+          <span class="px-2 py-1 rounded-full bg-sky-50 text-sky-700 text-[10px] font-bold border border-sky-200">
+            {{ template.get_template_type_display }}
+          </span>
+
+          {% if template.template_type == "DAILY" %}
+          <span class="px-2 py-1 rounded-full bg-green-50 text-green-700 text-[10px] font-bold border border-green-200">
+            {{ template.get_recurrence_scope_display }}
+          </span>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Action -->
+      <div class="mt-6">
+        <a href="{% url 'ehs:start_submission' template.id %}"
+           class="btn-action w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white shadow-lg shadow-sky-200/50 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 transition-all">
+          <i class="fas fa-play"></i>
+          Start Audit
+        </a>
+      </div>
+
+    </div>
+    {% endfor %}
+
+  </div>
+  {% else %}
+  <!-- Empty State -->
+  <div class="dashboard-card rounded-2xl p-10 text-center">
+    <div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100">
+      <i class="fas fa-folder-open text-2xl text-gray-300"></i>
+    </div>
+    <p class="text-lg font-bold text-gray-700">No Active EHS Forms</p>
+    <p class="text-sm text-gray-400 mt-2">
+      Please contact your EHS administrator.
+    </p>
+  </div>
+  {% endif %}
+
+</div>
+
+{% endblock %}

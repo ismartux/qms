@@ -1,0 +1,133 @@
+{% extends "shell/app.html" %}
+{% block content %}
+
+<h1 class="text-2xl font-bold mb-6">
+  Form Preview – {{ schema.template_name }} (v{{ schema.version }})
+</h1>
+
+<div class="bg-white rounded-xl shadow p-6 space-y-8">
+
+  {% for field in schema.fields %}
+    <div class="space-y-2 border-b pb-6 last:border-b-0 last:pb-0">
+
+      <!-- LABEL ROW -->
+      <div class="flex items-center gap-2">
+        <label class="block text-sm font-semibold text-gray-800">
+          {{ field.label }}
+        </label>
+
+        {% if field.required %}
+          <span class="text-xs px-2 py-0.5 rounded bg-red-100 text-red-600">
+            Required
+          </span>
+        {% endif %}
+
+        {% if field.read_only %}
+          <span class="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">
+            Read only
+          </span>
+        {% endif %}
+      </div>
+
+      <!-- HELP TEXT -->
+      {% if field.help_text %}
+        <p class="text-xs text-gray-500">
+          {{ field.help_text }}
+        </p>
+      {% endif %}
+
+      <!-- DEPENDENCY HINT -->
+      {% if field.dependency %}
+        <p class="text-xs text-blue-600">
+          This field depends on another selection
+        </p>
+      {% endif %}
+
+      <!-- 🔑 STANDARD VALUE RULE HINT -->
+      {% for rule in schema.standard_rules %}
+        {% if rule.target_field_id == field.id %}
+          <div class="mt-2 p-3 rounded bg-yellow-50 border border-yellow-200 text-xs text-yellow-800 space-y-1">
+            <div class="font-semibold">Standard Value Rule</div>
+
+            <div>
+              Value must be
+              <strong>
+                {% if rule.operator == "EQ" %}equal to{% endif %}
+                {% if rule.operator == "LTE" %}less than or equal to{% endif %}
+                {% if rule.operator == "GTE" %}greater than or equal to{% endif %}
+              </strong>
+              standard value
+            </div>
+
+            <div>
+              Source:
+              <strong>
+                {% if rule.value_source == "MANUAL" %}
+                  Manual
+                {% else %}
+                  Bitable ({{ rule.bitable_column_id }})
+                {% endif %}
+              </strong>
+            </div>
+
+            {% if rule.dependency_filters %}
+              <div>
+                Filtered by:
+                {% for dep in rule.dependency_filters %}
+                  <span class="inline-block px-2 py-0.5 bg-yellow-100 rounded mr-1">
+                    {{ dep.field_label|default:"Field" }}
+                  </span>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        {% endif %}
+      {% endfor %}
+
+      <!-- FIELD INPUT -->
+      {% if field.type == "TEXT" %}
+        <input type="text" class="input w-full" {% if field.required %}required{% endif %}>
+
+      {% elif field.type == "NUMBER" %}
+        <input
+          type="number"
+          class="input w-full"
+          {% if field.min is not None %}min="{{ field.min }}"{% endif %}
+          {% if field.max is not None %}max="{{ field.max }}"{% endif %}
+          {% if field.required %}required{% endif %}
+        >
+
+      {% elif field.type == "DROPDOWN" %}
+        <select class="input w-full" {% if field.required %}required{% endif %}>
+          <option value="">— Select —</option>
+          {% for opt in field.options %}
+            <option value="{{ opt }}">{{ opt }}</option>
+          {% empty %}
+            <option disabled>
+              {% if field.dependency %}
+                Select parent field first
+              {% else %}
+                No options available
+              {% endif %}
+            </option>
+          {% endfor %}
+        </select>
+
+      {% elif field.type == "BOOLEAN" %}
+        <select class="input w-full" {% if field.required %}required{% endif %}>
+          <option value="">— Select —</option>
+          <option value="true">Yes</option>
+          <option value="false">No</option>
+        </select>
+
+      {% elif field.type == "IMAGE" %}
+        <input type="file" accept="image/*" class="input w-full">
+
+      {% endif %}
+
+    </div>
+  {% endfor %}
+
+</div>
+
+{% endblock %}

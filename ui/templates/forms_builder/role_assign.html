@@ -1,0 +1,47 @@
+{% extends "shell/app.html" %}
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+    
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900">Assign Roles</h1>
+        <p class="text-gray-500">Configure access for template: <strong class="text-gray-900">{{ template.code }} – {{ template.name }}</strong></p>
+        <div class="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+            <i class="fas fa-info-circle mr-2"></i>
+            Selected roles will determine which users can access and fill this checklist.
+            <br>
+            <span class="text-xs text-blue-700">
+                (Cloned templates inherit roles from the original template.)
+            </span>
+        </div>
+    </div>
+
+    <form method="post" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        {% csrf_token %}
+        
+        <div class="divide-y divide-gray-100">
+            {% for role in available_roles %}
+            <label class="flex items-center justify-between p-4 hover:bg-gray-50 cursor-pointer transition-colors group">
+                <div class="flex items-center">
+                    <input type="checkbox" name="roles" value="{{ role.id }}" {% if role.id in assigned_roles %}checked{% endif %} class="w-5 h-5 text-sky-600 border-gray-300 rounded focus:ring-sky-500 cursor-pointer">
+                    <span class="ml-3 text-gray-900 font-medium">{{ role.name }}</span>
+                </div>
+                <!-- Custom checkbox indicator (Visual only) -->
+                <div class="w-5 h-5 rounded border border-gray-300 flex items-center justify-center group-hover:border-sky-500 transition-colors {% if role.id in assigned_roles %}bg-sky-600 border-sky-600 text-white{% endif %}">
+                    {% if role.id in assigned_roles %}<i class="fas fa-check text-xs"></i>{% endif %}
+                </div>
+            </label>
+            {% endfor %}
+        </div>
+        <a href="{% url 'transs_admin_flow:template_detail' template.id %}"
+            class="mr-4 inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 hover:text-sky-600 transition-colors">
+                ← Back to Template
+            </a>
+
+        <div class="bg-gray-50 px-6 py-4 border-t border-gray-200 text-right">
+            <button class="inline-flex items-center px-6 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                Save & Continue
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

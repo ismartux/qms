@@ -1,0 +1,160 @@
+{% extends "shell/app.html" %}
+{% block content %}
+
+<div class="max-w-4xl mx-auto space-y-6">
+    
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-900">Edit Checklist Item</h1>
+    </div>
+
+    <form method="post" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        {% csrf_token %}
+
+        <div class="p-6 space-y-6">
+            
+            <!-- Basic Details -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Section</label>
+                    <select name="section" class="w-full rounded-lg border-gray-300 bg-white border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500">
+                        {% for sec in sections %}
+                        <option value="{{ sec.id }}" {% if sec.id == item.section.id %}selected{% endif %}>{{ sec.title }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Item ID</label>
+                    <input type="text" name="item_id" class="w-full rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 bg-white font-mono" value="{{ item.item_id }}" required>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Label</label>
+                    <input type="text" name="label" class="w-full rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 bg-white" value="{{ item.label }}" required>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Item Type</label>
+                    <select name="item_type" id="id_item_type" class="w-full rounded-lg border-gray-300 bg-white border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500" onchange="toggleDropdownOptions()" required>
+                        {% for key, label in item.ITEM_TYPES %}
+                        <option value="{{ key }}" {% if key == item.item_type %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Order</label>
+                    <input type="number" name="order" class="w-full rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 bg-white" value="{{ item.order }}" min="1" required>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Severity Weight</label>
+                    <input type="number" name="severity_weight" class="w-full rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 bg-white" value="{{ item.severity_weight }}" min="0" max="10">
+                    <p class="mt-1 text-xs text-gray-500">Contribution to severity score if non-conforming</p>
+                </div>
+
+                <div class="flex items-center h-full pt-6">
+                    <div class="flex items-center">
+                        <input id="requiredCheck" type="checkbox" name="required" class="w-4 h-4 text-sky-600 border-gray-300 rounded focus:ring-sky-500" {% if item.required %}checked{% endif %}>
+                        <label for="requiredCheck" class="ml-2 block text-sm font-medium text-gray-900">Required Item</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dropdown Options (Conditional) -->
+            <div id="dropdownOptions" style="display:none;">
+                <hr class="border-gray-200">
+                <h6 class="text-sm font-bold text-gray-900 mb-3 mt-4 uppercase tracking-wide">Dropdown Options</h6>
+                <div id="optionsContainer" class="space-y-3">
+                    {% if options %}
+                    {% for opt in options %}
+                    <div class="flex gap-3">
+                        <input type="text" name="option_label[]" class="flex-1 rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 bg-white" placeholder="Label" value="{{ opt.label }}">
+                        <input type="text" name="option_value[]" class="flex-1 rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 bg-white" placeholder="Value" value="{{ opt.value }}">
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="flex gap-3">
+                        <input type="text" name="option_label[]" class="flex-1 rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 bg-white" placeholder="Label">
+                        <input type="text" name="option_value[]" class="flex-1 rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 bg-white" placeholder="Value">
+                    </div>
+                    {% endif %}
+                </div>
+                <button type="button" onclick="addOptionRow()" class="mt-3 text-sm font-medium text-sky-600 hover:text-sky-700">
+                    + Add Option
+                </button>
+            </div>
+
+            <!-- Rules -->
+            <hr class="border-gray-200">
+            <h6 class="text-sm font-bold text-gray-900 mb-3 mt-4 uppercase tracking-wide">Rule (Optional)</h6>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Rule Type</label>
+                    <select name="rule_type" class="w-full rounded-lg border-gray-300 bg-white border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500">
+                        <option value="">No Rule</option>
+                        {% for key, label in rule.RULE_TYPES %}
+                        <option value="{{ key }}" {% if rule and key == rule.rule_type %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Condition Value</label>
+                    <input type="text" name="condition_value" class="w-full rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 bg-white" value="{{ rule.condition_value|default:'' }}" placeholder="YES or NO">
+                    <p id="conditionHelp" class="mt-1 text-xs text-gray-500">Depends on item type (e.g. YES/NO, DAMAGED, &lt;5, NG)</p>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t border-gray-200">
+            <a href="{% url 'transs_admin_flow:manage_items' item.section.id %}" class="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500">
+                Cancel
+            </a>
+            <button type="submit" class="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                Update Item
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+function updateConditionHelp() {
+  const type = document.getElementById("id_item_type").value;
+
+  const booleanSelect = document.getElementById("condition_value_boolean");
+  const genericInput = document.getElementById("condition_value_generic");
+  const help = document.getElementById("conditionHelp");
+
+  if (type === "BOOLEAN") {
+    booleanSelect.classList.remove("hidden");
+    genericInput.classList.add("hidden");
+    genericInput.value = "";
+    help.textContent = "Rules can target YES or NO only (NA is ignored)";
+  } else {
+    booleanSelect.classList.add("hidden");
+    genericInput.classList.remove("hidden");
+    booleanSelect.value = "";
+    
+    const messages = {
+      "TEXT": "Exact match (e.g. DAMAGED)",
+      "NUMBER": "Use comparisons (e.g. <5, >=10)",
+      "DROPDOWN": "Use option value (e.g. NG)",
+      "PHOTO": "Usually leave empty"
+    };
+
+    help.textContent = messages[type] || "Condition depends on item type";
+  }
+}
+
+
+// hook into existing logic
+document.getElementById("id_item_type").addEventListener(
+  "change",
+  updateConditionHelp
+);
+
+// initialize on load
+document.addEventListener("DOMContentLoaded", updateConditionHelp);
+</script>
+{% endblock %}

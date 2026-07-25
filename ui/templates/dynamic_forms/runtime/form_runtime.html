@@ -1,0 +1,219 @@
+{% extends "shell/app.html" %}
+{% load static %}
+{% load dynamic_form_extras %}
+{% block content %}
+
+<div class="max-w-5xl mx-auto space-y-6">
+
+  <h1 class="text-2xl font-bold">{{ template.name }}</h1>
+
+  <form id="dynamic-form"
+        method="post"
+        action="{% url 'dynamic_forms:form_save' submission.submission_id %}">
+    {% csrf_token %}
+
+    {% for field in schema.fields %}
+      <div class="mb-4"
+           data-field-wrapper
+           data-field-id="{{ field.id }}"
+           {% if field.dependency %}
+             data-depends-on="{{ field.dependency.depends_on }}"
+           {% endif %}
+      >
+
+        <label class="block font-medium">
+          {{ field.label }}
+          {% if field.required %}
+            <span class="text-red-500">*</span>
+          {% endif %}
+        </label>
+
+        {# ---------------- TEXT ---------------- #}
+        {% if field.type == "TEXT" %}
+          <input type="text"
+                 name="field_{{ field.id }}"
+                 value="{{ responses|get_item:field.id }}"
+                 class="w-full border rounded p-2">
+
+        {# ---------------- NUMBER ---------------- #}
+        {% elif field.type == "NUMBER" %}
+          <input type="number"
+                 name="field_{{ field.id }}"
+                 value="{{ responses|get_item:field.id }}"
+                 min="{{ field.min }}"
+                 max="{{ field.max }}"
+                 class="w-full border rounded p-2">
+
+        {# ---------------- DROPDOWN ---------------- #}
+        {% elif field.type == "DROPDOWN" %}
+          <select name="field_{{ field.id }}"
+                  class="w-full border rounded p-2"
+                  data-dropdown>
+            <option value="">Select</option>
+            {% for opt in field.options %}
+              <option value="{{ opt }}"
+                {% if responses|get_item:field.id == opt %}
+                  selected
+                {% endif %}
+              >{{ opt }}</option>
+            {% endfor %}
+          </select>
+
+        {# ---------------- BOOLEAN ---------------- #}
+        {% elif field.type == "BOOLEAN" %}
+          <select name="field_{{ field.id }}"
+                  class="w-full border rounded p-2">
+            <option value="">Select</option>
+            <option value="YES"
+              {% if responses|get_item:field.id == "YES" %}selected{% endif %}
+            >Yes</option>
+            <option value="NO"
+              {% if responses|get_item:field.id == "NO" %}selected{% endif %}
+            >No</option>
+          </select>
+
+        {% endif %}
+
+        {% if field.help_text %}
+          <p class="text-xs text-gray-500">{{ field.help_text }}</p>
+        {% endif %}
+
+        {# 🔥 STANDARD RULE RESULT PLACEHOLDER #}
+        <p class="text-xs mt-1 text-red-600 hidden"
+           data-standard-error>
+        </p>
+      </div>
+    {% endfor %}
+
+    <div class="flex gap-3 mt-6">
+      <button class="btn-secondary" type="submit">
+        Save Draft
+      </button>
+    </div>
+  </form>
+
+  <form method="post"
+        action="{% url 'dynamic_forms:form_submit' submission.submission_id %}">
+    {% csrf_token %}
+    <button class="btn-primary mt-4">
+      Submit
+    </button>
+  </form>
+
+</div>
+
+{# ===================================================== #}
+{# 🔥 DEPENDENCY + STANDARD VALUE JS (MINIMAL & CLEAN) #}
+{# ===================================================== #}
+
+<script>
+(function () {
+
+  const csrfToken = document.querySelector(
+    'input[name="csrfmiddlewaretoken"]'
+  ).value;
+
+  function collectResponses() {
+    const data = {};
+    document.querySelectorAll('[data-field-wrapper]').forEach(w => {
+      const fieldId = w.dataset.fieldId;
+      const input = w.querySelector('input, select');
+      if (input && input.value !== "") {
+        data[fieldId] = input.value;
+      }
+    });
+    return data;
+  }
+
+  function updateDropdown(fieldWrapper) {
+    const fieldId = fieldWrapper.dataset.fieldId;
+    const responses = collectResponses();
+
+    fetch("{% url 'dynamic_forms:resolve_field_dependency' template.id %}", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": csrfToken,
+      },
+      body: JSON.stringify({
+        field_id: fieldId,
+        mode: "dropdown",
+        responses: responses,
+      }),
+    })
+    .then(r => r.json())
+    .then(data => {
+      const select = fieldWrapper.querySelector("select");
+      if (!select) return;
+
+      select.innerHTML = '<option value="">Select</option>';
+      data.options.forEach(opt => {
+        const o = document.createElement("option");
+        o.value = opt;
+        o.textContent = opt;
+        select.appendChild(o);
+      });
+    });
+  }
+
+  function evaluateStandardRules() {
+    const responses = collectResponses();
+
+    fetch("{% url 'dynamic_forms:resolve_field_dependency' template.id %}", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": csrfToken,
+      },
+      body: JSON.stringify({
+        mode: "standard",
+        responses: responses,
+      }),
+    })
+    .then(r => r.json())
+    .then(data => {
+      document
+        .querySelectorAll('[data-standard-error]')
+        .forEach(el => el.classList.add("hidden"));
+
+      (data.results || []).forEach(r => {
+        if (!r.passed) {
+          const wrapper = document.querySelector(
+            `[data-field-id="${r.field_id}"]`
+          );
+          if (!wrapper) return;
+
+          const error = wrapper.querySelector('[data-standard-error]');
+          if (!error) return;
+
+          error.textContent =
+            `Value ${r.actual} must be ${r.operator} ${r.standard}`;
+          error.classList.remove("hidden");
+        }
+      });
+    });
+  }
+
+  // --------------------------------------------------
+  // LISTENERS
+  // --------------------------------------------------
+  document
+    .querySelectorAll('[data-dropdown], input, select')
+    .forEach(el => {
+      el.addEventListener("change", () => {
+        document
+          .querySelectorAll('[data-depends-on]')
+          .forEach(w => {
+            if (w.dataset.dependsOn === el.name.replace("field_", "")) {
+              updateDropdown(w);
+            }
+          });
+
+        evaluateStandardRules();
+      });
+    });
+
+})();
+</script>
+
+{% endblock %}

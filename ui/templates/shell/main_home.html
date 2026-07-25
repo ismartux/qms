@@ -1,0 +1,317 @@
+{% extends "shell/app.html" %}
+{% block title %}Home{% endblock %}
+
+{% block content %}
+
+<div class="max-w-7xl mx-auto space-y-12 pb-12">
+
+  <!-- ===================================================== -->
+  <!-- ================= HERO WELCOME ======================= -->
+  <!-- ===================================================== -->
+
+  <div class="bg-gradient-to-r from-sky-600 to-indigo-600 rounded-3xl p-8 md:p-12 text-white shadow-xl">
+
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
+
+      <div>
+        <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight">
+          Welcome back, {{ request.user.get_full_name|default:request.user.username }} 👋
+        </h1>
+
+        <p class="mt-4 text-white/90 max-w-2xl text-sm md:text-base leading-relaxed">
+          TranssFlow is your centralized manufacturing control platform —
+          managing inspections, safety audits, corrective actions and operational insights
+          across your plant ecosystem.
+        </p>
+
+        <div class="mt-6 flex flex-wrap gap-3">
+          <span class="px-4 py-2 bg-white/20 rounded-full text-xs font-semibold backdrop-blur">
+            Real-time Monitoring
+          </span>
+          <span class="px-4 py-2 bg-white/20 rounded-full text-xs font-semibold backdrop-blur">
+            Compliance Driven
+          </span>
+          <span class="px-4 py-2 bg-white/20 rounded-full text-xs font-semibold backdrop-blur">
+            Multi-Role Workflow
+          </span>
+        </div>
+      </div>
+
+      <div class="hidden md:block text-right">
+        <div class="text-sm text-white/80">Logged in as</div>
+        <div class="text-lg font-bold">
+          {% if request.user.is_superuser %}
+            Platform Superuser
+          {% elif can_manage_ehs_templates %}
+            EHS Administrator
+          {% elif can_fill_ehs_forms %}
+            EHS Auditor
+          {% elif can_view_analytics %}
+            Quality Analyst
+          {% elif is_operator %}
+            Line Operator
+          {% else %}
+            User
+          {% endif %}
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+
+
+  <!-- ===================================================== -->
+  <!-- ================= QUALITY SECTION ==================== -->
+  <!-- ===================================================== -->
+
+  {% if is_operator or can_view_analytics or can_manage_capa %}
+
+  <div>
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-2xl font-bold text-gray-900">
+        Quality Management
+      </h2>
+      <span class="text-xs font-bold bg-sky-100 text-sky-700 px-3 py-1 rounded-full">
+        IPQC
+      </span>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+
+      {% if is_operator %}
+      <a href="{% url 'ui:forms_list' %}"
+         class="group bg-white rounded-2xl border p-6 hover:shadow-xl transition duration-300">
+
+        <div class="flex items-center justify-between mb-4">
+          <div class="text-sky-600 text-2xl">
+            <i class="fas fa-clipboard-check"></i>
+          </div>
+          <div class="text-xs text-gray-400 font-semibold">
+            ACTION
+          </div>
+        </div>
+
+        <h3 class="font-bold text-lg text-gray-900 group-hover:text-sky-600 transition">
+          IPQC Inspections
+        </h3>
+
+        <p class="text-sm text-gray-500 mt-2">
+          Execute and submit production line inspection forms.
+        </p>
+      </a>
+      {% endif %}
+
+
+      {% if can_view_analytics %}
+      <a href="{% url 'ui:ipqc_dashboard' %}"
+         class="group bg-white rounded-2xl border p-6 hover:shadow-xl transition duration-300">
+
+        <div class="flex items-center justify-between mb-4">
+          <div class="text-indigo-600 text-2xl">
+            <i class="fas fa-chart-line"></i>
+          </div>
+          <div class="text-xs text-gray-400 font-semibold">
+            INSIGHT
+          </div>
+        </div>
+
+        <h3 class="font-bold text-lg text-gray-900 group-hover:text-indigo-600 transition">
+          Analytics Dashboard
+        </h3>
+
+        <p class="text-sm text-gray-500 mt-2">
+          Monitor plant performance, risk trends and inspection KPIs.
+        </p>
+      </a>
+      {% endif %}
+
+
+      {% if can_manage_capa %}
+      <a href="{% url 'capa:capa_list_view' %}"
+         class="group bg-white rounded-2xl border p-6 hover:shadow-xl transition duration-300">
+
+        <div class="flex items-center justify-between mb-4">
+          <div class="text-amber-600 text-2xl">
+            <i class="fas fa-exclamation-triangle"></i>
+          </div>
+          <div class="text-xs text-gray-400 font-semibold">
+            CONTROL
+          </div>
+        </div>
+
+        <h3 class="font-bold text-lg text-gray-900 group-hover:text-amber-600 transition">
+          CAPA Management
+        </h3>
+
+        <p class="text-sm text-gray-500 mt-2">
+          Track corrective and preventive actions across operations.
+        </p>
+      </a>
+      {% endif %}
+
+    </div>
+  </div>
+
+  {% endif %}
+
+
+
+  <!-- ===================================================== -->
+  <!-- ================= EHS SECTION ======================== -->
+  <!-- ===================================================== -->
+
+  {% if can_fill_ehs_forms or can_manage_ehs_templates or can_view_ehs_reports %}
+
+  <div>
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-2xl font-bold text-gray-900">
+        Environment • Health • Safety
+      </h2>
+      <span class="text-xs font-bold bg-rose-100 text-rose-700 px-3 py-1 rounded-full">
+        EHS
+      </span>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+
+      {% if can_fill_ehs_forms %}
+      <a href="{% url 'ehs:ehs_home' %}"
+         class="group bg-white rounded-2xl border p-6 hover:shadow-xl transition duration-300">
+
+        <div class="flex items-center justify-between mb-4">
+          <div class="text-rose-600 text-2xl">
+            <i class="fas fa-hard-hat"></i>
+          </div>
+          <div class="text-xs text-gray-400 font-semibold">
+            FIELD
+          </div>
+        </div>
+
+        <h3 class="font-bold text-lg text-gray-900 group-hover:text-rose-600 transition">
+          EHS Home
+        </h3>
+
+        <p class="text-sm text-gray-500 mt-2">
+          Perform safety audits and compliance inspections.
+        </p>
+      </a>
+      {% endif %}
+
+
+      {% if can_view_ehs_reports %}
+      <a href="{% url 'ehs:ehs_admin_submission_list' %}"
+         class="group bg-white rounded-2xl border p-6 hover:shadow-xl transition duration-300">
+
+        <div class="flex items-center justify-between mb-4">
+          <div class="text-purple-600 text-2xl">
+            <i class="fas fa-file-alt"></i>
+          </div>
+          <div class="text-xs text-gray-400 font-semibold">
+            REVIEW
+          </div>
+        </div>
+
+        <h3 class="font-bold text-lg text-gray-900 group-hover:text-purple-600 transition">
+          EHS Reports
+        </h3>
+
+        <p class="text-sm text-gray-500 mt-2">
+          Review and analyze plant-wide safety submissions.
+        </p>
+      </a>
+      {% endif %}
+
+
+      {% if can_manage_ehs_templates %}
+      <a href="{% url 'ehs_builder:template_list' %}"
+         class="group bg-white rounded-2xl border p-6 hover:shadow-xl transition duration-300">
+
+        <div class="flex items-center justify-between mb-4">
+          <div class="text-indigo-600 text-2xl">
+            <i class="fas fa-layer-group"></i>
+          </div>
+          <div class="text-xs text-gray-400 font-semibold">
+            CONFIG
+          </div>
+        </div>
+
+        <h3 class="font-bold text-lg text-gray-900 group-hover:text-indigo-600 transition">
+          EHS Builder
+        </h3>
+
+        <p class="text-sm text-gray-500 mt-2">
+          Manage inspection templates, workflows and safety logic.
+        </p>
+      </a>
+      {% endif %}
+
+    </div>
+  </div>
+
+  {% endif %}
+
+
+
+  <!-- ===================================================== -->
+  <!-- ================= FALLBACK SECTION =================== -->
+  <!-- ===================================================== -->
+
+  {% if not is_operator and not can_view_analytics and not can_manage_capa and not can_fill_ehs_forms and not can_manage_ehs_templates and not can_view_ehs_reports and not request.user.is_superuser %}
+
+  <div class="bg-yellow-50 border border-yellow-200 rounded-2xl p-8 text-center">
+
+    <div class="text-4xl text-yellow-500 mb-4">
+      <i class="fas fa-user-lock"></i>
+    </div>
+
+    <h3 class="text-xl font-bold text-yellow-700">
+      No Role Access Configured
+    </h3>
+
+    <p class="text-sm text-yellow-600 mt-3 max-w-xl mx-auto">
+      Your account is authenticated but no operational role has been assigned.
+      Please contact your system administrator to enable Quality or EHS access.
+    </p>
+
+  </div>
+
+  {% endif %}
+
+
+
+  <!-- ===================================================== -->
+  <!-- ================= SUPERUSER PANEL ==================== -->
+  <!-- ===================================================== -->
+
+  {% if request.user.is_superuser %}
+
+  <div>
+    <h2 class="text-xl font-bold text-red-600 mb-4">
+      Platform Administration
+    </h2>
+
+    <a href="{% url 'admin_panel:admin_dashboard' %}"
+       class="bg-red-50 p-6 rounded-2xl border border-red-200 hover:shadow-xl transition block">
+
+      <div class="flex items-center gap-4">
+        <i class="fas fa-shield-alt text-red-600 text-2xl"></i>
+
+        <div>
+          <h3 class="font-bold text-lg text-red-700">
+            Admin Control Center
+          </h3>
+          <p class="text-sm text-red-600 mt-1">
+            Manage system users, permissions, workflows and reports.
+          </p>
+        </div>
+      </div>
+
+    </a>
+  </div>
+
+  {% endif %}
+
+</div>
+
+{% endblock %}

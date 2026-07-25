@@ -1,0 +1,64 @@
+source /home/mrsingh29/.virtualenvs/transsflow/bin/activate
+
+
+from submissions.models import Submission
+from django.db.models import Count
+
+Submission.objects.values("public_approval_token") \
+    .annotate(c=Count("submission_id")) \
+    .filter(c__gt=1)
+
+
+
+
+from django.db.models import Count
+
+dupes = (
+    Submission.objects
+    .values("public_approval_token")
+    .annotate(c=Count("submission_id"))
+    .filter(c__gt=1, public_approval_token__isnull=False)
+)
+
+for d in dupes:
+    qs = Submission.objects.filter(
+        public_approval_token=d["public_approval_token"]
+    )
+    qs.exclude(submission_id=qs.first().submission_id) \
+      .update(public_approval_token=None)
+
+
+from django.db.models import Count
+
+dupes = (
+    Submission.objects
+    .values("public_approval_token")
+    .annotate(c=Count("submission_id"))
+    .filter(c__gt=1, public_approval_token__isnull=False)
+)
+
+for d in dupes:
+    qs = Submission.objects.filter(
+        public_approval_token=d["public_approval_token"]
+    )
+    qs.exclude(submission_id=qs.first().submission_id) \
+      .update(public_approval_token=None)
+
+
+
+
+from submissions.models import Submission
+import uuid
+
+seen = set()
+
+for s in Submission.objects.exclude(public_approval_token__isnull=True):
+    token = s.public_approval_token
+
+    if not token or token in seen:
+        s.public_approval_token = uuid.uuid4()
+        s.save(update_fields=["public_approval_token"])
+
+    seen.add(s.public_approval_token)
+
+print("✅ UUID tokens fixed")

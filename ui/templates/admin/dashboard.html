@@ -1,0 +1,125 @@
+{% extends "shell/app.html" %}
+{% load static %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-8">
+    
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+        <a href="{% url 'admin:index' %}" class="text-sm text-sky-600 hover:text-sky-700 font-medium">
+            <i class="fas fa-external-link-alt mr-1"></i> Django Admin
+        </a>
+    </div>
+
+    <!-- Metrics -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 relative overflow-hidden group">
+            <div class="absolute right-0 top-0 h-full w-1 bg-sky-500 group-hover:bg-sky-600 transition-colors"></div>
+            <div class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Total Users</div>
+            <div class="text-3xl font-extrabold text-gray-900">{{ total_users }}</div>
+            <div class="mt-4 flex items-center text-xs text-green-600 font-medium">
+                <i class="fas fa-arrow-up mr-1"></i> Active Now
+            </div>
+        </div>
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 relative overflow-hidden group">
+            <div class="absolute right-0 top-0 h-full w-1 bg-indigo-500 group-hover:bg-indigo-600 transition-colors"></div>
+            <div class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Plants</div>
+            <div class="text-3xl font-extrabold text-gray-900">{{ total_plants }}</div>
+            <div class="mt-4 flex items-center text-xs text-gray-500 font-medium">
+                Operational
+            </div>
+        </div>
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 relative overflow-hidden group">
+            <div class="absolute right-0 top-0 h-full w-1 bg-emerald-500 group-hover:bg-emerald-600 transition-colors"></div>
+            <div class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Submissions</div>
+            <div class="text-3xl font-extrabold text-gray-900">{{ total_submissions }}</div>
+            <div class="mt-4 flex items-center text-xs text-green-600 font-medium">
+                <i class="fas fa-arrow-up mr-1"></i> +12% vs last week
+            </div>
+        </div>
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 relative overflow-hidden group">
+            <div class="absolute right-0 top-0 h-full w-1 bg-rose-500 group-hover:bg-rose-600 transition-colors"></div>
+            <div class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Open CAPAs</div>
+            <div class="text-3xl font-extrabold text-gray-900">{{ total_capas }}</div>
+            <div class="mt-4 flex items-center text-xs text-rose-600 font-medium">
+                <i class="fas fa-exclamation-circle mr-1"></i> Attention Needed
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Submissions Chart -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h3 class="text-lg font-bold text-gray-900 mb-6">Submissions by Plant</h3>
+            <div class="relative h-64 w-full">
+                <canvas id="submissionsByPlantChart"></canvas>
+            </div>
+        </div>
+
+        <!-- CAPA Status Chart -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h3 class="text-lg font-bold text-gray-900 mb-6">CAPA Status Distribution</h3>
+            <div class="relative h-64 w-full flex justify-center">
+                <canvas id="capaStatusChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h3 class="text-lg font-bold text-gray-900 mb-6">Recent Activities</h3>
+        {% if recent_activities %}
+        <ul class="divide-y divide-gray-100">
+            {% for activity in recent_activities %}
+            <li class="py-4 flex">
+                <div class="h-10 w-10 rounded-full bg-sky-100 flex-shrink-0 flex items-center justify-center text-sky-600">
+                    <i class="fas fa-{{ activity.icon }}"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-900">{{ activity.title }}</p>
+                    <p class="text-xs text-gray-500">{{ activity.time }}</p>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-center text-gray-500 py-8">No recent activities found.</p>
+        {% endif %}
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  Chart.defaults.font.family = '-apple-system, system-ui, "Segoe UI", Roboto, "Helvetica Neue", "Arial"';
+  
+  // Submissions Chart
+  const plantLabels = JSON.parse("{{ plant_labels|escapejs }}");
+  const plantData = JSON.parse("{{ plant_data|escapejs }}");
+
+  if (plantLabels.length) {
+    new Chart(document.getElementById('submissionsByPlantChart'), {
+      type: 'bar',
+      data: {
+        labels: plantLabels,
+        datasets: [{ label: 'Submissions', data: plantData, backgroundColor: '#6366f1', borderRadius: 6 }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f3f4f6' } }, x: { grid: { display: false } } } }
+    });
+  }
+
+  // CAPA Chart
+  const capaLabels = JSON.parse("{{ capa_labels|escapejs }}");
+  const capaData = JSON.parse("{{ capa_data|escapejs }}");
+
+  if (capaLabels.length) {
+    new Chart(document.getElementById('capaStatusChart'), {
+      type: 'doughnut',
+      data: { labels: capaLabels, datasets: [{ data: capaData, backgroundColor: ['#ef4444', '#f59e0b', '#10b981'], borderWidth: 0 }] },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: 20 } } } }
+    });
+  }
+});
+</script>
+{% endblock %}

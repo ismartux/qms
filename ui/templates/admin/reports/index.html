@@ -1,0 +1,141 @@
+{% extends "shell/app.html" %}
+{% block content %}
+
+<div class="max-w-7xl mx-auto space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Reports Center</h1>
+            <p class="text-sm text-gray-500">Generate and export data insights.</p>
+        </div>
+    </div>
+
+    <!-- Generator Card -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="p-6 md:p-8">
+            <form id="reportForm" class="space-y-6">
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Report Type -->
+                    <div class="space-y-2">
+                        <label for="reportType" class="block text-sm font-medium text-gray-700">Report Type</label>
+                        <div class="relative">
+                            <select id="reportType" name="reportType" class="block w-full pl-3 pr-10 py-2.5 text-base border-gray-300 bg-gray-50 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm rounded-lg border">
+                                <option value="submissions">Submissions Report</option>
+                                <option value="capas">CAPAs Report</option>
+                                <option value="nc_items">Non-Conformance Items</option>
+                                <option value="severity">Severity Analysis</option>
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                                <i class="fas fa-chevron-down text-xs"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Plant -->
+                    <div class="space-y-2">
+                        <label for="plant" class="block text-sm font-medium text-gray-700">Plant</label>
+                        <div class="relative">
+                            <select id="plant" name="plant" class="block w-full pl-3 pr-10 py-2.5 text-base border-gray-300 bg-gray-50 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm rounded-lg border">
+                                <option value="">All Plants</option>
+                                {% for plant in plants %}
+                                <option value="{{ plant.id }}">{{ plant.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Date Range -->
+                    <div class="space-y-2">
+                        <label for="dateRange" class="block text-sm font-medium text-gray-700">Date Range</label>
+                        <div class="relative">
+                            <select id="dateRange" name="dateRange" class="block w-full pl-3 pr-10 py-2.5 text-base border-gray-300 bg-gray-50 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm rounded-lg border">
+                                <option value="today">Today</option>
+                                <option value="week">This Week</option>
+                                <option value="month" selected>This Month</option>
+                                <option value="quarter">This Quarter</option>
+                                <option value="year">This Year</option>
+                                <option value="custom">Custom Range</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Custom Date Range (Hidden by default) -->
+                <div id="customDateRange" class="hidden grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <div>
+                        <label for="startDate" class="block text-sm font-medium text-gray-700">Start Date</label>
+                        <input type="date" id="startDate" name="startDate" class="mt-1 block w-full border-gray-300 bg-white rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm border py-2 px-3">
+                    </div>
+                    <div>
+                        <label for="endDate" class="block text-sm font-medium text-gray-700">End Date</label>
+                        <input type="date" id="endDate" name="endDate" class="mt-1 block w-full border-gray-300 bg-white rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm border py-2 px-3">
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end pt-4 border-t border-gray-100">
+                    <button type="submit" class="inline-flex items-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors">
+                        <i class="fas fa-magic mr-2"></i> Generate Report
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Preview Area -->
+    <div id="reportPreview" class="hidden">
+        <div class="flex justify-end mb-2 space-x-2 no-print">
+            <button id="downloadReport" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors">
+                <i class="fas fa-download mr-2"></i> Download
+            </button>
+            <button id="printReport" class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors">
+                <i class="fas fa-print mr-2"></i> Print
+            </button>
+        </div>
+        <div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-[500px]">
+            <div id="reportContent" class="p-6"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+  document.getElementById('dateRange').addEventListener('change', function() {
+      const custom = document.getElementById('customDateRange');
+      custom.classList.toggle('hidden', this.value !== 'custom');
+  });
+
+  document.getElementById('reportForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const btn = this.querySelector('button[type="submit"]');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Generating...';
+      btn.disabled = true;
+
+      const formData = new FormData(this);
+      const params = new URLSearchParams(formData).toString();
+
+      fetch(`/admin/reports/generate/?${params}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('reportContent').innerHTML = data.html;
+                document.getElementById('reportPreview').classList.remove('hidden');
+                document.getElementById('reportPreview').scrollIntoView({ behavior: 'smooth' });
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .finally(() => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        });
+  });
+
+  document.getElementById('downloadReport').addEventListener('click', function() {
+      window.print(); // Simplified for this demo
+  });
+  document.getElementById('printReport').addEventListener('click', function() {
+      window.print();
+  });
+</script>
+{% endblock %}

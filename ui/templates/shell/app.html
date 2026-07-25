@@ -1,0 +1,213 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<!-- Viewport + safe-area for notches -->
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+	<title>TranssFlow - Manufacturing Control</title>
+	<!-- PWA / Mobile meta -->
+	<link rel="manifest" href="/manifest.json">
+	<meta name="theme-color" content="#0ea5e9" />
+	<meta name="mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+	<link rel="apple-touch-icon" href="{% static 'icons/apple-touch-icon.png' %}">
+	<!-- Microsoft Tiles -->
+	<meta name="msapplication-TileColor" content="#0ea5e9">
+	<meta name="msapplication-config" content="{% static 'browserconfig.xml' %}">
+	<!-- Favicon -->
+	<link rel="icon" type="image/png" href="{% static 'screenshots/favicon.png' %}">
+	<!-- Tailwind (CDN) -->
+	<script src="https://cdn.tailwindcss.com"></script>
+	<!-- FontAwesome -->
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+	<!-- Select2 CSS (Kept for functionality, styled via custom CSS if needed) -->
+	<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+	<link rel="stylesheet" href="{% static 'css/app.css' %}">
+	{% block extra_css %}{% endblock %}
+
+	<script>
+		window.APP_CONFIG = {
+			serviceWorkerUrl: "{% url 'service_worker' %}"
+		};
+	</script>
+</head>
+
+<body>
+	<!-- PWA Loading Screen -->
+	<div class="pwa-loading" id="pwaLoading">
+		<div class="pwa-logo">
+			<i class="fas fa-industry text-white text-3xl"></i>
+		</div>
+		<div class="text-xl font-bold text-gray-800">Transs Flow</div>
+		<div class="text-sm text-gray-600 mt-2">Loading...</div>
+	</div>
+	<!-- Header -->
+	<header class="header bg-white shadow no-print">
+		<div class="px-4 py-2 flex items-center justify-between relative max-w-[1300px] mx-auto w-full">
+
+			{# LEFT + CENTER #}
+			{% include "partials/header_base.html" %}
+
+
+			{# USER DROPDOWN #}
+			{% include "partials/header_user_menu.html" %}
+
+		</div>
+	</header>
+	<!-- App Shell -->
+	<div class="app-shell">
+		<div class="app-container w-full">
+
+			<!-- ================= SIDEBAR ================= -->
+			<aside id="sidebar" class="sidebar no-print" aria-hidden="false">
+				<div class="p-4 flex flex-col h-full">
+					<nav class="space-y-1 flex-1" aria-label="Primary">
+
+						{% with request.resolver_match.app_name as current_app %}
+						{% with request.resolver_match.url_name as current_url %}
+
+						{# ===================================================== #}
+						{# =============== ADMIN PANEL MODE ==================== #}
+						{# ===================================================== #}
+
+						{% if is_admin_panel and has_admin_access %}
+
+						{# Home still visible #}
+						<a href="{% url 'ui:main_home' %}"
+							class="nav-item {% if current_url == 'main_home' %}active{% endif %}"
+							data-tooltip="Home">
+							<i class="fas fa-home"></i>
+							<span class="nav-text">Home</span>
+						</a>
+
+						{% include "partials/sidebar_admin.html" %}
+
+						{% else %}
+
+						{# ===================================================== #}
+						{# ================= NORMAL MODE ======================= #}
+						{# ===================================================== #}
+
+						<a href="{% url 'ui:main_home' %}"
+							class="nav-item {% if current_url == 'main_home' %}active{% endif %}" data-tooltip="Home">
+							<i class="fas fa-home"></i>
+							<span class="nav-text">Home</span>
+						</a>
+
+						{% if can_view_submissions or is_admin %}
+						<a href="{% url 'ui:submission_list' %}"
+							class="nav-item {% if current_url == 'submission_list_view' %}active{% endif %}" data-tooltip="IPQC Submissions">
+							<i class="fas fa-clipboard-list"></i>
+							<span class="nav-text">Submissions</span>
+						</a>
+						{% endif %}
+
+						{% if can_manage_ehs_templates or is_admin %}
+						<a href="{% url 'ehs:ehs_admin_submission_list' %}"
+							class="nav-item {% if current_url == 'ehs_admin_submission_list' %}active{% endif %}" data-tooltip="EHS Submissions">
+							<i class="fas fa-shield-alt"></i>
+							<span class="nav-text">EHS Submissions</span>
+						</a>
+						{% endif %}
+
+						{% include "partials/sidebar_ipqc.html" %}
+						{% include "partials/sidebar_ehs.html" %}
+						{% include "partials/sidebar_approvals.html" %}
+						{% include "partials/sidebar_capa.html" %}
+
+						{# 🔥 THIS WAS MISSING #}
+						{% if has_admin_access %}
+						<a href="{% url 'admin_panel:admin_dashboard' %}"
+							class="nav-item {% if current_app == 'admin_panel' %}active{% endif %}">
+							<i class="fas fa-shield-alt"></i>
+							<span class="nav-text">Admin Panel</span>
+						</a>
+						{% endif %}
+
+						{% endif %}
+
+						{% endwith %}
+						{% endwith %}
+
+					</nav>
+
+					<!-- ================= USER FOOTER ================= -->
+					<div class="mt-8 pt-4 border-t">
+
+						<div class="sidebar-user"
+							data-tooltip="{{ request.user.username }} ({{ is_admin|yesno:'Admin,User' }})">
+
+							<!-- Avatar -->
+							<div class="sidebar-user-avatar">
+								<i class="fas fa-user"></i>
+							</div>
+
+							<!-- Text -->
+							<div class="sidebar-user-text">
+								<div class="text-sm font-bold text-gray-900">
+									{{ request.user.username }}
+								</div>
+								<div class="text-xs text-gray-600">
+									{% if is_admin %}Admin{% else %}User{% endif %}
+								</div>
+							</div>
+
+						</div>
+
+					</div>
+
+					<a href="{% url 'accounts:logout' %}"
+						class="nav-item text-red-600 hover:bg-red-50 hover:border-red-600" data-tooltip="Logout">
+						<i class="fas fa-sign-out-alt"></i>
+						<span class="nav-text">Logout</span>
+					</a>
+				</div>
+
+			</aside>
+
+			<div class="sidebar-overlay"></div>
+
+			<!-- ================= MAIN CONTENT ================= -->
+			<main class="main-content" role="main">
+				<div class="max-w-[1300px] mx-auto w-full px-4 py-6">
+					{% block content %}{% endblock %}
+				</div>
+			</main>
+
+			<!-- ✅ Tooltip portal (outside layout) -->
+			<div id="globalTooltip" class="global-tooltip"></div>
+
+		</div>
+
+		<!-- ================= MOBILE NAV ================= -->
+		{% if can_fill_ehs_forms or can_manage_ehs_templates or can_view_ehs_reports %}
+		{% include "partials/mobile_nav_ehs.html" %}
+		{% elif can_view_analytics or can_manage_capa or is_admin %}
+		{% include "partials/mobile_nav_ipqc.html" %}
+		{% endif %}
+	</div>
+
+	<!-- Update Progress Indicator -->
+	<div class="update-progress fixed top-0 left-0 right-0 h-1 bg-gray-200 z-[9999]" id="updateProgress"
+		style="display: none;">
+		<div class="update-progress-bar h-full bg-sky-500" id="updateProgressBar" style="width: 0%;"></div>
+	</div>
+	<!-- jQuery -->
+	<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+	<!-- Select2 -->
+	<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+	<!-- App JS -->
+	<script src="{% static 'js/config.js' %}"></script>
+	<script src="{% static 'js/app.js' %}"></script>
+	<script src="{% static 'js/sidebar.js' %}"></script>
+	{% block extra_js %}{% endblock %}
+	
+	<div id="modal-root"></div>
+	
+</body>
+
+</html>

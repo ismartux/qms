@@ -1,0 +1,31 @@
+# ======================
+# Python
+# ======================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ======================
+# Django
+# ======================
+db.sqlite3
+media/
+staticfiles/
+
+# ======================
+# Environments
+# ======================
+.env
+.env.*
+venv/
+.venv/
+virtualenv/
+env/
+log/
+
+# ======================
+# OS / Editor
+# ======================
+.DS_Store
+.idea/
+.vscode/

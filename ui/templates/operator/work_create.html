@@ -1,0 +1,431 @@
+{% extends "shell/app.html" %}
+{% load static %}
+{% block title %}Create Work Session{% endblock %}
+{% block content %}
+<style>
+	.search-wrapper {
+		position: relative;
+	}
+
+	.search-input {
+		width: 100%;
+		padding: 12px 16px 12px 44px;
+		border-radius: 12px;
+		border: 1px solid #e5e7eb;
+		background-color: #f9fafb;
+		font-size: 0.95rem;
+		color: #1f2937;
+		transition: all 0.2s ease;
+	}
+
+	.search-input:focus {
+		background-color: #ffffff;
+		border-color: #0ea5e9;
+		box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.1);
+		outline: none;
+	}
+
+	.search-icon {
+		position: absolute;
+		left: 14px;
+		top: 50%;
+		transform: translateY(-50%);
+		color: #9ca3af;
+		pointer-events: none;
+	}
+
+	.search-dropdown {
+		position: absolute;
+		top: 100%;
+		left: 0;
+		right: 0;
+		z-index: 50;
+		background: white;
+		border: 1px solid #e5e7eb;
+		border-radius: 12px;
+		box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+		margin-top: 8px;
+		max-height: 240px;
+		overflow-y: auto;
+		display: none;
+	}
+
+	.search-select.active .search-dropdown {
+		display: block;
+	}
+
+	.search-dropdown li {
+		padding: 10px 16px;
+		font-size: 0.9rem;
+		cursor: pointer;
+	}
+
+	.search-dropdown li:hover {
+		background-color: #f0f9ff;
+		color: #0284c7;
+	}
+
+	select.custom-select {
+		appearance: none;
+		background-position: right 1rem center;
+		background-repeat: no-repeat;
+		background-size: 1.5em 1.5em;
+	}
+</style>
+
+<div class="max-w-7xl mx-auto space-y-8 pb-12">
+	<!-- HEADER -->
+	<div class="flex justify-between items-center">
+		<h1 class="text-3xl font-extrabold text-gray-900">Create Work Session</h1>
+	</div>
+
+	<div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+		<div class="lg:col-span-2">
+			
+			<form method="post" id="workContextForm">
+				{% csrf_token %}
+
+				<div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 relative overflow-hidden">
+					<div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-sky-400 to-blue-500"></div>
+
+					<div class="space-y-8">
+
+						<!-- ROW 1 -->
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+
+							<!-- SHOP -->
+							<div class="search-select search-wrapper relative" id="shop-select">
+								<label class="block text-sm font-bold text-gray-700 mb-2">Shop / Area</label>
+								<input type="hidden" name="shop" required>
+								<div class="relative">
+									<input type="text" class="search-input" placeholder="Search shop..." autocomplete="off">
+									<i class="fas fa-search search-icon"></i>
+								</div>
+								<ul class="search-dropdown">
+									{% for shop in shops %}
+									<li data-value="{{ shop.id }}">{{ shop.name }}</li>
+									{% endfor %}
+								</ul>
+							</div>
+
+
+							<!-- LINE (Filtered by Shop) -->
+							<div class="search-select search-wrapper relative" id="line-select">
+								<label class="block text-sm font-bold text-gray-700 mb-2">Production Line</label>
+								<input type="hidden" name="line" required>
+								<div class="relative">
+									<input type="text" class="search-input" placeholder="Select shop first..." autocomplete="off" disabled>
+									<i class="fas fa-sitemap search-icon"></i>
+								</div>
+								<ul class="search-dropdown">
+									{% for line in lines %}
+									<li data-value="{{ line.id }}" data-shop="{{ line.shop.id }}">
+										{{ line.code }}
+									</li>
+									{% endfor %}
+								</ul>
+							</div>
+
+
+						</div>
+
+						<!-- ROW 2 -->
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+							<!-- BRAND -->
+							<div class="search-select search-wrapper relative" id="brand-select">
+								<label class="block text-sm font-bold text-gray-700 mb-2">Brand</label>
+								<input type="hidden" name="brand" required>
+								<div class="relative">
+									<input type="text" class="search-input" placeholder="Search brand..." autocomplete="off">
+									<i class="fas fa-tag search-icon"></i>
+								</div>
+								<ul class="search-dropdown">
+									{% for brand in brands %}
+									<li data-value="{{ brand }}">{{ brand }}</li>
+									{% endfor %}
+								</ul>
+							</div>
+
+							<!-- PRODUCT -->
+							<div class="search-select search-wrapper relative" id="product-select">
+								<label class="block text-sm font-bold text-gray-700 mb-2">Product / Model</label>
+								<input type="hidden" name="product_id" required>
+								<div class="relative">
+									<input type="text" class="search-input" placeholder="Select brand first..." autocomplete="off" disabled>
+									<i class="fas fa-box search-icon"></i>
+								</div>
+								<ul class="search-dropdown">
+									{% for product in products %}
+									<li data-value="{{ product.id }}" data-brand="{{ product.brand }}">
+										{{ product.name }}
+									</li>
+									{% endfor %}
+								</ul>
+							</div>
+
+						</div>
+						<!-- ROW 3 -->
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+							<div class="search-wrapper">
+								<label class="block text-sm font-bold text-gray-700 mb-2">Variant / Color</label>
+								<div class="relative">
+									<input type="text" name="model_color" class="search-input"
+										placeholder="e.g. Midnight Blue">
+									<i class="fas fa-palette search-icon"></i>
+								</div>
+							</div>
+
+							<!-- Production Date Display -->
+							<div class="search-wrapper">
+								<label class="block text-sm font-bold text-gray-700 mb-2">
+									Production Date (Auto)
+								</label>
+
+								<div class="search-input bg-gray-100 flex items-center gap-2 cursor-not-allowed">
+									<i class="fas fa-calendar-alt text-gray-400"></i>
+									<span class="font-semibold text-gray-700">
+										{{ production_date }}
+									</span>
+								</div>
+
+								<!-- Hidden real value -->
+								<input type="hidden" name="work_date" value="{{ production_date }}">
+							</div>
+						</div>
+
+						<!-- 🔥 ROW 3 AUTO SHIFT & DATE (READ ONLY) -->
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+							<!-- Shift Display -->
+							<div class="search-wrapper">
+								<label class="block text-sm font-bold text-gray-700 mb-2">
+									Shift Type (Auto)
+								</label>
+
+								<div
+									class="search-input bg-gray-100 flex items-center justify-between cursor-not-allowed">
+									<div class="flex items-center gap-2">
+										<i class="fas fa-clock text-gray-400"></i>
+										<span class="font-semibold text-gray-700">
+											{% if auto_shift == "DAY" %}
+											Day Shift (08:00 - 20:00)
+											{% else %}
+											Night Shift (20:00 - 08:00)
+											{% endif %}
+										</span>
+									</div>
+								</div>
+
+								<!-- Hidden real value -->
+								<input type="hidden" name="shift" value="{{ auto_shift }}">
+							</div>
+
+							<!-- Production Date Display -->
+							<div class="search-wrapper">
+								<label class="block text-sm font-bold text-gray-700 mb-2">Process Type</label>
+								<div class="relative">
+									<select name="process_type" class="search-input custom-select">
+										<option value="IPQC">IPQC</option>
+										<option value="OQC">OQC</option>
+										<option value="FQC">FQC</option>
+										<option value="IQC">IQC</option>
+										<option value="GENERIC">Generic Inspection</option>
+									</select>
+									<i class="fas fa-cogs search-icon"></i>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- ACTIONS -->
+				<div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex justify-end gap-3 mt-6">
+					<a href="{% url 'ui:work_context_list' %}"
+						class="px-8 py-3 border border-gray-300 rounded-xl text-gray-600 bg-white hover:bg-gray-50">
+						Cancel
+					</a>
+					<button type="submit"
+						class="px-10 py-3 rounded-xl text-white bg-gradient-to-r from-sky-500 to-blue-600 shadow-lg">
+						Create Session <i class="fas fa-check ml-2"></i>
+					</button>
+				</div>
+
+			</form>
+		</div>
+		<!-- Info Sidebar (Sticky) -->
+		<div class="lg:col-span-1">
+			<div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 lg:sticky lg:top-6">
+				<div class="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
+					<div
+						class="w-10 h-10 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center text-lg border border-amber-100">
+						<i class="fas fa-book-reader"></i>
+					</div>
+					<h3 class="text-lg font-bold text-gray-900">Session Guide</h3>
+				</div>
+				<p class="text-sm text-gray-600 mb-6 leading-relaxed">
+					A Work Session defines the operational context (Who, Where, What, When) for your quality
+					inspections. Accurate selection ensures data traceability.
+				</p>
+				<ul class="space-y-5 mb-6">
+					<li class="flex items-start gap-3 group">
+						<div
+							class="w-8 h-8 rounded-lg bg-sky-50 border border-sky-100 text-sky-600 flex items-center justify-center flex-shrink-0 group-hover:bg-sky-500 group-hover:text-white transition-colors duration-300">
+							<i class="fas fa-industry text-xs"></i>
+						</div>
+						<div>
+							<div class="text-sm font-bold text-gray-900">Shop & Line</div>
+							<div class="text-xs text-gray-500 mt-0.5">Physical location & area code.</div>
+						</div>
+					</li>
+					<li class="flex items-start gap-3 group">
+						<div
+							class="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0 group-hover:bg-indigo-500 group-hover:text-white transition-colors duration-300">
+							<i class="fas fa-box-open text-xs"></i>
+						</div>
+						<div>
+							<div class="text-sm font-bold text-gray-900">Product Model</div>
+							<div class="text-xs text-gray-500 mt-0.5">The specific item being inspected.</div>
+						</div>
+					</li>
+					<li class="flex items-start gap-3 group">
+						<div
+							class="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-500 group-hover:text-white transition-colors duration-300">
+							<i class="fas fa-calendar-check text-xs"></i>
+						</div>
+						<div>
+							<div class="text-sm font-bold text-gray-900">Shift & Date</div>
+							<div class="text-xs text-gray-500 mt-0.5">Temporal reference for record.</div>
+						</div>
+					</li>
+				</ul>
+				<!-- Tip Box -->
+				<div
+					class="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-50 to-white p-4 border border-gray-100">
+					<div
+						class="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-sky-100/50 to-transparent rounded-bl-full">
+					</div>
+					<div class="flex gap-3 relative z-10">
+						<div class="mt-0.5">
+							<i class="fas fa-lightbulb text-sky-500 text-lg"></i>
+						</div>
+						<div>
+							<p class="text-xs text-sky-900 font-semibold mb-1">Pro Tip</p>
+							<p class="text-[11px] text-sky-700/80 leading-relaxed">
+								Use the search bar to quickly find lines and products. Once created, the system will
+								automatically load the relevant checklists.
+							</p>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+    /* ==============================
+       GENERIC SEARCH DROPDOWN
+    ===============================*/
+    document.querySelectorAll(".search-select").forEach(select => {
+        const input = select.querySelector("input[type=text]");
+        const hidden = select.querySelector("input[type=hidden]");
+        const dropdown = select.querySelector(".search-dropdown");
+        const items = dropdown.querySelectorAll("li");
+
+        input.addEventListener("focus", () => {
+            if (!input.disabled) {
+                select.classList.add("active");
+            }
+        });
+
+        input.addEventListener("input", () => {
+            const term = input.value.toLowerCase();
+            items.forEach(item => {
+                item.style.display = item.textContent.toLowerCase().includes(term)
+                    ? "block"
+                    : "none";
+            });
+        });
+
+        items.forEach(item => {
+            item.addEventListener("click", () => {
+                input.value = item.textContent.trim();
+                hidden.value = item.dataset.value;
+                hidden.dispatchEvent(new Event("change", { bubbles: true }));
+                select.classList.remove("active");
+            });
+        });
+    });
+
+    document.addEventListener("click", (e) => {
+        document.querySelectorAll(".search-select").forEach(select => {
+            if (!select.contains(e.target)) {
+                select.classList.remove("active");
+            }
+        });
+    });
+
+
+    /* ==============================
+       SHOP → ENABLE + FILTER LINES
+    ===============================*/
+
+    const shopHidden = document.querySelector("input[name='shop']");
+    const lineSelect = document.getElementById("line-select");
+    const lineInput = lineSelect.querySelector("input[type=text]");
+    const lineHidden = lineSelect.querySelector("input[type=hidden]");
+    const lineItems = lineSelect.querySelectorAll("li");
+
+    shopHidden.addEventListener("change", () => {
+
+        const selectedShop = shopHidden.value;
+
+        // Enable line input
+        lineInput.disabled = false;
+        lineInput.placeholder = "Search line...";
+        lineInput.value = "";
+        lineHidden.value = "";
+
+        lineItems.forEach(item => {
+            const itemShop = item.dataset.shop;
+            item.style.display = itemShop === selectedShop ? "block" : "none";
+        });
+
+    });
+
+
+    /* ==============================
+       BRAND → ENABLE + FILTER PRODUCTS
+    ===============================*/
+
+    const brandHidden = document.querySelector("input[name='brand']");
+    const productSelect = document.getElementById("product-select");
+    const productInput = productSelect.querySelector("input[type=text]");
+    const productHidden = productSelect.querySelector("input[type=hidden]");
+    const productItems = productSelect.querySelectorAll("li");
+
+    brandHidden.addEventListener("change", () => {
+
+        const selectedBrand = brandHidden.value;
+
+        // Enable product input
+        productInput.disabled = false;
+        productInput.placeholder = "Search product...";
+        productInput.value = "";
+        productHidden.value = "";
+
+        productItems.forEach(item => {
+            const itemBrand = item.dataset.brand;
+            item.style.display = itemBrand === selectedBrand ? "block" : "none";
+        });
+
+    });
+
+});
+</script>
+{% endblock %}

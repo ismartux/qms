@@ -1,0 +1,93 @@
+{# ================= HEADER USER MENU ================= #}
+
+<div class="flex items-center gap-3 flex-shrink-0">
+
+  <div class="user-dropdown relative" id="userDropdown">
+
+    <div class="user-dropdown-toggle"
+         onclick="toggleUserDropdown()"
+         role="button"
+         aria-haspopup="true"
+         aria-expanded="false">
+
+      <div
+        class="w-8 h-8 rounded-full bg-sky-100 text-sky-600
+               flex items-center justify-center border-2 border-gray-200">
+        <i class="fas fa-user"></i>
+      </div>
+
+      <div class="hidden md:block">
+        <div class="text-sm font-bold text-gray-900 truncate max-w-[120px]">
+          {{ request.user.username }}
+        </div>
+        <div class="text-xs text-gray-600 font-medium truncate max-w-[120px]">
+          {% if is_admin %}Admin{% else %}Operator{% endif %}
+        </div>
+      </div>
+
+      <i class="fas fa-chevron-down text-xs text-gray-500 transition-transform"
+         id="dropdownArrow"></i>
+    </div>
+
+    <!-- DROPDOWN MENU -->
+    <div class="user-dropdown-menu" role="menu">
+
+      <div class="user-dropdown-header">
+        <div class="flex items-center gap-3">
+          <div
+            class="w-10 h-10 rounded-full bg-sky-100 text-sky-600
+                   flex items-center justify-center">
+            <i class="fas fa-user"></i>
+          </div>
+          <div>
+            <div class="font-semibold text-gray-900">
+              {{ request.user.username }}
+            </div>
+            <div class="text-xs text-gray-600">
+              ID: {{ request.user.id }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Profile -->
+      <a href="#" class="user-dropdown-item">
+        <i class="fas fa-user-circle"></i>
+        <span>My Profile</span>
+      </a>
+
+      <!-- Lark Broadcast -->
+      <a href="{% url 'bitable:bitable_send_lark_broadcast' %}"
+         class="user-dropdown-item text-orange-600 font-semibold">
+        <i class="fas fa-paper-plane"></i>
+        <span>Send Lark Message</span>
+      </a>
+
+      <!-- Notifications -->
+      <a href="{% url 'ehs:ehs_notification_list' %}"
+         class="user-dropdown-item flex justify-between items-center">
+
+        <div class="flex items-center gap-2">
+          <i class="fas fa-bell"></i>
+          <span>Notifications</span>
+        </div>
+
+        {% if ehs_unread_notifications > 0 %}
+        <span class="bg-red-600 text-white text-xs px-2 py-0.5 rounded-full">
+          {{ ehs_unread_notifications }}
+        </span>
+        {% endif %}
+      </a>
+
+      <div class="user-dropdown-divider"></div>
+
+      <a class="user-dropdown-item logout"
+         href="{% url 'accounts:logout' %}">
+        <i class="fas fa-sign-out-alt"></i>
+        <span>Logout</span>
+      </a>
+
+    </div>
+  </div>
+
+</div>

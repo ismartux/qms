@@ -1,0 +1,181 @@
+{% extends "shell/operator.html" %}
+{% block title %}HQ Analytics Dashboard{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+
+  <!-- Header -->
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">Headquarters Analytics</h1>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
+    <div class="bg-white p-5 rounded-xl shadow-sm border">
+      <div class="text-3xl font-extrabold">{{ plant_summary|length }}</div>
+      <div class="text-sm text-gray-500 uppercase mt-1">Total Plants</div>
+    </div>
+
+    <div class="bg-white p-5 rounded-xl shadow-sm border">
+      <div class="text-3xl font-extrabold">
+        {{ plant_summary|sum:"total_submissions" }}
+      </div>
+      <div class="text-sm text-gray-500 uppercase mt-1">Total Inspections</div>
+    </div>
+
+    <div class="bg-white p-5 rounded-xl shadow-sm border">
+      <div class="text-3xl font-extrabold">
+        {{ plant_summary|avg_severity }}
+      </div>
+      <div class="text-sm text-gray-500 uppercase mt-1">Avg Severity</div>
+    </div>
+
+    <div class="bg-white p-5 rounded-xl shadow-sm border">
+      <div class="text-3xl font-extrabold text-red-600">
+        {{ total_ncs }}
+      </div>
+      <div class="text-sm text-gray-500 uppercase mt-1">Total NCs</div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+
+    <div class="bg-white p-6 rounded-xl shadow-sm border">
+      <h3 class="text-lg font-bold mb-4">Inspections by Plant</h3>
+      <canvas id="plantComparisonChart" height="300"></canvas>
+    </div>
+
+    <div class="bg-white p-6 rounded-xl shadow-sm border">
+      <h3 class="text-lg font-bold mb-4">NC Rate by Plant</h3>
+      <canvas id="ncRateChart" height="300"></canvas>
+    </div>
+
+  </div>
+
+  <!-- Tables -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+    <!-- Plant Performance -->
+    <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+      <div class="px-6 py-4 border-b">
+        <h3 class="text-lg font-bold">Plant Performance Summary</h3>
+      </div>
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50 text-xs uppercase">
+          <tr>
+            <th class="px-6 py-3">Plant</th>
+            <th class="px-6 py-3">Inspections</th>
+            <th class="px-6 py-3">NC Count</th>
+            <th class="px-6 py-3">NC Rate</th>
+            <th class="px-6 py-3">Avg Severity</th>
+            <th class="px-6 py-3">CAPAs</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for plant in plant_summary %}
+          <tr class="border-t">
+            <td class="px-6 py-3 font-medium">{{ plant.plant.name }}</td>
+            <td class="px-6 py-3">{{ plant.total_submissions }}</td>
+            <td class="px-6 py-3 text-red-600 font-bold">{{ plant.nc_count }}</td>
+            <td class="px-6 py-3">{{ plant.nc_rate|floatformat:1 }}%</td>
+            <td class="px-6 py-3">{{ plant.avg_severity|floatformat:1 }}</td>
+            <td class="px-6 py-3">{{ plant.total_capas }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Top NC Items -->
+    <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+      <div class="px-6 py-4 border-b">
+        <h3 class="text-lg font-bold">Top Non-Conformance Items</h3>
+      </div>
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50 text-xs uppercase">
+          <tr>
+            <th class="px-6 py-3">Rank</th>
+            <th class="px-6 py-3">Item</th>
+            <th class="px-6 py-3">Plant</th>
+            <th class="px-6 py-3">Count</th>
+            <th class="px-6 py-3">%</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in top_nc_items %}
+          <tr class="border-t">
+            <td class="px-6 py-3">{{ forloop.counter }}</td>
+            <td class="px-6 py-3 font-medium">
+              {{ item.item__label }}
+            </td>
+            <td class="px-6 py-3">
+              {{ item.submission__plant__name }}
+            </td>
+            <td class="px-6 py-3 text-red-600 font-bold">
+              {{ item.count }}
+            </td>
+            <td class="px-6 py-3">
+              {{ item.count|div:total_ncs|mul:100|floatformat:1 }}%
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  const plantData = {{ plant_chart_data|safe }};
+  const ncRateData = {{ nc_rate_chart_data|safe }};
+
+  const commonOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { beginAtZero: true },
+      x: { grid: { display: false } }
+    }
+  };
+
+  new Chart(document.getElementById("plantComparisonChart"), {
+    type: "bar",
+    data: {
+      labels: plantData.labels,
+      datasets: [{
+        label: "Inspections",
+        data: plantData.values,
+        backgroundColor: "#0ea5e9"
+      }]
+    },
+    options: commonOptions
+  });
+
+  new Chart(document.getElementById("ncRateChart"), {
+    type: "line",
+    data: {
+      labels: ncRateData.labels,
+      datasets: [{
+        label: "NC Rate (%)",
+        data: ncRateData.values,
+        borderColor: "#ef4444",
+        backgroundColor: "rgba(239,68,68,0.1)",
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: commonOptions
+  });
+
+});
+</script>
+{% endblock %}

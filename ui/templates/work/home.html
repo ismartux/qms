@@ -1,0 +1,818 @@
+{% extends "shell/app.html" %}
+{% load static %}
+{% block title %}Work Contexts{% endblock %}
+{% block content %}
+<style>
+/* -----------------------------------------------------------
+   MOBILE-FIRST RESET & BASE STYLES
+----------------------------------------------------------- */
+.work-info-list {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 16px;
+    box-sizing: border-box;
+}
+
+/* Header Section */
+.header-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+    flex-direction: column;
+    gap: 16px;
+}
+@media (min-width: 768px) {
+    .header-section {
+        flex-direction: row;
+        align-items: center;
+    }
+}
+.page-title {
+    font-size: 24px;
+    font-weight: 800;
+    color: #111827;
+    margin: 0;
+    line-height: 1.2;
+}
+@media (min-width: 768px) {
+    .page-title { font-size: 28px; }
+}
+.page-subtitle {
+    color: #6b7280;
+    font-size: 14px;
+    margin: 4px 0 0 0;
+}
+.btn-new-record {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-decoration: none;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+    width: 100%; /* Mobile First */
+}
+@media (min-width: 768px) {
+    .btn-new-record {
+        width: auto;
+        font-size: 16px;
+        padding: 12px 24px;
+    }
+}
+.btn-new-record:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+}
+
+/* -----------------------------------------------------------
+   ACTIVE SECTION (GRADIENT BACKGROUND)
+----------------------------------------------------------- */
+.today-section {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 32px;
+    color: white;
+    box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+}
+.today-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.today-title {
+    font-size: 20px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+}
+.today-subtitle {
+    font-size: 13px;
+    opacity: 0.9;
+    margin: 0;
+}
+
+/* -----------------------------------------------------------
+   CARD GRID LAYOUTS (MOBILE FIRST)
+----------------------------------------------------------- */
+.contexts-grid {
+    display: grid;
+    grid-template-columns: 1fr; /* 1 column on mobile */
+    gap: 16px;
+}
+
+@media (min-width: 640px) {
+    .contexts-grid {
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    }
+}
+
+/* -----------------------------------------------------------
+   CARD STYLES
+----------------------------------------------------------- */
+.context-card {
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    position: relative;
+}
+
+/* Card Type 1: Active (White cards on Purple BG) */
+.card-active {
+    background: rgba(255, 255, 255, 0.95);
+    color: #1f2937;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+.card-active:hover {
+    transform: translateY(-3px);
+    background: #ffffff;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+/* Card Type 2: All List (Light Gray cards on White BG) */
+.card-light {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    color: #1f2937;
+}
+.card-light:hover {
+    border-color: #c7d2fe;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    background: #ffffff;
+}
+
+/* Internal Card Structure */
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+.card-line-code {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #4f46e5;
+    line-height: 1;
+}
+.card-light .card-line-code {
+    color: #4338ca;
+}
+
+.card-meta-top {
+    font-size: 0.75rem;
+    color: #6b7280;
+    text-align: right;
+}
+
+.card-product-section {
+    margin-bottom: 12px;
+}
+.card-product-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 4px;
+}
+.card-model-color {
+    display: inline-block;
+    font-size: 0.75rem;
+    background-color: #e5e7eb;
+    color: #374151;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.card-details-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-size: 0.85rem;
+}
+.detail-row {
+    display: flex;
+    flex-direction: column;
+}
+.detail-label {
+    font-size: 0.70rem;
+    text-transform: uppercase;
+    color: #9ca3af;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+.detail-value {
+    color: #374151;
+    font-weight: 600;
+}
+
+.card-actions {
+    margin-top: auto;
+    display: flex;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px dashed #e5e7eb;
+}
+
+/* Badges */
+.badge-active-card {
+    background: #dcfce7;
+    color: #166534;
+    padding: 4px 10px;
+    border-radius: 9999px;
+    font-size: 0.70rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    white-space: nowrap;
+}
+.shift-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 0.70rem;
+    font-weight: 600;
+}
+.shift-day { background-color: #d1fae5; color: #065f46; }
+.shift-night { background-color: #f3f4f6; color: #374151; }
+
+/* Action Buttons (Inside Cards) */
+.btn-card {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+    gap: 6px;
+}
+.btn-use {
+    background: white;
+    color: #374151;
+    border-color: #d1d5db;
+}
+.btn-use:hover {
+    border-color: #3b82f6;
+    color: #2563eb;
+    background-color: #eff6ff;
+}
+
+
+/* -----------------------------------------------------------
+   HISTORICAL / ALL SECTION
+----------------------------------------------------------- */
+.historical-section {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    margin-bottom: 32px;
+}
+@media (min-width: 768px) {
+    .historical-section {
+        padding: 24px;
+    }
+}
+.historical-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.historical-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+}
+.record-count {
+    font-size: 13px;
+    font-weight: 600;
+    color: #6b7280;
+    background: #f3f4f6;
+    padding: 4px 10px;
+    border-radius: 20px;
+}
+
+/* Filters */
+.filters-section {
+    background: #f9fafb;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+    border: 1px solid #e5e7eb;
+}
+.filters-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 12px;
+}
+.filters-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+@media (min-width: 640px) {
+    .filters-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+}
+.filter-group {
+    display: flex;
+    flex-direction: column;
+}
+.filter-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #4b5563;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+}
+.filter-input, .filter-select {
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: all 0.2s;
+    background: white;
+    width: 100%;
+    box-sizing: border-box;
+}
+.filter-input:focus, .filter-select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+/* -----------------------------------------------------------
+   EMPTY STATES
+----------------------------------------------------------- */
+.empty-state {
+    text-align: center;
+    padding: 32px 20px;
+    color: #6b7280;
+}
+.empty-state i {
+    font-size: 40px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+    display: block;
+}
+.empty-state p {
+    margin: 0 0 16px 0;
+    font-size: 15px;
+}
+.empty-state-white {
+    color: #e0e7ff;
+}
+.empty-state-white p {
+    color: rgba(255,255,255,0.9);
+}
+
+/* -----------------------------------------------------------
+   POPUP MODAL
+----------------------------------------------------------- */
+.popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(2px);
+    padding: 16px;
+}
+.popup-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+.popup-content {
+    background: white;
+    border-radius: 16px;
+    max-width: 500px;
+    width: 100%;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    transform: scale(0.95);
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+.popup-overlay.active .popup-content {
+    transform: scale(1);
+}
+.popup-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.popup-title {
+    font-size: 16px;
+    font-weight: 700;
+}
+.popup-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px;
+}
+.popup-body {
+    padding: 20px;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr; /* Mobile first stack */
+    gap: 12px;
+}
+@media (min-width: 480px) {
+    .detail-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+.detail-item {
+    background: #f9fafb;
+    padding: 12px;
+    border-radius: 8px;
+}
+.detail-label {
+    font-size: 11px;
+    color: #6b7280;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+.detail-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1f2937;
+    word-break: break-word;
+}
+</style>
+
+<div class="work-info-list">
+    <!-- Header Section -->
+    <header class="header-section">
+        <div>
+            <h1 class="page-title">Work Contexts</h1>
+            <p class="page-subtitle">Select or manage work sessions to perform quality inspections.</p>
+        </div>
+        <a href="{% url 'ui:work_create' %}" class="btn-new-record">
+            <i class="fas fa-plus"></i> New Context
+        </a>
+    </header>
+
+    <!-- Active Contexts Section (Gradient Background) -->
+    <section class="today-section">
+        <div class="today-header">
+            <div>
+                <h2 class="today-title">
+                    <i class="fas fa-bolt"></i>
+                    Active Work Context
+                </h2>
+                <p class="today-subtitle">Currently selected session for inspection</p>
+            </div>
+        </div>
+        
+        {% if contexts %}
+            {% with sorted_contexts=contexts|dictsort:"is_active"|slice:"::-1" %}
+            {% with latest=sorted_contexts|first %}
+            
+            <!-- Active Cards Grid -->
+            {% if latest and latest.is_active %}
+                <div class="contexts-grid">
+                    {% for c in contexts %}
+                        {% if c.is_active %}
+                        <div class="context-card card-active">
+                            <div class="card-header">
+                                <div>
+                                    <div class="card-line-code">{{ c.line.code }}</div>
+                                    <div class="card-shop-name" style="font-size: 0.85rem; color: #6b7280; margin-top:2px;">{{ c.shop.name|default:"—" }}</div>
+                                </div>
+                                <span class="badge-active-card">
+                                    <i class="fas fa-check-circle mr-1"></i> Active
+                                </span>
+                            </div>
+                            
+                            <div class="card-product-section">
+                                <div class="card-product-name">{{ c.product.name }}</div>
+                                {% if c.model_color %}
+                                <span class="card-model-color">{{ c.model_color }}</span>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="card-details-grid">
+                                <div class="detail-row">
+                                    <span class="detail-label">Date</span>
+                                    <span class="detail-value">{{ c.work_date|date:"M d, Y" }}</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Shift</span>
+                                    <span class="detail-value">
+                                        {% if c.shift == 'DAY' %}
+                                            <span class="shift-badge shift-day">Day</span>
+                                        {% else %}
+                                            <span class="shift-badge shift-night">Night</span>
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                {% if request.user.is_superuser %}
+                                <div class="detail-row" style="grid-column: span 2; padding-top: 8px; border-top: 1px dashed #e5e7eb;">
+                                    <span class="detail-label">User</span>
+                                    <span class="detail-value" style="font-size: 0.8rem;">{{ c.user.username }}</span>
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="card-actions">
+                                <a href="{% url 'ui:forms_list' %}" class="btn-card btn-use">
+                                    <i class="fas fa-clipboard-list"></i> Open Forms
+                                </a>
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            {% else %}
+                <!-- Empty State: No Active Context -->
+                <div class="empty-state empty-state-white">
+                    <i class="fas fa-power-off"></i>
+                    <p>No active work context selected.</p>
+                    <a href="{% url 'ui:work_create' %}" class="btn-new-record" style="padding: 8px 16px; font-size: 13px; width: auto;">
+                        Create Context
+                    </a>
+                </div>
+            {% endif %}
+            
+            {% endwith %}
+            {% endwith %}
+        {% endif %}
+    </section>
+
+    <!-- All Contexts Section (White Background, Card List) -->
+    <main class="historical-section">
+        <div class="historical-header">
+            <h2 class="historical-title">
+                <i class="fas fa-list"></i>
+                All Work Contexts
+            </h2>
+            <span class="record-count">
+                {{ contexts|length }} Records
+            </span>
+        </div>
+
+        
+
+        <!-- All Contexts Grid -->
+        {% if contexts %}
+        <div class="contexts-grid">
+            {% for c in contexts %}
+            <div class="context-card card-light">
+                <div class="card-header">
+                    <div>
+                        <div class="card-line-code">{{ c.line.code }}</div>
+                        <div class="card-meta-top">
+                            {{ c.work_date|date:"M d" }}
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        {% if c.shift == 'DAY' %}
+                            <span class="shift-badge shift-day">Day</span>
+                        {% else %}
+                            <span class="shift-badge shift-night">Night</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="card-product-section">
+                    <div class="card-product-name">{{ c.product.name }}</div>
+                    {% if c.model_color %}
+                    <span class="card-model-color">{{ c.model_color }}</span>
+                    {% endif %}
+                </div>
+
+                <div class="card-details-grid">
+                    <div class="detail-row">
+                        <span class="detail-label">Shop</span>
+                        <span class="detail-value" style="font-size: 0.9rem;">{{ c.shop.name|default:"—" }}</span>
+                    </div>
+                    {% if request.user.is_superuser %}
+                    <div class="detail-row">
+                        <span class="detail-label">User</span>
+                        <span class="detail-value" style="font-size: 0.9rem;">{{ c.user.username }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="card-actions">
+                    {% if c.is_active %}
+                        <a href="{% url 'ui:forms_list' %}" class="btn-card btn-use">
+                            <i class="fas fa-clipboard-list"></i> Open Forms
+                        </a>
+                    {% else %}
+                        <a href="{% url 'ui:work_activate' c.id %}" class="btn-card btn-use">
+                            <i class="fas fa-power-off"></i> Activate
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-clipboard-list"></i>
+            <p>No Work Contexts Found</p>
+            <a href="{% url 'ui:work_create' %}" class="btn-new-record">
+                <i class="fas fa-plus"></i> Create Work Context
+            </a>
+        </div>
+        {% endif %}
+    </main>
+</div>
+
+<!-- Popup Modal -->
+<div class="popup-overlay" id="detailsPopup" onclick="closePopup(event)">
+    <div class="popup-content" onclick="event.stopPropagation()">
+        <div class="popup-header">
+            <h3 class="popup-title">Context Details</h3>
+            <button class="popup-close" onclick="closePopup()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="popup-body" id="popupBody">
+            <div class="text-center py-4 text-gray-500">
+                <i class="fas fa-circle-notch fa-spin fa-2x"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% url 'ui:work_activate' '00000000-0000-0000-0000-000000000000' as workActivateUrl %}
+
+<script>
+/* ============================================================
+   CONTEXT DATA (SERVER → JS)
+============================================================ */
+const contextsData = {
+    {% for c in contexts %}
+    "{{ c.id }}": {
+        id: "{{ c.id }}",
+        line: "{{ c.line.code }}",
+        shop: "{{ c.shop.name|default:'N/A' }}",
+        product: "{{ c.product.name }}",
+        color: "{{ c.model_color|default:'N/A' }}",
+        shift: "{{ c.shift }}",
+        date: "{{ c.work_date|date:'Y-m-d' }}",
+        status: "{{ c.is_active|yesno:'Active,Inactive' }}",
+        {% if request.user.is_superuser %}
+        user: "{{ c.user.username }}",
+        created_by: "{{ c.created_by.username }}",
+        {% endif %}
+        is_active: {{ c.is_active|yesno:"true,false" }}
+    },
+    {% endfor %}
+};
+
+
+/* ============================================================
+   SHOW DETAILS POPUP
+============================================================ */
+function showDetails(contextId) {
+    const popup = document.getElementById("detailsPopup");
+    const popupBody = document.getElementById("popupBody");
+    const data = contextsData[contextId];
+
+    if (!data) return;
+
+    let userHtml = "";
+    if (data.user) {
+        userHtml = `
+            <div class="detail-item">
+                <div class="detail-label">User</div>
+                <div class="detail-value">${data.user}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Created By</div>
+                <div class="detail-value">${data.created_by}</div>
+            </div>
+        `;
+    }
+
+    /* 🔒 Build activate URL safely */
+    const activateUrl = "{{ workActivateUrl }}".replace(
+        "00000000-0000-0000-0000-000000000000",
+        data.id
+    );
+
+    /* 🔘 Disable button if already active */
+    const actionButton = data.is_active
+        ? `<div class="mt-4 text-center text-sm text-gray-500 font-medium">
+             <i class="fas fa-check-circle text-green-500 mr-1"></i>
+             This context is already active
+           </div>`
+        : `<div class="mt-4 text-center">
+             <a href="${activateUrl}"
+                class="btn-card btn-use w-full justify-center"
+                style="padding:12px;">
+               <i class="fas fa-check mr-2"></i> Switch to This Context
+             </a>
+           </div>`;
+
+    popupBody.innerHTML = `
+        <div class="detail-grid">
+            <div class="detail-item">
+                <div class="detail-label">Context ID</div>
+                <div class="detail-value">#${data.id}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Date</div>
+                <div class="detail-value">${data.date}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Shift</div>
+                <div class="detail-value">${data.shift}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Status</div>
+                <div class="detail-value">${data.status}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Line</div>
+                <div class="detail-value">${data.line}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Shop</div>
+                <div class="detail-value">${data.shop}</div>
+            </div>
+            <div class="detail-item" style="grid-column: 1 / -1;">
+                <div class="detail-label">Product</div>
+                <div class="detail-value">${data.product}</div>
+            </div>
+            <div class="detail-item" style="grid-column: 1 / -1;">
+                <div class="detail-label">Model Color</div>
+                <div class="detail-value">${data.color}</div>
+            </div>
+            ${userHtml}
+        </div>
+        ${actionButton}
+    `;
+
+    popup.classList.add("active");
+}
+
+
+/* ============================================================
+   CLOSE POPUP
+============================================================ */
+function closePopup(event) {
+    const popup = document.getElementById("detailsPopup");
+    if (!event || event.target === popup) {
+        popup.classList.remove("active");
+    }
+}
+
+document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") {
+        closePopup();
+    }
+});
+</script>
+{% endblock %}

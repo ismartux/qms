@@ -1,0 +1,34 @@
+{% extends "shell/app.html" %}
+
+{% block title %}Send Lark Message{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto py-8">
+
+    <div class="bg-white shadow rounded-lg p-6 space-y-4">
+
+        <h2 class="text-xl font-bold text-gray-800">
+            Send Message to {{ role }} Group
+        </h2>
+
+        <form method="post">
+            {% csrf_token %}
+
+            <textarea name="message"
+                      rows="6"
+                      class="w-full border rounded p-3"
+                      placeholder="Type your message here..."
+                      required></textarea>
+
+            <div class="flex justify-end">
+                <button type="submit"
+                        class="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600">
+                    Send Message
+                </button>
+            </div>
+        </form>
+
+    </div>
+
+</div>
+{% endblock %}

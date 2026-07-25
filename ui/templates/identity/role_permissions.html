@@ -1,0 +1,30 @@
+{% extends "shell/app.html" %}
+{% block content %}
+
+<h1 class="text-2xl font-bold mb-6">
+  Permissions – {{ role.name }}
+</h1>
+
+<form method="post" class="bg-white rounded-xl shadow p-6 space-y-4">
+  {% csrf_token %}
+
+  <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+    {% for perm in permissions %}
+      <label class="flex items-center gap-3">
+        <input type="checkbox"
+               name="permissions"
+               value="{{ perm.id }}"
+               class="form-checkbox"
+               {% if perm.id in assigned %}checked{% endif %}>
+        <span>{{ perm.name }}</span>
+      </label>
+    {% endfor %}
+  </div>
+
+  <div class="pt-6 flex gap-4">
+    <button class="btn btn-primary">Save</button>
+    <a href="{% url 'identity:permission_list' %}" class="btn btn-secondary">Cancel</a>
+  </div>
+</form>
+
+{% endblock %}

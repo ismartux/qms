@@ -1,0 +1,201 @@
+{% extends "shell/app.html" %}
+{% load dynamic_form_extras %}
+{% block content %}
+
+<div class="flex justify-between items-center mb-6">
+  <h1 class="text-2xl font-bold">{{ template.name }}</h1>
+</div>
+
+<!-- ===================== -->
+<!-- VERSIONS -->
+<!-- ===================== -->
+<div class="bg-white rounded-xl shadow p-6 mb-8">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-lg font-semibold">Versions</h2>
+
+    <a href="{% url 'dynamic_forms_admin:version_create' template.id %}"
+       class="btn-primary">
+      <i class="fas fa-code-branch mr-2"></i>
+      New Version
+    </a>
+  </div>
+
+  <table class="min-w-full text-sm">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="px-4 py-2">Version</th>
+        <th class="px-4 py-2 text-center">Active</th>
+        <th class="px-4 py-2 text-center">Published</th>
+        <th class="px-4 py-2 text-right">Actions</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {% for v in template.versions.all %}
+      <tr class="border-t">
+        <td class="px-4 py-2 font-medium">
+          v{{ v.version_number }}
+        </td>
+
+        <td class="px-4 py-2 text-center">
+          {{ v.is_active|yesno:"Yes,No" }}
+        </td>
+
+        <td class="px-4 py-2 text-center">
+          {{ v.is_published|yesno:"Yes,No" }}
+        </td>
+
+        <td class="px-4 py-2 text-right space-x-3">
+          <a href="{% url 'dynamic_forms_admin:form_builder' v.id %}"
+             class="text-sky-600 hover:underline">
+            Builder
+          </a>
+
+          <a href="{% url 'dynamic_forms_admin:version_edit' v.id %}"
+             class="text-indigo-600 hover:underline">
+            Edit
+          </a>
+
+          {% if not v.is_active and not v.is_published %}
+            <form method="post"
+                  action="{% url 'dynamic_forms_admin:version_delete' v.id %}"
+                  class="inline"
+                  onsubmit="return confirm('Delete this version permanently?');">
+              {% csrf_token %}
+              <button type="submit"
+                      class="text-red-600 hover:underline">
+                Delete
+              </button>
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="4" class="text-center py-6 text-gray-500">
+          No versions yet.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ===================== -->
+<!-- APPROVAL WORKFLOW -->
+<!-- ===================== -->
+<div class="bg-white rounded-xl shadow p-6 mb-8">
+  <h2 class="text-lg font-semibold mb-4">Approval Workflow</h2>
+
+  <p class="text-sm text-gray-500 mb-4">
+    Define the approval sequence for this template.
+    Approvals are executed in order during submission.
+  </p>
+
+  <form method="POST">
+    {% csrf_token %}
+
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-100">
+        <tr>
+          <th class="px-4 py-2 text-center">Enable</th>
+          <th class="px-4 py-2 text-left">Approval Category</th>
+          <th class="px-4 py-2 text-center">Required</th>
+          <th class="px-4 py-2 text-center">Order</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {% for c in categories %}
+        {% with step=steps|get_item:c.id %}
+        <tr class="border-t">
+          <td class="px-4 py-2 text-center">
+            <input type="checkbox"
+                   name="approval_{{ c.id }}"
+                   {% if step %}checked{% endif %}>
+          </td>
+
+          <td class="px-4 py-2 font-medium">
+            {{ c.name }}
+            <div class="text-xs text-gray-500">{{ c.code }}</div>
+          </td>
+
+          <td class="px-4 py-2 text-center">
+            <input type="checkbox"
+                   name="approval_{{ c.id }}_required"
+                   {% if step and step.is_required %}checked{% endif %}>
+          </td>
+
+          <td class="px-4 py-2 text-center text-gray-600">
+            {% if step %}
+              Step {{ step.order }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+        </tr>
+        {% endwith %}
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="mt-6 text-right">
+      <button type="submit" class="btn-primary">
+        Save Approval Flow
+      </button>
+    </div>
+  </form>
+</div>
+
+<!-- ===================== -->
+<!-- ROLE ASSIGNMENT -->
+<!-- ===================== -->
+<div class="bg-white rounded-xl shadow p-6">
+  <h2 class="text-lg font-semibold mb-4">Role Access & Work Context</h2>
+
+  <form method="POST">
+    {% csrf_token %}
+
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-100">
+        <tr>
+          <th class="px-4 py-2 text-left">Role</th>
+          <th class="px-4 py-2 text-center">Assigned</th>
+          <th class="px-4 py-2 text-center">Requires Work Context</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for role in roles %}
+        {% with assignment=assignments|get_item:role.id %}
+        <tr class="border-t">
+          <td class="px-4 py-2 font-medium">
+            {{ role.name }}
+            <div class="text-xs text-gray-500">{{ role.code }}</div>
+          </td>
+
+          <td class="px-4 py-2 text-center">
+            <input type="checkbox"
+                   name="role_{{ role.id }}"
+                   {% if assignment %}checked{% endif %}>
+          </td>
+
+          <td class="px-4 py-2 text-center">
+            <input type="checkbox"
+                   name="role_{{ role.id }}_requires_context"
+                   {% if assignment and assignment.requires_work_context %}checked{% endif %}>
+          </td>
+        </tr>
+        {% endwith %}
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="mt-6 text-right">
+      <button type="submit" class="btn-primary">
+        Save Role Assignments
+      </button>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

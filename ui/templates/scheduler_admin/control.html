@@ -1,0 +1,32 @@
+{% extends "shell/app.html" %}
+{% block content %}
+
+<h1 class="text-2xl font-bold mb-6">Scheduler Control</h1>
+
+<div class="bg-white p-6 rounded-xl shadow border max-w-xl space-y-4">
+
+  <div class="flex justify-between items-center">
+    <span class="font-semibold text-gray-700">Last Scheduler Run</span>
+    <span class="text-gray-600">
+      {{ control.last_run|default:"Never" }}
+    </span>
+  </div>
+
+  <div class="pt-2 text-sm text-gray-500">
+    <p>
+      Scheduler runs automatically when authenticated users interact with the system.
+    </p>
+    <p class="mt-1">
+      Throttle interval: <b>5 minutes</b>
+    </p>
+  </div>
+
+</div>
+
+<div class="mt-6">
+  <a href="{% url 'scheduler_admin:schedule_list' %}" class="btn btn-secondary">
+    ← Back to Schedules
+  </a>
+</div>
+
+{% endblock %}

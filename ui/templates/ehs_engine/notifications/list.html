@@ -1,0 +1,50 @@
+{% extends "shell/app.html" %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto py-6 space-y-4">
+
+    <h2 class="text-xl font-bold">Notifications</h2>
+
+    {% for notification in notifications %}
+
+        <div class="p-4 rounded border
+            {% if not notification.is_read %}
+                bg-yellow-50 border-yellow-300
+            {% else %}
+                bg-white border-gray-200
+            {% endif %}
+        ">
+
+            <div class="flex justify-between">
+                <strong>{{ notification.title }}</strong>
+                <small>{{ notification.created_at|date:"d M Y H:i" }}</small>
+            </div>
+
+            <p class="mt-2 text-sm">
+                {{ notification.message }}
+            </p>
+
+            {% if notification.submission %}
+                <a href="{% url 'ehs:fill_submission' notification.submission.id %}"
+                   class="text-blue-600 text-sm">
+                    View Submission
+                </a>
+            {% endif %}
+
+            {% if not notification.is_read %}
+                <div class="mt-2">
+                    <a href="{% url 'ehs:ehs_mark_notification_read' notification.id %}"
+                       class="text-green-600 text-sm">
+                        Mark as Read
+                    </a>
+                </div>
+            {% endif %}
+
+        </div>
+
+    {% empty %}
+        <p>No notifications.</p>
+    {% endfor %}
+
+</div>
+{% endblock %}

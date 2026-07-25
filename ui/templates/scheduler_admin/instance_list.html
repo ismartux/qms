@@ -1,0 +1,56 @@
+{% extends "shell/app.html" %}
+{% block content %}
+
+<h1 class="text-2xl font-bold mb-6">Scheduled Instances</h1>
+
+<div class="bg-white rounded-xl shadow border overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-slate-50 border-b">
+      <tr>
+        <th class="px-4 py-3 text-left">Template</th>
+        <th class="px-4 py-3 text-left">Expected At</th>
+        <th class="px-4 py-3 text-left">Status</th>
+        <th class="px-4 py-3 text-left">Submission</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for i in instances %}
+      <tr class="border-b hover:bg-slate-50">
+        <td class="px-4 py-3 font-semibold">
+          {{ i.schedule.template.name }}
+        </td>
+
+        <td class="px-4 py-3">
+          {{ i.expected_at }}
+        </td>
+
+        <td class="px-4 py-3">
+          {% if i.is_completed %}
+            <span class="text-green-600 font-semibold">Completed</span>
+          {% else %}
+            <span class="text-yellow-600 font-semibold">Pending</span>
+          {% endif %}
+        </td>
+
+        <td class="px-4 py-3 text-gray-600">
+          {{ i.created_submission_id|default:"—" }}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="4" class="text-center py-10 text-gray-400">
+          No scheduled instances found
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="mt-6">
+  <a href="{% url 'scheduler_admin:schedule_list' %}" class="btn btn-secondary">
+    ← Back to Schedules
+  </a>
+</div>
+
+{% endblock %}

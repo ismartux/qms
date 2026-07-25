@@ -1,0 +1,79 @@
+{% if can_fill_ehs_forms or can_manage_ehs_templates or can_view_ehs_reports %}
+
+<nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-2 z-50 md:hidden no-print">
+
+  <!-- HOME -->
+  <a href="{% url 'ehs:ehs_home' %}"
+     class="flex flex-col items-center
+     {% if current_url == 'ehs_home' %}
+       text-rose-600
+     {% else %}
+       text-gray-600
+     {% endif %}">
+    <i class="fas fa-hard-hat text-lg"></i>
+    <span class="text-xs">Home</span>
+  </a>
+
+
+  <!-- INSPECT (Auditor + Admin) -->
+  {% if can_fill_ehs_forms %}
+  <a href="{% url 'ehs:ehs_daily_template_list' %}"
+     class="flex flex-col items-center
+     {% if current_url in 'ehs_daily_template_list ehs_special_template_list fill_submission' %}
+       text-rose-600
+     {% else %}
+       text-gray-600
+     {% endif %}">
+    <i class="fas fa-clipboard-check text-lg"></i>
+    <span class="text-xs">Inspect</span>
+  </a>
+  {% endif %}
+
+
+  <!-- REPORTS -->
+  {% if can_view_ehs_reports %}
+  <a href="{% url 'ehs:ehs_submission_list' %}"
+     class="flex flex-col items-center
+     {% if current_url in 'ehs_submission_list submission_detail_view' %}
+       text-rose-600
+     {% else %}
+       text-gray-600
+     {% endif %}">
+    <i class="fas fa-file-alt text-lg"></i>
+    <span class="text-xs">Reports</span>
+  </a>
+  {% endif %}
+
+
+  <!-- ADMIN -->
+  {% if can_manage_ehs_templates %}
+  <a href="{% url 'ehs:ehs_admin_submission_list' %}"
+     class="flex flex-col items-center
+     {% if current_url == 'ehs_admin_submission_list' %}
+       text-rose-600
+     {% else %}
+       text-gray-600
+     {% endif %}">
+    <i class="fas fa-chart-line text-lg"></i>
+    <span class="text-xs">Admin</span>
+  </a>
+  {% endif %}
+
+
+  <!-- QR -->
+  {% if can_fill_ehs_forms %}
+  <a href="{% url 'ehs:ehs_qr_scanner' %}"
+     class="flex flex-col items-center
+     {% if current_url == 'ehs_qr_scanner' %}
+       text-rose-600
+     {% else %}
+       text-gray-600
+     {% endif %}">
+    <i class="fas fa-qrcode text-lg"></i>
+    <span class="text-xs">Scan</span>
+  </a>
+  {% endif %}
+
+</nav>
+
+{% endif %}

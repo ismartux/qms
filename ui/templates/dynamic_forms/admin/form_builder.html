@@ -1,0 +1,667 @@
+{% extends "shell/app.html" %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-8">
+
+  <!-- HEADER -->
+  <div class="flex justify-between items-center">
+    <div>
+      <h1 class="text-2xl font-bold">Form Builder – v{{ version.version_number }}</h1>
+      <p class="text-gray-500">Design and configure dynamic form fields</p>
+    </div>
+    <a href="{% url 'dynamic_forms_admin:form_preview' version.id %}" class="btn-secondary">
+      Preview
+    </a>
+  </div>
+
+  <!-- BUILDER -->
+  <div class="bg-white rounded-xl border shadow-sm p-6 space-y-6">
+
+    <!-- EXISTING FIELDS (LOADED FROM DB) -->
+    <div id="fields-container" class="space-y-6"></div>
+
+    <!-- STANDARD RULES -->
+    <div class="border-t pt-6 space-y-4">
+      <div class="flex justify-between items-center">
+        <h2 class="text-lg font-semibold">Standard Value Rules</h2>
+        <button type="button" onclick="addRule()" class="btn-secondary text-sm">
+          ➕ Add Rule
+        </button>
+      </div>
+
+      <div id="rules-container" class="space-y-4"></div>
+    </div>
+
+    <!-- 🔑 NEW FIELDS WILL BE INSERTED HERE -->
+    <div id="fields-insert-anchor"></div>
+
+    <!-- ACTIONS -->
+    <div class="flex justify-between pt-6 border-t">
+      <button type="button" onclick="addField()" class="btn-secondary">
+        ➕ Add Field
+      </button>
+      <button type="button" onclick="saveBuilder()" class="btn-primary">
+        💾 Save Configuration
+      </button>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{{ existing_fields|json_script:"existing-fields" }}
+{{ existing_rules|json_script:"existing-rules" }}
+
+<script>
+/* =====================================================
+   HELPERS
+===================================================== */
+function getCookie(name) {
+  let v = null;
+  document.cookie.split(";").forEach(c => {
+    c = c.trim();
+    if (c.startsWith(name + "=")) v = decodeURIComponent(c.slice(name.length + 1));
+  });
+  return v;
+}
+
+/* =====================================================
+   INIT
+===================================================== */
+document.addEventListener("DOMContentLoaded", () => {
+
+  const SAVE_URL = "{% url 'dynamic_forms_admin:save_builder_config' version.id %}";
+  const EXISTING_FIELDS = JSON.parse(
+    document.getElementById("existing-fields").textContent
+  );
+
+  const fieldContainer = document.getElementById("fields-container");
+  const ruleContainer = document.getElementById("rules-container");
+
+  let fieldCounter = 0;
+
+  const dbIdToTempId = {};
+  const tempIdToDbId = {}; // 🔑 ADDED
+
+  /* =====================================================
+     FIELD CARD (UNCHANGED)
+  ===================================================== */
+  function fieldRow(field = {}) {
+    const num = field.number_config || {};
+    const fieldId = field._tmp_id || `tmp_${fieldCounter++}`;
+    const d = field.dropdown_config || {};
+    const r = field.reference_config || {};
+    const dep = field.dependency_config || {};
+
+    return `
+    <div class="field-row border rounded-xl p-5 bg-gray-50 space-y-5"
+         data-field-id="${fieldId}"
+         data-depends-on-db="${field.depends_on_field || ""}">
+
+      <div class="flex justify-between items-center">
+        <h3 class="font-semibold text-lg">Field</h3>
+        <button type="button" class="remove-field text-red-600 text-sm">❌ Remove</button>
+      </div>
+
+      <div class="grid md:grid-cols-4 gap-4">
+        <div>
+          <label class="text-sm">Label</label>
+          <input class="label-input border p-2 w-full" value="${field.label || ""}">
+        </div>
+
+        <div>
+          <label class="text-sm">Kind</label>
+          <select class="kind-select border p-2 w-full">
+            <option value="INPUT" ${field.field_kind==="INPUT"?"selected":""}>Input</option>
+            <option value="SUPPORT" ${field.field_kind==="SUPPORT"?"selected":""}>Supporting</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="text-sm">Type</label>
+          <select class="type-select border p-2 w-full">
+            ${["TEXT","NUMBER","BOOLEAN","DROPDOWN","IMAGE"].map(t =>
+              `<option value="${t}" ${field.data_type===t?"selected":""}>${t}</option>`
+            ).join("")}
+          </select>
+        </div>
+
+        <div>
+          <label class="text-sm">Bitable Column</label>
+          <input class="column-input border p-2 w-full hidden"
+                 value="${field.bitable_column_id || ""}">
+        </div>
+      </div>
+
+      <!-- DROPDOWN CONFIG -->
+      <div class="dropdown-config hidden bg-white p-4 rounded border space-y-2">
+        <h4 class="font-medium text-sm">Dropdown Configuration</h4>
+        <select class="dropdown-source border p-2 w-full">
+          <option value="manual" ${d.source==="manual"?"selected":""}>Manual</option>
+          <option value="auto" ${d.source==="auto"?"selected":""}>From Bitable</option>
+        </select>
+        <textarea class="manual-options border p-2 w-full hidden"
+          placeholder="Comma separated options">${(d.options||[]).join(", ")}</textarea>
+      </div>
+
+      <!-- NUMBER CONFIG -->
+      <div class="number-config hidden bg-white p-4 rounded border space-y-3">
+        <h4 class="font-medium text-sm">Number Configuration</h4>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs">Min Type</label>
+            <select class="num-min-type border p-2 w-full">
+              <option value="">None</option>
+              <option value="static" ${num.min?.type==="static"?"selected":""}>Manual</option>
+              <option value="column" ${num.min?.type==="column"?"selected":""}>From Bitable</option>
+            </select>
+            <input class="num-min-value border p-2 w-full mt-1 hidden"
+                  placeholder="Min value or column"
+                  value="${num.min?.value || ""}">
+          </div>
+
+          <div>
+            <label class="text-xs">Max Type</label>
+            <select class="num-max-type border p-2 w-full">
+              <option value="">None</option>
+              <option value="static" ${num.max?.type==="static"?"selected":""}>Manual</option>
+              <option value="column" ${num.max?.type==="column"?"selected":""}>From Bitable</option>
+            </select>
+            <input class="num-max-value border p-2 w-full mt-1 hidden"
+                  placeholder="Max value or column"
+                  value="${num.max?.value || ""}">
+          </div>
+        </div>
+      </div>
+
+      <!-- DEPENDENCY -->
+      <div class="dependency-config hidden bg-white p-4 rounded border space-y-3">
+        <label class="flex items-center gap-2 text-sm">
+          <input type="checkbox" class="dependency-enabled"
+            ${field.depends_on_field ? "checked" : ""}>
+          Enable Dependency
+        </label>
+
+        <div class="dependency-body hidden space-y-2">
+          <label class="text-sm">Depends on field</label>
+          <select class="depends-on-select border p-2 w-full"></select>
+
+          <div class="grid grid-cols-2 gap-2">
+            <input class="parent-column border p-2"
+                   placeholder="Parent column"
+                   value="${dep.parent_column || ""}">
+            <input class="self-column border p-2"
+                   placeholder="This field column"
+                   value="${dep.self_column || ""}">
+          </div>
+        </div>
+      </div>
+
+      <!-- REFERENCE -->
+      <div class="reference-config hidden bg-white p-4 rounded border space-y-2">
+        <label class="flex items-center gap-2 text-sm">
+          <input type="checkbox" class="reference-enabled" ${r.enabled?"checked":""}>
+          Enable Reference Data
+        </label>
+        <input class="reference-column border p-2 w-full hidden"
+               value="${r.source_column||""}">
+      </div>
+
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" class="required-checkbox" ${field.required?"checked":""}>
+        Required
+      </label>
+    </div>`;
+  }
+
+  /* =====================================================
+     STANDARD RULE UI (UNCHANGED)
+  ===================================================== */
+  function ruleRow() {
+    return `
+    <div class="rule-row border rounded-lg p-4 bg-gray-50 space-y-4">
+
+      <div class="flex justify-between items-center">
+        <h4 class="font-medium">Standard Rule</h4>
+        <button type="button" class="remove-rule text-red-600 text-sm">❌</button>
+      </div>
+
+      <select class="rule-target border p-2 w-full">
+        <option value="">Target Field</option>
+      </select>
+
+      <select class="rule-source border p-2 w-full">
+        <option value="MANUAL">Manual Value</option>
+        <option value="BITABLE">From Bitable</option>
+      </select>
+
+      <input class="rule-manual border p-2 w-full" placeholder="Manual standard value">
+      <input class="rule-column border p-2 w-full hidden" placeholder="Standard value Bitable column">
+
+      <select class="rule-operator border p-2 w-full">
+        <option value="EQ">Equal</option>
+        <option value="LTE">Less Than or Equal</option>
+        <option value="GTE">Greater Than or Equal</option>
+      </select>
+
+      <div class="rule-deps hidden space-y-3">
+        <div class="flex justify-between items-center">
+          <span class="text-sm font-medium">Dependency Filters</span>
+          <button type="button" class="btn-secondary text-xs add-dep">➕ Add Dependency</button>
+        </div>
+        <div class="dep-list space-y-2"></div>
+      </div>
+
+    </div>`;
+  }
+
+  function depRow() {
+    return `
+    <div class="dep-row grid grid-cols-3 gap-2 items-center">
+      <select class="dep-field border p-2">
+        <option value="">Form Field</option>
+      </select>
+      <input class="dep-column border p-2" placeholder="Bitable column">
+      <button type="button" class="remove-dep text-red-600 text-sm">❌</button>
+    </div>`;
+  }
+
+  /* =====================================================
+     DEPENDENCY OPTIONS (FIXED)
+  ===================================================== */
+  function populateDependencyOptions() {
+    const rows = [...document.querySelectorAll(".field-row")];
+
+    rows.forEach(row => {
+      const select = row.querySelector(".depends-on-select");
+      if (!select) return;
+
+      const previousDbId = row.dataset.dependsOnDb || "";
+
+      select.innerHTML = `<option value="">-- Select field --</option>`;
+
+      rows.forEach(r => {
+        if (r === row) return;
+        if (r.querySelector(".type-select").value !== "DROPDOWN") return;
+
+        const opt = document.createElement("option");
+        opt.value = r.dataset.fieldId;
+        opt.textContent = r.querySelector(".label-input").value || "Dropdown";
+        select.appendChild(opt);
+      });
+
+      if (previousDbId) {
+        const tmp = dbIdToTempId[previousDbId];
+        if (tmp) select.value = tmp;
+      }
+    });
+
+    document.querySelectorAll(".rule-target, .dep-field").forEach(select => {
+      const previous = select.dataset.dbValue || select.value || "";
+
+      select.innerHTML = `<option value="">${select.classList.contains("dep-field") ? "Form Field" : "Target Field"}</option>`;
+
+      rows.forEach(r => {
+        const opt = document.createElement("option");
+        opt.value = r.dataset.fieldId;
+        opt.textContent = r.querySelector(".label-input").value || "Field";
+        select.appendChild(opt);
+      });
+
+      if (previous) {
+        select.value = dbIdToTempId[previous] || previous;
+      }
+    });
+  }
+
+  /* =====================================================
+     BIND FIELD (FIXED)
+  ===================================================== */
+  function applyRules(row) {
+    const type = row.querySelector(".type-select").value;
+    const source = row.querySelector(".dropdown-source")?.value;
+
+    // -------------------------------
+    // DROPDOWN CONFIG
+    // -------------------------------
+    row.querySelector(".dropdown-config")
+      ?.classList.toggle("hidden", type !== "DROPDOWN");
+
+    row.querySelector(".manual-options")
+      ?.classList.toggle("hidden", source !== "manual");
+
+    row.querySelector(".column-input")
+      ?.classList.toggle("hidden", !(type === "DROPDOWN" && source === "auto"));
+
+    // -------------------------------
+    // DEPENDENCY CONFIG
+    // -------------------------------
+    row.querySelector(".dependency-config")
+      ?.classList.toggle("hidden", type !== "DROPDOWN");
+
+    row.querySelector(".dependency-body")
+      ?.classList.toggle(
+        "hidden",
+        !row.querySelector(".dependency-enabled")?.checked
+      );
+
+    // ===============================
+    // NUMBER CONFIG (ADDED)
+    // ===============================
+    const isNumber = type === "NUMBER";
+    const numberBlock = row.querySelector(".number-config");
+
+    if (numberBlock) {
+      // Show / hide number block
+      numberBlock.classList.toggle("hidden", !isNumber);
+
+      if (isNumber) {
+        const minTypeEl = row.querySelector(".num-min-type");
+        const maxTypeEl = row.querySelector(".num-max-type");
+
+        const minInput = row.querySelector(".num-min-value");
+        const maxInput = row.querySelector(".num-max-value");
+
+        // ---------------------------
+        // MIN
+        // ---------------------------
+        if (minTypeEl && minInput) {
+          const showMin = !!minTypeEl.value;
+          minInput.classList.toggle("hidden", !showMin);
+
+          minInput.placeholder =
+            minTypeEl.value === "column"
+              ? "Bitable column name"
+              : "Minimum value";
+        }
+
+        // ---------------------------
+        // MAX
+        // ---------------------------
+        if (maxTypeEl && maxInput) {
+          const showMax = !!maxTypeEl.value;
+          maxInput.classList.toggle("hidden", !showMax);
+
+          maxInput.placeholder =
+            maxTypeEl.value === "column"
+              ? "Bitable column name"
+              : "Maximum value";
+        }
+      }
+    }
+  }
+
+  function bind(row) {
+    row.querySelectorAll("input,select,textarea").forEach(el =>
+      el.addEventListener("change", () => applyRules(row))
+    );
+
+    const depSelect = row.querySelector(".depends-on-select");
+    if (depSelect) {
+      depSelect.addEventListener("change", e => {
+        row.dataset.dependsOnDb = tempIdToDbId[e.target.value] || "";
+      });
+    }
+
+    row.querySelector(".remove-field").onclick = () => {
+      row.remove();
+      populateDependencyOptions();
+    };
+  }
+
+  /* =====================================================
+     INIT FIELDS (FIXED)
+  ===================================================== */
+  EXISTING_FIELDS.forEach(f => {
+    const tmpId = `tmp_${fieldCounter++}`;
+    dbIdToTempId[f.id] = tmpId;
+    tempIdToDbId[tmpId] = f.id; // 🔑 ADDED
+    f._tmp_id = tmpId;
+    fieldContainer.insertAdjacentHTML("beforeend", fieldRow(f));
+  });
+
+  const EXISTING_RULES = JSON.parse(
+    document.getElementById("existing-rules").textContent
+  );
+
+  document.querySelectorAll(".field-row").forEach(row => {
+    bind(row);
+    applyRules(row);
+  });
+
+  populateDependencyOptions();
+
+  EXISTING_RULES.forEach(rule => {
+    ruleContainer.insertAdjacentHTML("beforeend", ruleRow());
+    const row = ruleContainer.lastElementChild;
+
+    /* -----------------------------------------
+      REMOVE RULE
+    ----------------------------------------- */
+    row.querySelector(".remove-rule").onclick = () => row.remove();
+
+    /* -----------------------------------------
+      SOURCE CHANGE TOGGLE
+    ----------------------------------------- */
+    row.querySelector(".rule-source").onchange = e => {
+      const isBitable = e.target.value === "BITABLE";
+      row.querySelector(".rule-manual").classList.toggle("hidden", isBitable);
+      row.querySelector(".rule-column").classList.toggle("hidden", !isBitable);
+      row.querySelector(".rule-deps").classList.toggle("hidden", !isBitable);
+    };
+
+    /* -----------------------------------------
+      ADD DEPENDENCY (EXPLICIT, NO CLICK)
+    ----------------------------------------- */
+    row.querySelector(".add-dep").onclick = () => {
+      const list = row.querySelector(".dep-list");
+      list.insertAdjacentHTML("beforeend", depRow());
+      populateDependencyOptions();
+
+      list.lastElementChild
+        .querySelector(".remove-dep")
+        .onclick = e => e.target.closest(".dep-row").remove();
+    };
+
+    /* -----------------------------------------
+      RESTORE TARGET FIELD
+    ----------------------------------------- */
+    const targetSelect = row.querySelector(".rule-target");
+    targetSelect.dataset.dbValue = rule.target_field_id;
+    populateDependencyOptions();
+
+    setTimeout(() => {
+      const tmp = dbIdToTempId[rule.target_field_id];
+      if (tmp) targetSelect.value = tmp;
+    }, 0);
+
+    /* -----------------------------------------
+      RESTORE SOURCE + VALUE
+    ----------------------------------------- */
+    row.querySelector(".rule-source").value = rule.value_source;
+    row.querySelector(".rule-source").dispatchEvent(new Event("change"));
+
+    if (rule.value_source === "MANUAL") {
+      row.querySelector(".rule-manual").value = rule.manual_value || "";
+    } else {
+      row.querySelector(".rule-column").value = rule.bitable_column_id || "";
+    }
+
+    /* -----------------------------------------
+      RESTORE OPERATOR
+    ----------------------------------------- */
+    row.querySelector(".rule-operator").value = rule.operator;
+
+    /* -----------------------------------------
+      RESTORE DEPENDENCY FILTERS (NO .click())
+    ----------------------------------------- */
+    (rule.dependency_filters || []).forEach(dep => {
+      const list = row.querySelector(".dep-list");
+      list.insertAdjacentHTML("beforeend", depRow());
+      populateDependencyOptions();
+
+      const depEl = list.lastElementChild;
+      const depSelect = depEl.querySelector(".dep-field");
+
+      // store db field id
+      depSelect.dataset.dbValue = dep.field_id;
+
+      // restore AFTER populateDependencyOptions runs
+      setTimeout(() => {
+        const tmpId = dbIdToTempId[dep.field_id];
+        if (tmpId) {
+          depSelect.value = tmpId;
+        }
+      }, 0);
+
+      depEl.querySelector(".dep-column").value = dep.bitable_column;
+
+      depEl.querySelector(".remove-dep").onclick =
+        e => e.target.closest(".dep-row").remove();
+    });
+  });
+
+  window.addField = () => {
+    const anchor = document.getElementById("fields-insert-anchor");
+
+    // Insert field BELOW rules, ABOVE actions
+    anchor.insertAdjacentHTML("beforebegin", fieldRow({}));
+
+    const newRow = anchor.previousElementSibling;
+    bind(newRow);
+    applyRules(newRow);
+    populateDependencyOptions();
+  };
+
+  window.addRule = () => {
+    ruleContainer.insertAdjacentHTML("beforeend", ruleRow());
+    const row = ruleContainer.lastElementChild;
+
+    populateDependencyOptions();
+
+    row.querySelector(".remove-rule").onclick = () => row.remove();
+
+    row.querySelector(".rule-source").onchange = e => {
+      const isBitable = e.target.value === "BITABLE";
+      row.querySelector(".rule-manual").classList.toggle("hidden", isBitable);
+      row.querySelector(".rule-column").classList.toggle("hidden", !isBitable);
+      row.querySelector(".rule-deps").classList.toggle("hidden", !isBitable);
+    };
+
+    row.querySelector(".add-dep").onclick = () => {
+      const list = row.querySelector(".dep-list");
+      list.insertAdjacentHTML("beforeend", depRow());
+      populateDependencyOptions();
+
+      list.lastElementChild.querySelector(".remove-dep").onclick = e =>
+        e.target.closest(".dep-row").remove();
+    };
+  };
+
+  /* =====================================================
+     SAVE (FIXED)
+  ===================================================== */
+  window.saveBuilder = () => {
+    const fields = [];
+    const standard_rules = [];
+
+    document.querySelectorAll(".field-row").forEach((row, i) => {
+      fields.push({
+        id: tempIdToDbId[row.dataset.fieldId] || row.dataset.fieldId,
+        label: row.querySelector(".label-input").value,
+        field_kind: row.querySelector(".kind-select").value,
+        data_type: row.querySelector(".type-select").value,
+        bitable_column_id: row.querySelector(".column-input").value || null,
+        dropdown_config: {
+          source: row.querySelector(".dropdown-source")?.value || null,
+          options: row.querySelector(".manual-options")?.value
+            ?.split(",").map(v=>v.trim()).filter(Boolean) || []
+        },
+        depends_on_field: row.querySelector(".dependency-enabled")?.checked
+          ? row.dataset.dependsOnDb || null
+          : null,
+        dependency_config: row.querySelector(".dependency-enabled")?.checked
+          ? {
+              operator: "EQ",
+              parent_column: row.querySelector(".parent-column").value,
+              self_column: row.querySelector(".self-column").value
+            }
+          : {},
+        reference_config: {
+          enabled: row.querySelector(".reference-enabled")?.checked || false,
+          source_column: row.querySelector(".reference-column")?.value || null
+        },
+        number_config: row.querySelector(".type-select").value === "NUMBER"
+          ? {
+              min: row.querySelector(".num-min-type").value
+                ? {
+                    type: row.querySelector(".num-min-type").value,
+                    value: row.querySelector(".num-min-value").value || null
+                  }
+                : null,
+              max: row.querySelector(".num-max-type").value
+                ? {
+                    type: row.querySelector(".num-max-type").value,
+                    value: row.querySelector(".num-max-value").value || null
+                  }
+                : null
+            }
+          : {},
+        required: row.querySelector(".required-checkbox").checked,
+        order: i
+      });
+    });
+
+    document.querySelectorAll(".rule-row").forEach(rule => {
+      const tmpTarget = rule.querySelector(".rule-target").value;
+      if (!tmpTarget) return;
+
+      const targetDb = tempIdToDbId[tmpTarget];
+      if (!targetDb) return;
+
+      const source = rule.querySelector(".rule-source").value;
+
+      const deps = [];
+      rule.querySelectorAll(".dep-row").forEach(dep => {
+        const tmpField = dep.querySelector(".dep-field").value;
+        const col = dep.querySelector(".dep-column").value;
+        if (!tmpField || !col) return;
+
+        const dbField = tempIdToDbId[tmpField];
+        if (!dbField) return;
+
+        deps.push({ field_id: dbField, bitable_column: col });
+      });
+
+      standard_rules.push({
+        target_field_id: targetDb,
+        value_source: source,
+        manual_value: source === "MANUAL"
+          ? rule.querySelector(".rule-manual").value || null
+          : null,
+        bitable_column_id: source === "BITABLE"
+          ? rule.querySelector(".rule-column").value || null
+          : null,
+        operator: rule.querySelector(".rule-operator").value,
+        dependency_filters: deps
+      });
+    });
+
+    fetch(SAVE_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCookie("csrftoken")
+      },
+      body: JSON.stringify({ fields, standard_rules })
+    })
+    .then(r => r.json())
+    .then(d => alert(d.success ? "Saved successfully" : "Save failed"));
+  };
+
+});
+</script>
+{% endblock %}

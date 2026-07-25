@@ -1,0 +1,493 @@
+{% extends "shell/app.html" %}
+{% load custom_filters %}
+{% block title %}{{ schema.template.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ===============================
+   HIDE GLOBAL MOBILE NAV
+   =============================== */
+@media (max-width: 768px) {
+  .mobile-bottom-nav {
+    display: none !important;
+  }
+}
+
+/* ===============================
+   SEARCHABLE DROPDOWN OVERLAY
+   =============================== */
+.custom-select-container {
+  position: relative;
+  overflow: visible !important;
+}
+
+.dropdown-search-input {
+  background-color: #f9fafb;
+  border-radius: 12px;
+}
+
+.search-results-list {
+  position: absolute !important;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 6px 0;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.12);
+}
+
+.search-results-list .option-item {
+  padding: 14px 18px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #1f2937;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.search-results-list .option-item:hover {
+  background-color: #f3f4f6;
+}
+
+.search-results-list::-webkit-scrollbar {
+  width: 10px;
+}
+.search-results-list::-webkit-scrollbar-thumb {
+  background-color: #9ca3af;
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.field-wrapper,
+.bg-white.rounded-2xl {
+  overflow: visible !important;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto pb-6 min-h-screen bg-gray-50">
+
+  <header class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-gray-200 shadow-sm">
+    <div class="px-5 py-4 space-y-4">
+
+      <div class="flex justify-between items-start">
+        <div class="flex-1 pr-4">
+          <h1 class="text-lg font-bold text-gray-900 leading-tight">
+            {{ section.title|default:schema.template.name }}
+          </h1>
+
+          <div class="flex items-center gap-4 mt-2 text-[11px] font-semibold">
+            <div class="flex items-center gap-1 text-blue-600 uppercase tracking-wide">
+              <i class="fas fa-file-alt text-[10px] opacity-70"></i>
+              <span>Form No: {{ template.code }}</span>
+            </div>
+
+            {% if version %}
+            <div class="flex items-center gap-1 text-gray-500 uppercase tracking-wide">
+              <i class="fas fa-layer-group text-[10px] opacity-70"></i>
+              <span>Ver {{ version.version_number }}</span>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="text-right flex-shrink-0">
+          <div class="text-2xl font-bold text-sky-600 tabular-nums" id="progressText">0%</div>
+          <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Done</div>
+        </div>
+      </div>
+
+      {% if requires_work_context and work_context %}
+      <div class="flex flex-wrap items-center gap-3 text-xs text-gray-600">
+        <div class="flex items-center gap-1">
+          <i class="fas fa-sitemap text-gray-400 text-[10px]"></i>
+          <span>{{ work_context.line.code }}</span>
+        </div>
+        <span class="text-gray-300">|</span>
+        <div class="flex items-center gap-1 max-w-[140px]">
+          <i class="fas fa-box text-gray-400 text-[10px]"></i>
+          <span class="truncate">{{ work_context.product }}</span>
+        </div>
+        <span class="text-gray-300">|</span>
+        <div class="flex items-center gap-1">
+          <i class="far fa-calendar text-gray-400 text-[10px]"></i>
+          <span>{{ work_context.work_date }}</span>
+        </div>
+        <span class="text-gray-300">|</span>
+        <div class="flex items-center gap-1">
+          <i class="far fa-clock text-gray-400 text-[10px]"></i>
+          <span>{{ work_context.shift }}</span>
+        </div>
+        <span class="text-gray-300">|</span>
+        <div class="flex items-center gap-1">
+          <i class="fas fa-palette text-gray-400 text-[10px]"></i>
+          <span>{{ work_context.model_color }}</span>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="relative h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+        <div id="itemProgressBar"
+             class="absolute top-0 left-0 h-full bg-sky-500 rounded-full transition-all duration-500 ease-out"
+             style="width: 0%"></div>
+      </div>
+
+      <div class="flex justify-between text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+        <span>Step {{ step }} / {{ total_steps }}</span>
+      </div>
+
+    </div>
+  </header>
+
+  <main class="p-4 space-y-4">
+
+    {% if messages %}
+      {% for message in messages %}
+      <div class="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-xl shadow-sm flex items-center gap-3">
+        <i class="fas fa-exclamation-circle text-red-500"></i>
+        <span class="text-sm font-medium">{{ message }}</span>
+      </div>
+      {% endfor %}
+    {% endif %}
+
+    {% if not is_readonly %}
+    <form method="post" enctype="multipart/form-data" id="dynamicForm">
+      {% csrf_token %}
+
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 divide-y">
+
+        {% for field in schema.fields %}
+        <div class="p-5 field-wrapper"
+             data-field-id="{{ field.id }}"
+             {% if field.dependency %}
+               data-depends-on="{{ field.dependency.depends_on }}"
+             {% endif %}>
+
+          <label class="text-sm font-bold text-gray-900 block mb-2 leading-snug">
+            {{ forloop.counter }}. {{ field.label }}
+            {% if field.required %}
+              <span class="text-red-500 align-top ml-0.5">*</span>
+            {% endif %}
+          </label>
+
+          {% if field.type == "TEXT" %}
+            <input type="text"
+                   name="field_{{ field.id }}"
+                   value="{{ values|get_item:field.id }}"
+                   class="w-full rounded-xl border-gray-300 bg-gray-50 border p-4">
+
+          {% elif field.type == "NUMBER" %}
+            <input type="number"
+                  step="any"
+                   name="field_{{ field.id }}"
+                   value="{{ values|get_item:field.id }}"
+                   class="w-full rounded-xl border-gray-300 bg-gray-50 border p-4">
+
+          {% elif field.type == "DROPDOWN" %}
+            <div class="custom-select-container">
+              <input type="hidden"
+                     name="field_{{ field.id }}"
+                     id="hidden_{{ field.id }}"
+                     value="{{ values|get_item:field.id }}"
+                     class="real-input">
+
+              <input type="text"
+                     id="search_{{ field.id }}"
+                     placeholder="Search or select..."
+                     class="dropdown-search-input w-full rounded-xl border-gray-300 bg-gray-50 border p-4 pr-10"
+                     value="{{ values|get_item:field.id|default_if_none:'' }}"
+                     {% if field.dependency and not values|get_item:field.dependency.depends_on %}disabled{% endif %}
+                     autocomplete="off">
+
+              <div id="list_{{ field.id }}" class="search-results-list hidden">
+                {% for opt in field.options %}
+                  <div class="option-item" data-value="{{ opt }}">{{ opt }}</div>
+                {% endfor %}
+              </div>
+            </div>
+
+          {% elif field.type == "BOOLEAN" %}
+            <div class="grid grid-cols-2 gap-3">
+              <label class="cursor-pointer">
+                <input type="radio"
+                       name="field_{{ field.id }}"
+                       value="YES"
+                       class="peer sr-only"
+                       {% if values|get_item:field.id == "YES" %}checked{% endif %}>
+                <div class="p-4 rounded-xl border-2 border-gray-200 text-center
+                            peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:shadow-md">
+                  YES
+                </div>
+              </label>
+              <label class="cursor-pointer">
+                <input type="radio"
+                       name="field_{{ field.id }}"
+                       value="NO"
+                       class="peer sr-only"
+                       {% if values|get_item:field.id == "NO" %}checked{% endif %}>
+                <div class="p-4 rounded-xl border-2 border-gray-200 text-center
+                            peer-checked:border-red-500 peer-checked:bg-red-50 peer-checked:shadow-md">
+                  NO
+                </div>
+              </label>
+            </div>
+
+            {% elif field.type == "IMAGE" %}
+            <div class="space-y-3">
+              <input type="file"
+                    name="field_{{ field.id }}"
+                    accept="image/*"
+                    class="block w-full text-sm text-gray-700
+                            file:mr-4 file:py-2 file:px-4
+                            file:rounded-xl file:border-0
+                            file:text-sm file:font-semibold
+                            file:bg-sky-50 file:text-sky-700
+                            hover:file:bg-sky-100
+                            cursor-pointer">
+
+              {% if values|get_item:field.id %}
+                <div class="mt-2">
+                  <img src="{{ values|get_item:field.id }}"
+                      class="max-h-40 rounded-xl border border-gray-200 shadow-sm"
+                      alt="Uploaded image preview">
+                </div>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          {% if field.help_text %}
+            <p class="text-xs text-gray-400 mt-1">{{ field.help_text }}</p>
+          {% endif %}
+
+          <!-- STANDARD VALUE -->
+          <div class="mt-3 hidden" data-standard-value>
+            <div class="flex items-center gap-2 bg-blue-50 border border-blue-200
+                        text-blue-700 text-xs px-3 py-2 rounded-lg">
+              <span>📌</span>
+              <span data-standard-text></span>
+            </div>
+          </div>
+
+          <!-- STANDARD ERROR -->
+          <div class="mt-2 hidden" data-standard-error>
+            <div class="flex items-center gap-2 bg-red-50 border border-red-200
+                        text-red-700 text-xs px-3 py-2 rounded-lg">
+              <span>❌</span>
+              <span data-error-text></span>
+            </div>
+          </div>
+
+        </div>
+        {% endfor %}
+
+      </div>
+    </form>
+    {% endif %}
+
+    <!-- ================= NAVIGATION ================= -->
+    <div class="flex justify-end pt-5 pb-6">
+
+      {% if step > 1 %}
+      <a href="?step={{ step|add:'-1' }}"
+        class="mr-3 inline-flex justify-center items-center
+                px-5 py-3
+                border border-gray-300
+                text-sm font-semibold
+                rounded-xl
+                bg-white hover:bg-gray-50 transition">
+        <i class="fas fa-arrow-left mr-2"></i> Back
+      </a>
+      {% endif %}
+
+      {% if step < total_steps %}
+      <button type="submit"
+              form="dynamicForm"
+              class="inline-flex justify-center items-center
+                    px-6 py-3
+                    text-sm font-semibold
+                    rounded-xl
+                    text-white
+                    bg-sky-600 hover:bg-sky-700 transition">
+        Next <i class="fas fa-arrow-right ml-2"></i>
+      </button>
+      {% else %}
+      <button type="submit"
+              form="dynamicForm"
+              class="inline-flex justify-center items-center
+                    px-6 py-3
+                    text-sm font-semibold
+                    rounded-xl
+                    text-white
+                    bg-green-600 hover:bg-green-700 transition">
+        Submit <i class="fas fa-check ml-2"></i>
+      </button>
+      {% endif %}
+
+    </div>
+
+  </main>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+/* 🔒 ALL LOGIC BELOW IS 100% UNCHANGED */
+(function () {
+
+  const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value;
+
+  function collectResponses() {
+    const data = {};
+    document.querySelectorAll(".field-wrapper").forEach(w => {
+      const input = w.querySelector("input[name^='field_'], select");
+      if (!input || input.value === "") return;
+      data[input.name.replace("field_", "")] = input.value;
+    });
+    return data;
+  }
+
+  function clearStandard(w) {
+    w.querySelector("[data-standard-value]")?.classList.add("hidden");
+    w.querySelector("[data-standard-error]")?.classList.add("hidden");
+  }
+
+  function evaluateStandardRules() {
+    fetch("{% url 'dynamic_forms:resolve_field_dependency' template.id %}", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": csrfToken,
+      },
+      body: JSON.stringify({
+        mode: "standard",
+        responses: collectResponses(),
+      }),
+    })
+    .then(r => r.json())
+    .then(data => {
+      document.querySelectorAll(".field-wrapper").forEach(clearStandard);
+      (data.results || []).forEach(r => {
+        const w = document.querySelector(`.field-wrapper[data-field-id="${r.field_id}"]`);
+        if (!w) return;
+
+        const std = w.querySelector("[data-standard-value]");
+        const txt = w.querySelector("[data-standard-text]");
+        txt.textContent = `Standard (${r.source === "BITABLE" ? "Auto" : "Manual"}): ${r.standard}`;
+        std.classList.remove("hidden");
+
+        if (!r.passed) {
+          const err = w.querySelector("[data-standard-error]");
+          err.querySelector("[data-error-text]").textContent =
+            `Entered value ${r.actual} must be ${r.operator} ${r.standard}`;
+          err.classList.remove("hidden");
+        }
+      });
+    });
+  }
+
+  function updateDropdown(w) {
+    const fieldId = w.dataset.fieldId;
+    const searchInput = w.querySelector(".dropdown-search-input");
+    const listContainer = w.querySelector(".search-results-list");
+    const hiddenInput = w.querySelector(".real-input");
+    if (!searchInput) return;
+
+    fetch("{% url 'dynamic_forms:resolve_field_dependency' template.id %}", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": csrfToken,
+      },
+      body: JSON.stringify({
+        mode: "dropdown",
+        field_id: fieldId,
+        responses: collectResponses(),
+      }),
+    })
+    .then(r => r.json())
+    .then(data => {
+      listContainer.innerHTML = '';
+      (data.options || []).forEach(o => {
+        const div = document.createElement("div");
+        div.className = "option-item";
+        div.dataset.value = o;
+        div.textContent = o;
+        listContainer.appendChild(div);
+      });
+      searchInput.disabled = false;
+      hiddenInput.value = "";
+      searchInput.value = "";
+    });
+  }
+
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest('.custom-select-container')) {
+      document.querySelectorAll('.search-results-list').forEach(l => l.classList.add('hidden'));
+    }
+
+    if (e.target.classList.contains('dropdown-search-input')) {
+      const list = e.target.nextElementSibling;
+      list.classList.remove('hidden');
+      filterList(e.target, list);
+    }
+
+    if (e.target.classList.contains('option-item')) {
+      const container = e.target.closest('.custom-select-container');
+      const searchInput = container.querySelector('.dropdown-search-input');
+      const hiddenInput = container.querySelector('.real-input');
+
+      searchInput.value = e.target.textContent;
+      hiddenInput.value = e.target.dataset.value;
+      container.querySelector('.search-results-list').classList.add('hidden');
+      handleFieldChange(hiddenInput);
+    }
+  });
+
+  document.addEventListener("input", (e) => {
+    if (e.target.classList.contains('dropdown-search-input')) {
+      const list = e.target.nextElementSibling;
+      list.classList.remove('hidden');
+      filterList(e.target, list);
+    }
+  });
+
+  function filterList(input, list) {
+    const filter = input.value.toLowerCase();
+    list.querySelectorAll('.option-item').forEach(item => {
+      item.style.display = item.textContent.toLowerCase().includes(filter) ? "block" : "none";
+    });
+  }
+
+  function handleFieldChange(el) {
+    const fieldName = el.name.replace("field_", "");
+    document.querySelectorAll(".field-wrapper").forEach(w => {
+      if (w.dataset.dependsOn === fieldName) updateDropdown(w);
+    });
+    evaluateStandardRules();
+  }
+
+  document.querySelectorAll("input:not(.dropdown-search-input), select").forEach(el => {
+    el.addEventListener("change", () => handleFieldChange(el));
+  });
+
+  document.querySelectorAll(".field-wrapper").forEach(w => {
+    if (w.dataset.dependsOn) updateDropdown(w);
+  });
+
+  evaluateStandardRules();
+
+})();
+</script>
+{% endblock %}

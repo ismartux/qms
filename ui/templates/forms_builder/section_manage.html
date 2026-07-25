@@ -1,0 +1,70 @@
+{% extends "shell/app.html" %}
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Sections</h1>
+            <p class="text-sm text-gray-500">Template: <strong>{{ version.template.name }}</strong> (Version {{ version.version_number }})</p>
+            {% if version.is_published %}
+            <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                <i class="fas fa-lock mr-2"></i>
+                This version is <strong>published</strong> and locked.
+                No further sections or items can be modified.
+            </div>
+            {% endif %}
+        </div>
+        <a href="{% url 'transs_admin_flow:form_builder_dashboard' %}" class="text-sm text-gray-500 hover:text-sky-600 font-medium">
+            ← Back to Template
+        </a>
+    </div>
+
+    <!-- Add Section Form -->
+    {% if not version.is_published %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h3 class="text-lg font-bold text-gray-900 mb-4">Add New Section</h3>
+        <form method="post" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            {% csrf_token %}
+            <div class="md:col-span-2">
+                <input name="title" class="w-full rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 bg-white" placeholder="Section Title" required>
+            </div>
+            <div>
+                <input name="order" type="number" class="w-full rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 bg-white" placeholder="Order">
+            </div>
+            <button class="bg-sky-600 text-white rounded-lg px-4 py-2.5 font-medium hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500">
+                Add Section
+            </button>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Sections List -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <ul class="divide-y divide-gray-100">
+            {% for s in sections %}
+            <li class="p-4 flex justify-between items-center hover:bg-gray-50 transition-colors">
+                <div class="font-bold text-gray-900 text-lg">{{ s.title }}</div>
+                <div class="flex gap-2">
+                    <a href="{% url 'transs_admin_flow:manage_items' s.id %}" class="px-4 py-2 border border-sky-600 text-sky-600 rounded-lg text-sm font-medium hover:bg-sky-50 transition-colors">
+                        Items
+                    </a>
+                    {% if not version.is_published %}
+                    <a href="{% url 'transs_admin_flow:delete_section' s.id %}"
+                    class="px-4 py-2 border border-red-600 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
+                    onclick="return confirm('Delete this section?')">
+                        Delete
+                    </a>
+                    {% else %}
+                    <span class="px-4 py-2 border border-gray-300 text-gray-400 rounded-lg text-sm font-medium cursor-not-allowed">
+                        Delete
+                    </span>
+                    {% endif %}
+                </div>
+            </li>
+            {% empty %}
+            <li class="p-8 text-center text-gray-500">No sections created yet.</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %}

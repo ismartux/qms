@@ -1,0 +1,110 @@
+{% extends "shell/app.html" %}
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Breadcrumbs / Header -->
+    <div class="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="flex items-center gap-2 text-sm text-gray-500">
+            <a href="{% url 'admin_panel:admin_capas' %}" class="hover:text-sky-600">CAPAs</a>
+            <i class="fas fa-chevron-right text-xs"></i>
+            <span class="text-gray-900 font-medium">Details</span>
+        </div>
+        <div class="flex gap-3">
+            <a href="{% url 'admin_panel:capa_edit' capa.capa_id %}" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500">
+                <i class="fas fa-edit mr-2"></i> Edit
+            </a>
+            <a href="{% url 'admin_panel:admin_capas' %}" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500">
+                <i class="fas fa-arrow-left mr-2"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left Column: Main Info -->
+        <div class="lg:col-span-2 space-y-6">
+            
+            <!-- Identity Card -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                    <h2 class="text-lg font-bold text-gray-900">{{ capa.title }}</h2>
+                    <div class="flex gap-2">
+                        {% if capa.status == "OPEN" %}<span class="px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">Open</span>{% endif %}
+                        <span class="px-3 py-1 rounded-full text-xs font-bold bg-gray-200 text-gray-700 border border-gray-300">Severity {{ capa.severity }}</span>
+                    </div>
+                </div>
+                <div class="p-6 space-y-6">
+                    <div>
+                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Description</h4>
+                        <p class="text-gray-700 leading-relaxed">{{ capa.description }}</p>
+                    </div>
+                    {% if capa.rca_summary %}
+                    <div class="bg-amber-50 rounded-lg p-4 border border-amber-100">
+                        <h4 class="text-xs font-bold text-amber-600 uppercase tracking-wider mb-2 flex items-center"><i class="fas fa-search mr-2"></i> Root Cause Analysis</h4>
+                        <p class="text-amber-900 text-sm">{{ capa.rca_summary }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Submission Context -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+                    <h3 class="font-bold text-gray-800">Related Submission</h3>
+                </div>
+                <div class="p-0">
+                    <dl class="divide-y divide-gray-100">
+                        <div class="px-6 py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+                            <dt class="text-sm font-medium text-gray-500">Submission ID</dt>
+                            <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0 font-mono">{{ capa.submission.submission_id }}</dd>
+                        </div>
+                        <div class="px-6 py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+                            <dt class="text-sm font-medium text-gray-500">Template</dt>
+                            <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ capa.submission.template_version.template.name }}</dd>
+                        </div>
+                        <div class="px-6 py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+                            <dt class="text-sm font-medium text-gray-500">Plant / Line</dt>
+                            <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ capa.submission.plant.name }} / {{ capa.submission.line.name|default:"—" }}</dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Right Column: Meta & Timeline -->
+        <div class="space-y-6">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h3 class="font-bold text-gray-900 mb-4">Meta Information</h3>
+                <div class="space-y-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-sky-100 flex items-center justify-center text-sky-600 flex-shrink-0">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-400">Owner</div>
+                            <div class="text-sm font-medium text-gray-900">{{ capa.owner.username|default:'Unassigned' }}</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 flex-shrink-0">
+                            <i class="fas fa-calendar"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-400">Due Date</div>
+                            <div class="text-sm font-medium text-gray-900">{{ capa.due_date }}</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 flex-shrink-0">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-400">Created</div>
+                            <div class="text-sm font-medium text-gray-900">{{ capa.created_at }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

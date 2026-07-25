@@ -1,0 +1,139 @@
+{% extends "shell/app.html" %}
+{% block title %}Management Dashboard{% endblock %}
+
+{% block content %}
+
+<div class="max-w-7xl mx-auto space-y-8 pb-12">
+
+  <!-- ================= HEADER ================= -->
+  <div class="flex items-center gap-4">
+    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center text-xl shadow-lg">
+      <i class="fas fa-chart-line"></i>
+    </div>
+    <div>
+      <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900">
+        Management Dashboard
+      </h1>
+      <p class="text-sm text-gray-500 mt-1">
+        Global performance overview across all plants
+      </p>
+    </div>
+  </div>
+
+
+  <!-- ================= KPI CARDS ================= -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+
+    <div class="bg-white rounded-xl border p-6 shadow-sm">
+      <p class="text-xs uppercase font-bold text-gray-400 mb-2">Total Submissions</p>
+      <h2 class="text-3xl font-extrabold text-gray-900">
+        {{ total_submissions|default:0 }}
+      </h2>
+    </div>
+
+    <div class="bg-white rounded-xl border p-6 shadow-sm">
+      <p class="text-xs uppercase font-bold text-gray-400 mb-2">Average Severity</p>
+      <h2 class="text-3xl font-extrabold text-amber-600">
+        {{ avg_severity|default:0|floatformat:2 }}
+      </h2>
+    </div>
+
+    <div class="bg-white rounded-xl border p-6 shadow-sm">
+      <p class="text-xs uppercase font-bold text-gray-400 mb-2">High Severity (≥8)</p>
+      <h2 class="text-3xl font-extrabold text-red-600">
+        {{ high_severity|default:0 }}
+      </h2>
+    </div>
+
+  </div>
+
+
+  <!-- ================= CHARTS ================= -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+    <!-- Plant Comparison -->
+    <div class="bg-white rounded-xl shadow p-6">
+      <h3 class="font-bold text-gray-900 mb-4">
+        Average Severity by Plant
+      </h3>
+      <canvas id="plantChart" height="280"></canvas>
+    </div>
+
+    <!-- Severity Trend -->
+    <div class="bg-white rounded-xl shadow p-6">
+      <h3 class="font-bold text-gray-900 mb-4">
+        Monthly Severity Trend
+      </h3>
+      <canvas id="trendChart" height="280"></canvas>
+    </div>
+
+  </div>
+
+</div>
+
+{% endblock %}
+
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  const plantData = {{ plant_comparison|default:"[]"|safe }};
+  const trendData = {{ trend|default:"[]"|safe }};
+
+  const commonOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false }
+    },
+    scales: {
+      y: {
+        beginAtZero: true
+      },
+      x: {
+        grid: { display: false }
+      }
+    }
+  };
+
+  // ================= PLANT COMPARISON =================
+  new Chart(document.getElementById("plantChart"), {
+    type: "bar",
+    data: {
+      labels: plantData.map(x => x.plant__name),
+      datasets: [{
+        label: "Avg Severity",
+        data: plantData.map(x => x.avg_severity),
+        backgroundColor: "#6366f1"
+      }]
+    },
+    options: commonOptions
+  });
+
+  // ================= TREND =================
+  new Chart(document.getElementById("trendChart"), {
+    type: "line",
+    data: {
+      labels: trendData.map(x => {
+        if (!x.month) return "";
+        const d = new Date(x.month);
+        return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+      }),
+      datasets: [{
+        label: "Avg Severity",
+        data: trendData.map(x => x.avg_severity),
+        borderColor: "#f59e0b",
+        backgroundColor: "rgba(245,158,11,0.15)",
+        tension: 0.3,
+        fill: true
+      }]
+    },
+    options: commonOptions
+  });
+
+});
+</script>
+{% endblock %}

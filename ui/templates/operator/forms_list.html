@@ -1,0 +1,199 @@
+{% extends "shell/app.html" %}
+{% load custom_filters %}
+{% block title %}Quality Checklists{% endblock %}
+
+{% block content %}
+
+<div class="max-w-6xl mx-auto pb-20 space-y-6 px-4 sm:px-6">
+
+  <!-- ================= STICKY HEADER ================= -->
+  <header class="sticky top-0 z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-4 bg-white/90 backdrop-blur-md border-b border-gray-200 transition-all">
+    <div class="flex flex-col gap-4">
+
+      <div class="flex justify-between items-start">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+            <i class="fas fa-clipboard-check text-lg"></i>
+          </div>
+          <div>
+            <h1 class="text-xl font-bold text-gray-900 leading-tight">
+              Quality Checklists
+            </h1>
+            <p class="text-xs text-gray-500">
+              Select a template to begin inspection
+            </p>
+          </div>
+        </div>
+
+        <a href="{% url 'ui:operator_home' %}"
+           class="inline-flex items-center px-4 py-2 bg-white border border-gray-200 rounded-xl 
+                  text-xs sm:text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:text-sky-600 
+                  active:scale-95 transition-all shadow-sm whitespace-nowrap">
+          <i class="fas fa-sync-alt mr-2 text-gray-400"></i>
+          <span class="hidden sm:inline">Change Session</span>
+          <span class="sm:hidden">Change</span>
+        </a>
+      </div>
+
+      <!-- Context Pills -->
+      {% if requires_work_context and work_context %}
+      <div class="flex flex-wrap gap-2">
+
+        <div class="inline-flex items-center px-3 py-1 rounded-full bg-gray-50 text-gray-600 text-xs font-bold border border-gray-200">
+          <i class="fas fa-sitemap mr-1.5 text-gray-400"></i>
+          {{ work_context.line.code }}
+        </div>
+
+        <div class="inline-flex items-center px-3 py-1 rounded-full bg-gray-50 text-gray-600 text-xs font-bold border border-gray-200">
+          <i class="fas fa-box mr-1.5 text-gray-400"></i>
+          {{ work_context.product.name }}
+        </div>
+
+        <div class="inline-flex items-center px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100">
+          <i class="fas fa-clock mr-1.5 text-indigo-400"></i>
+          {{ work_context.shift }}
+        </div>
+
+      </div>
+      {% endif %}
+
+    </div>
+  </header>
+
+  <!-- ================= KPI GRID ================= -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+      <div class="text-[10px] font-bold text-gray-400 uppercase">Today</div>
+      <div class="text-2xl font-extrabold text-gray-900 mt-2">{{ kpi_today_count }}</div>
+    </div>
+
+    <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+      <div class="text-[10px] font-bold text-gray-400 uppercase">Severity</div>
+      <div class="text-2xl font-extrabold text-gray-900 mt-2">
+        {{ kpi_avg_severity|floatformat:2 }}
+      </div>
+    </div>
+
+    <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+      <div class="text-[10px] font-bold text-gray-400 uppercase">Open</div>
+      <div class="text-2xl font-extrabold text-gray-900 mt-2">{{ kpi_open_issues }}</div>
+    </div>
+
+    <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+      <div class="text-[10px] font-bold text-gray-400 uppercase">Last</div>
+      <div class="text-xl font-bold text-gray-900 mt-2">
+        {% if kpi_last_submission %}
+          {{ kpi_last_submission|date:"H:i" }}
+        {% else %}
+          —
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= FORMS GRID ================= -->
+  {% if templates %}
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+
+    {% for template in templates %}
+    {% with version=template.active_version %}
+    {% with progress=shift_progress_map|get_item:template.id %}
+    {% with interval_status=interval_status_map|get_item:template.id %}
+
+    <div class="group relative rounded-2xl border overflow-hidden transition-all duration-300
+                {% if template.is_completed_for_shift %}
+                  bg-gray-50 opacity-60
+                {% else %}
+                  bg-white shadow-sm hover:shadow-xl hover:border-[var(--theme-color)]
+                {% endif %}"
+         style="--theme-color:{% cycle '#0ea5e9' '#6366f1' '#10b981' '#f59e0b' '#f43f5e' '#8b5cf6' '#06b6d4' '#f97316' %};">
+
+      <div class="h-1.5 w-full bg-[var(--theme-color)]"></div>
+
+      <div class="p-5 flex flex-col h-full">
+
+        <!-- Header -->
+        <div class="flex justify-between items-start mb-4">
+          <div class="w-12 h-12 rounded-lg flex items-center justify-center
+                      bg-gray-50 text-[var(--theme-color)]
+                      group-hover:bg-[var(--theme-color)]
+                      group-hover:text-white transition shadow-sm">
+            <i class="fas fa-clipboard-check text-xl"></i>
+          </div>
+
+          <div class="flex flex-col items-end gap-1">
+            <span class="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-0.5 rounded uppercase">
+              {{ template.engine }}
+            </span>
+
+            {% if template.is_completed_for_shift %}
+              <span class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded uppercase">
+                Completed
+              </span>
+            {% endif %}
+
+            {% if version %}
+              <span class="bg-gray-100 text-gray-500 text-[10px] font-bold px-2 py-0.5 rounded border uppercase">
+                v{{ version.version_number }}
+              </span>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Title -->
+        <h3 class="text-lg font-bold mb-2
+                   {% if template.is_completed_for_shift %}
+                     text-gray-400
+                   {% else %}
+                     text-gray-900 group-hover:text-[var(--theme-color)]
+                   {% endif %}">
+          {{ template.name }}
+        </h3>
+
+        <!-- Description -->
+        <p class="text-sm text-gray-500 mb-4 line-clamp-2">
+          {{ template.description|default:"No description provided." }}
+        </p>
+
+        <!-- Action (✅ FIXED) -->
+        <a
+          href="
+            {% if requires_work_context %}
+              {% url 'ui:unified_form_runtime' template.engine template.id %}
+            {% else %}
+              {% url 'ui:dynamic_form_runtime' template.id %}
+            {% endif %}
+          "
+          class="mt-auto w-full flex items-center justify-center px-4 py-3 rounded-xl font-bold text-sm transition
+                {% if template.is_completed_for_shift %}
+                  bg-gray-200 text-gray-500 border border-gray-300
+                {% else %}
+                  bg-white border border-gray-300 text-gray-700
+                  hover:bg-[var(--theme-color)]
+                  hover:text-white
+                {% endif %}">
+          {% if template.is_completed_for_shift %}
+            Submit Again
+          {% else %}
+            Start Inspection
+          {% endif %}
+          <i class="fas fa-arrow-right ml-2"></i>
+        </a>
+
+      </div>
+    </div>
+
+    {% endwith %}
+    {% endwith %}
+    {% endwith %}
+    {% endfor %}
+
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{% endblock %}

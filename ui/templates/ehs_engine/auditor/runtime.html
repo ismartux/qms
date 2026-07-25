@@ -1,0 +1,401 @@
+{% extends "shell/app.html" %}
+{% load dict_extras %}
+{% load static %}
+{% block title %}{{ submission.version.template.name }}{% endblock %}
+
+<style>
+@media (max-width: 768px) {
+  .mobile-bottom-nav { display: none !important; }
+}
+</style>
+
+{% block content %}
+<div class="max-w-2xl mx-auto pb-[4rem] min-h-screen bg-gray-50">
+
+<!-- ================= HEADER ================= -->
+<header class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-gray-200 shadow-sm">
+<div class="px-5 py-4 space-y-4">
+
+<div class="flex justify-between items-start">
+<div class="flex-1 pr-4">
+<h1 class="text-lg font-bold text-gray-900 leading-tight">
+{{ section.title }}
+</h1>
+
+<div class="flex items-center gap-4 mt-2 text-[11px] font-semibold">
+<div class="flex items-center gap-1 text-blue-600 uppercase tracking-wide">
+<i class="fas fa-file-alt text-[10px] opacity-70"></i>
+<span>Form No: {{ submission.version.template.code }}</span>
+</div>
+<div class="flex items-center gap-1 text-gray-500 uppercase tracking-wide">
+<i class="fas fa-layer-group text-[10px] opacity-70"></i>
+<span>Ver {{ submission.version.version_number }}</span>
+</div>
+</div>
+</div>
+
+<div class="text-right">
+<div class="text-2xl font-bold text-sky-600 tabular-nums" id="progressText">0%</div>
+<div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Done</div>
+</div>
+</div>
+
+<div class="relative h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+<div id="itemProgressBar"
+class="absolute top-0 left-0 h-full bg-sky-500 rounded-full transition-all duration-500 ease-out"
+style="width:0%">
+</div>
+</div>
+
+<div class="flex justify-between text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+<span>Step {{ step }} / {{ total_steps }}</span>
+</div>
+
+</div>
+</header>
+
+<main class="p-4 space-y-4">
+
+{% if messages %}
+  {% for message in messages %}
+    {% if message.tags == "error" %}
+      <div class="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded shadow-sm">
+        {{ message }}
+      </div>
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
+{% if submission.status != "DRAFT" %}
+<div class="bg-green-50 border border-green-200 text-green-800 p-6 rounded-xl text-center shadow-sm">
+<h3 class="font-bold text-lg">Inspection Submitted</h3>
+<p class="text-sm mt-1 opacity-80">This record is locked.</p>
+</div>
+{% else %}
+
+<form method="post" enctype="multipart/form-data" id="inspectionForm" class="space-y-4">
+{% csrf_token %}
+
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+<div class="divide-y divide-gray-100">
+
+{% for item in section.items.all %}
+{% with response=responses_by_item|get_item:item.id %}
+
+<div class="p-5 form-item relative
+{% if item.id in missing_item_ids %}bg-red-50/30 border-l-4 border-red-500{% endif %}"
+data-item-id="{{ item.id }}"
+data-required="{{ item.required|yesno:'1,0' }}"
+{% for rule in item.rules.all %}
+{% if rule.rule_type == "PHOTO_REQUIRED" %}data-photo-cond="{{ rule.condition_value }}"{% endif %}
+{% if rule.rule_type == "REMARK_REQUIRED" %}data-remark-cond="{{ rule.condition_value }}"{% endif %}
+{% if rule.rule_type == "ESCALATE" %}data-escalate-cond="{{ rule.condition_value }}"{% endif %}
+{% endfor %}>
+
+<div class="mb-4">
+<label class="text-sm font-bold text-gray-900 block">
+{{ forloop.counter }}. {{ item.label }}
+{% if item.required %}<span class="text-red-500">*</span>{% endif %}
+</label>
+</div>
+
+<div class="space-y-3">
+
+<!-- ================= BOOLEAN ================= -->
+{% if item.item_type == "BOOLEAN" %}
+<div class="grid grid-cols-3 gap-3">
+
+<!-- PASS -->
+<label class="cursor-pointer group">
+  <input type="radio"
+         name="item_{{ item.id }}"
+         value="YES"
+         class="peer sr-only"
+         {% if response and response.value == "YES" %}checked{% endif %}>
+  <div class="p-4 rounded-xl border-2 text-center transition-all duration-200
+              border-gray-200
+              peer-checked:border-green-500
+              peer-checked:bg-green-50">
+    Pass
+  </div>
+</label>
+
+<!-- FAIL -->
+<label class="cursor-pointer group">
+  <input type="radio"
+         name="item_{{ item.id }}"
+         value="NO"
+         class="peer sr-only"
+         {% if response and response.value == "NO" %}checked{% endif %}>
+  <div class="p-4 rounded-xl border-2 text-center transition-all duration-200
+              border-gray-200
+              peer-checked:border-red-500
+              peer-checked:bg-red-50">
+    Fail
+  </div>
+</label>
+
+<!-- NA -->
+<label class="cursor-pointer group">
+  <input type="radio"
+         name="item_{{ item.id }}"
+         value="NA"
+         class="peer sr-only"
+         {% if response and response.value == "NA" %}checked{% endif %}>
+  <div class="p-4 rounded-xl border-2 text-center transition-all duration-200
+              border-gray-200
+              peer-checked:border-gray-500
+              peer-checked:bg-gray-100">
+    NA
+  </div>
+</label>
+
+</div>
+
+<!-- REMARK RULE -->
+<div class="mt-4 bg-gray-50 rounded-xl p-4 border border-gray-200 rule-remark hidden">
+  <label class="text-xs font-bold text-gray-500 uppercase mb-2 block">
+    Add Remark
+  </label>
+  <textarea name="item_remark_{{ item.id }}"
+            rows="2"
+            class="w-full rounded-lg border-gray-300 border p-3 text-sm">
+    {{ response.remark|default:'' }}
+  </textarea>
+</div>
+
+<!-- PHOTO RULE -->
+<div class="mt-4 bg-amber-50 rounded-xl p-4 border border-amber-200 rule-photo hidden">
+  <label class="text-xs font-bold text-amber-700 uppercase mb-2 block">
+    Proof Photo Required
+  </label>
+  <input type="file" name="item_file_{{ item.id }}">
+</div>
+
+{% endif %}
+
+<!-- ================= TEXT ================= -->
+{% if item.item_type == "TEXT" %}
+<input type="text" name="item_{{ item.id }}"
+value="{{ response.value|default:'' }}"
+class="w-full rounded-xl border-gray-300 border p-4">
+{% endif %}
+
+<!-- ================= NUMBER ================= -->
+{% if item.item_type == "NUMBER" %}
+<input type="number" name="item_{{ item.id }}"
+value="{{ response.value|default:'' }}"
+class="w-full rounded-xl border-gray-300 border p-4">
+{% endif %}
+
+<!-- ================= DROPDOWN ================= -->
+{% if item.item_type == "DROPDOWN" %}
+<select name="item_{{ item.id }}"
+class="w-full rounded-xl border-gray-300 border p-4">
+<option value="">Select</option>
+{% for opt in item.options.all %}
+<option value="{{ opt.value }}"
+{% if response and response.value == opt.value %}selected{% endif %}>
+{{ opt.label }}
+</option>
+{% endfor %}
+</select>
+{% endif %}
+
+<!-- ================= DATE ================= -->
+{% if item.item_type == "DATE" %}
+<input type="date" name="item_{{ item.id }}"
+value="{{ response.value|default:'' }}"
+class="w-full rounded-xl border-gray-300 border p-4">
+{% endif %}
+
+<!-- ================= PHOTO ================= -->
+{% if item.item_type == "PHOTO" %}
+<div class="relative">
+  <input type="file"
+         name="item_file_{{ item.id }}"
+         id="file_{{ item.id }}"
+         class="hidden"
+         accept="image/*"
+         onchange="previewImage(this, 'preview_{{ item.id }}')">
+
+  <label for="file_{{ item.id }}"
+         class="block w-full border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:bg-gray-50 hover:border-sky-400 transition-all cursor-pointer group bg-gray-50">
+
+    <!-- Image Preview -->
+    <div id="preview_{{ item.id }}" class="hidden mb-3">
+      <img src=""
+           class="h-32 mx-auto rounded-lg shadow-md object-cover w-full">
+      <p class="text-xs text-gray-500 mt-2 font-medium">
+        Tap to change photo
+      </p>
+    </div>
+
+    <!-- Placeholder -->
+    <div id="placeholder_{{ item.id }}">
+      <div class="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+        <i class="fas fa-camera text-sky-500 text-xl"></i>
+      </div>
+      <p class="text-sm font-medium text-gray-700">
+        Upload Photo
+      </p>
+      <p class="text-xs text-gray-400 mt-1">
+        JPG, PNG supported
+      </p>
+    </div>
+
+  </label>
+</div>
+{% endif %}
+
+<!-- ================= RISK MATRIX ================= -->
+{% if item.item_type == "RISK_MATRIX" %}
+<div class="grid grid-cols-2 gap-4">
+<div>
+<label class="text-xs font-bold text-gray-500">Likelihood</label>
+<select name="risk_likelihood" class="w-full rounded-xl border-gray-300 border p-3">
+<option value="">Select</option>
+{% for i in "12345" %}
+<option value="{{ i }}"
+{% if risk_assessment and risk_assessment.likelihood|stringformat:"s" == i %}selected{% endif %}>
+{{ i }}
+</option>
+{% endfor %}
+</select>
+</div>
+
+<div>
+<label class="text-xs font-bold text-gray-500">Severity</label>
+<select name="risk_severity" class="w-full rounded-xl border-gray-300 border p-3">
+<option value="">Select</option>
+{% for i in "12345" %}
+<option value="{{ i }}"
+{% if risk_assessment and risk_assessment.severity|stringformat:"s" == i %}selected{% endif %}>
+{{ i }}
+</option>
+{% endfor %}
+</select>
+</div>
+</div>
+
+<div class="mt-3 text-sm font-semibold">
+Risk Score:
+<span id="risk_score">
+{% if risk_assessment %}{{ risk_assessment.score }}{% else %}0{% endif %}
+</span>
+</div>
+{% endif %}
+
+</div>
+</div>
+
+{% endwith %}
+{% endfor %}
+
+</div>
+</div>
+
+<!-- ================= NAVIGATION ================= -->
+<div class="flex justify-between items-center gap-4 pt-6">
+
+{% if step > 1 %}
+<a href="?step={{ step|add:'-1' }}"
+class="flex-1 flex justify-center items-center px-3 py-2 border border-gray-300 text-sm font-semibold rounded-xl bg-white hover:bg-gray-50">
+<i class="fas fa-arrow-left mr-2"></i> Back
+</a>
+{% else %}
+<div class="flex-1"></div>
+{% endif %}
+
+{% if step < total_steps %}
+<button type="submit"
+class="flex-1 flex justify-center items-center px-3 py-2 text-sm font-semibold rounded-xl text-white bg-sky-600 hover:bg-sky-700">
+Next Step <i class="fas fa-arrow-right ml-2"></i>
+</button>
+{% else %}
+<button type="submit"
+class="flex-1 flex justify-center items-center px-3 py-2 text-sm font-semibold rounded-xl text-white bg-green-600 hover:bg-green-700">
+Submit Inspection <i class="fas fa-check ml-2"></i>
+</button>
+{% endif %}
+
+</div>
+
+</form>
+{% endif %}
+
+</main>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+
+// RULE ENGINE UI
+document.querySelectorAll(".form-item").forEach(function(itemEl){
+
+const itemId = itemEl.dataset.itemId;
+const radios = itemEl.querySelectorAll('input[name="item_'+itemId+'"]');
+const remarkBlock = itemEl.querySelector(".rule-remark");
+const photoBlock = itemEl.querySelector(".rule-photo");
+
+const remarkCond = itemEl.dataset.remarkCond;
+const photoCond = itemEl.dataset.photoCond;
+
+function evaluate(){
+let selected="";
+radios.forEach(r=>{ if(r.checked) selected=r.value; });
+
+if(selected==="NA"){
+if(remarkBlock) remarkBlock.classList.add("hidden");
+if(photoBlock) photoBlock.classList.add("hidden");
+return;
+}
+
+if(remarkBlock){
+remarkBlock.classList.toggle("hidden", selected!==remarkCond);
+}
+if(photoBlock){
+photoBlock.classList.toggle("hidden", selected!==photoCond);
+}
+}
+
+evaluate();
+radios.forEach(r=>r.addEventListener("change",evaluate));
+
+});
+
+// RISK MATRIX AUTO SCORE
+const likelihood=document.querySelector('[name="risk_likelihood"]');
+const severity=document.querySelector('[name="risk_severity"]');
+const score=document.getElementById("risk_score");
+
+if(likelihood && severity){
+function update(){
+const l=parseInt(likelihood.value)||0;
+const s=parseInt(severity.value)||0;
+score.innerText=l*s;
+}
+likelihood.addEventListener("change",update);
+severity.addEventListener("change",update);
+}
+
+});
+
+window.previewImage = function(input, previewId) {
+  const preview = document.getElementById(previewId);
+  const placeholder = preview.nextElementSibling;
+
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      preview.querySelector("img").src = e.target.result;
+      preview.classList.remove("hidden");
+      placeholder.classList.add("hidden");
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+};
+</script>
+{% endblock %}

@@ -1,0 +1,38 @@
+<nav class="mobile-bottom-nav fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-2 z-50 md:hidden no-print">
+
+  <a href="{% url 'ui:operator_home' %}"
+     class="flex flex-col items-center
+     {% if current_url == 'operator_home' %}text-sky-600{% else %}text-gray-600{% endif %}">
+    <i class="fas fa-home text-lg"></i>
+    <span class="text-xs">Home</span>
+  </a>
+
+  <a href="{% url 'ui:forms_list' %}"
+     class="flex flex-col items-center
+     {% if current_url in 'forms_list form_runtime submission_detail' %}
+       text-sky-600
+     {% else %}
+       text-gray-600
+     {% endif %}">
+    <i class="fas fa-clipboard-list text-lg"></i>
+    <span class="text-xs">Form</span>
+  </a>
+
+  <a href="{% url 'ui:ipqc_dashboard' %}"
+     class="flex flex-col items-center
+     {% if current_app == 'ipqc_dashboard' %}
+       text-sky-600
+     {% else %}
+       text-gray-600
+     {% endif %}">
+    <i class="fas fa-chart-pie text-lg"></i>
+    <span class="text-xs">Dash</span>
+  </a>
+
+  <a href="{% url 'ui:work_context_list' %}"
+     class="flex flex-col items-center text-gray-600">
+    <i class="fas fa-user text-lg"></i>
+    <span class="text-xs">Work</span>
+  </a>
+
+</nav>

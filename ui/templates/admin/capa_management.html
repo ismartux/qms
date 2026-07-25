@@ -1,0 +1,113 @@
+{% extends "shell/app.html" %}
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+    
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <h1 class="text-2xl font-bold text-gray-900">CAPA Management</h1>
+        <a href="{% url 'admin_panel:capa_create' %}" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-sky-600 hover:bg-sky-700 focus:ring-2 focus:ring-offset-2 focus:ring-sky-500">
+            <i class="fas fa-plus mr-2"></i> Create CAPA
+        </a>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex flex-col md:flex-row gap-4">
+        <div class="flex-1 max-w-xs relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <i class="fas fa-search text-gray-400"></i>
+            </div>
+            <input type="text" id="capaSearch" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-gray-50 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm" placeholder="Search CAPAs...">
+        </div>
+        <div class="flex gap-3">
+            <select id="statusFilter" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 bg-gray-50 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm rounded-lg border">
+                <option value="">All Statuses</option>
+                <option value="OPEN">Open</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="CLOSED">Closed</option>
+            </select>
+            <select id="severityFilter" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 bg-gray-50 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm rounded-lg border">
+                <option value="">All Severities</option>
+                <option value="1">1 - Low</option>
+                <option value="5">5 - Medium</option>
+                <option value="10">10 - Critical</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Owner</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Severity</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                        <th scope="col" class="relative px-6 py-3"><span class="sr-only">Actions</span></th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200" id="capaTableBody">
+                    {% for capa in capas %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500">{{ capa.capa_id|truncatechars:8 }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ capa.title }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ capa.owner.username|default:'—' }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                {{ capa.severity }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if capa.status == "OPEN" %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Open</span>
+                            {% elif capa.status == "IN_PROGRESS" %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">In Progress</span>
+                            {% else %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Closed</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ capa.due_date }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <a href="{% url 'ui:capa_detail_view' %}" class="text-sky-600 hover:text-sky-900 mr-3">View</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const tableBody = document.getElementById('capaTableBody');
+    const rows = Array.from(tableBody.querySelectorAll('tr'));
+    
+    const filterFn = () => {
+        const sVal = document.getElementById('statusFilter').value;
+        const sevVal = document.getElementById('severityFilter').value;
+        const term = document.getElementById('capaSearch').value.toLowerCase();
+
+        rows.forEach(row => {
+            const statusTxt = row.children[4].textContent.trim();
+            const sevTxt = row.children[3].textContent.trim();
+            const rowTxt = row.textContent.toLowerCase();
+            
+            const matchStatus = !sVal || statusTxt.includes(sVal.replace('_', ' '));
+            const matchSev = !sevVal || sevTxt.includes(sevVal);
+            const matchTerm = !term || rowTxt.includes(term);
+
+            row.style.display = (matchStatus && matchSev && matchTerm) ? '' : 'none';
+        });
+    };
+
+    ['keyup', 'change'].forEach(evt => {
+        document.getElementById('capaSearch').addEventListener(evt, filterFn);
+        document.getElementById('statusFilter').addEventListener(evt, filterFn);
+        document.getElementById('severityFilter').addEventListener(evt, filterFn);
+    });
+  });
+</script>
+{% endblock %}

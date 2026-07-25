@@ -1,0 +1,126 @@
+{% extends "shell/app.html" %}
+
+{% block extra_js %}
+<script>
+function toggleScheduleFields(type) {
+  document.querySelectorAll(".schedule-block").forEach(el => {
+    el.classList.add("hidden");
+  });
+  if (type) {
+    const block = document.getElementById(type + "-block");
+    if (block) block.classList.remove("hidden");
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const typeField = document.getElementById("id_schedule_type");
+  toggleScheduleFields(typeField.value);
+  typeField.addEventListener("change", e => toggleScheduleFields(e.target.value));
+});
+</script>
+{% endblock %}
+
+{% block content %}
+
+<!-- PAGE HEADER -->
+<div class="mb-8">
+  <h1 class="text-3xl font-extrabold text-gray-900">
+    {% if form.instance.pk %}Edit Schedule{% else %}Create Schedule{% endif %}
+  </h1>
+  <p class="text-gray-500 mt-1">
+    Configure how and when this checklist is generated automatically
+  </p>
+</div>
+
+<form method="post" class="space-y-8 max-w-3xl">
+  {% csrf_token %}
+
+  <!-- TEMPLATE -->
+  <div class="bg-white rounded-2xl shadow border p-6 space-y-4">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center">
+        <i class="fas fa-layer-group"></i>
+      </div>
+      <h2 class="text-lg font-bold">Checklist Template</h2>
+    </div>
+
+    <div>
+      <label class="block font-semibold mb-1">Select Template</label>
+      {{ form.template }}
+      <p class="form-help">
+        This checklist will be auto-created based on the schedule below.
+      </p>
+    </div>
+  </div>
+
+  <!-- SCHEDULE TYPE -->
+  <div class="bg-white rounded-2xl shadow border p-6 space-y-4">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center">
+        <i class="fas fa-clock"></i>
+      </div>
+      <h2 class="text-lg font-bold">Schedule Type</h2>
+    </div>
+
+    <div>
+      <label class="block font-semibold mb-1">How often should it run?</label>
+      {{ form.schedule_type }}
+    </div>
+
+    <!-- INTERVAL -->
+    <div id="interval-block" class="schedule-block hidden pt-4 border-t">
+      <label class="block font-semibold mb-1">Interval (Minutes)</label>
+      {{ form.interval_minutes }}
+      <p class="form-help">Checklist will be created repeatedly at this interval.</p>
+    </div>
+
+    <!-- SHIFT LIMIT -->
+    <div id="shift_limit-block" class="schedule-block hidden pt-4 border-t">
+      <label class="block font-semibold mb-1">Times Per Shift</label>
+      {{ form.times_per_shift }}
+      <p class="form-help">Maximum number of checklists per shift.</p>
+    </div>
+
+    <!-- DAILY -->
+    <div id="daily-block" class="schedule-block hidden pt-4 border-t">
+      <label class="block font-semibold mb-1">Daily Time</label>
+      {{ form.daily_time }}
+      <p class="form-help">Checklist will be generated once daily.</p>
+    </div>
+  </div>
+
+  <!-- STATUS -->
+  <div class="bg-white rounded-2xl shadow border p-6">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-10 h-10 rounded-xl bg-green-100 text-green-600 flex items-center justify-center">
+        <i class="fas fa-toggle-on"></i>
+      </div>
+      <h2 class="text-lg font-bold">Status</h2>
+    </div>
+
+    <div class="flex items-start gap-4">
+      {{ form.is_active }}
+      <div>
+        <div class="font-semibold">Schedule Active</div>
+        <div class="text-sm text-gray-500">
+          Disable this if you want to pause automation.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTIONS -->
+  <div class="flex justify-between items-center pt-4">
+    <a href="{% url 'scheduler_admin:schedule_list' %}" class="btn btn-secondary">
+      Cancel
+    </a>
+
+    <button type="submit" class="btn btn-primary px-8">
+      <i class="fas fa-save"></i>
+      Save Schedule
+    </button>
+  </div>
+
+</form>
+
+{% endblock %}

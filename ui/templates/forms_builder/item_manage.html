@@ -1,0 +1,240 @@
+{% extends "shell/app.html" %}
+{% block title %}Items – {{ section.title }}{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+    
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <a href="{% url 'transs_admin_flow:manage_sections' section.version.id %}" class="text-sm text-gray-500 hover:text-sky-600 font-medium mb-1 inline-block">
+                ← Back to Sections
+            </a>
+            <h1 class="text-2xl font-bold text-gray-900">Checklist Items</h1>
+            <p class="text-sm text-gray-500">Section: <strong class="text-gray-900">{{ section.title }}</strong></p>
+        </div>
+        <a href="{% url 'transs_admin_flow:finalize_version' section.version.id %}"
+           class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+           onclick="return confirm('Finalize this version?\nNo further edits will be allowed.')">
+            <i class="fas fa-check-circle mr-2"></i> Finalize Template
+        </a>
+    </div>
+
+    <!-- Add Item Form -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-bold text-gray-900 flex items-center">
+                <i class="fas fa-plus-circle text-sky-500 mr-2"></i> Add New Item
+            </h3>
+        </div>
+        <div class="p-6">
+            <form method="post" class="space-y-6">
+                {% csrf_token %}
+                
+                <!-- Basic Details -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Section</label>
+                        <select name="section" class="w-full rounded-lg border-gray-300 bg-white border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500" required>
+                            {% for s in sections %}
+                            <option value="{{ s.id }}" {% if s.id == section.id %}selected{% endif %}>{{ s.title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Item ID</label>
+                        <input name="item_id" class="w-full rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 bg-white font-mono" required placeholder="e.g. QC_01">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Label</label>
+                        <input name="label" class="w-full rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 bg-white" required placeholder="Inspection description">
+                    </div>
+                </div>
+
+                <!-- Settings -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Item Type</label>
+                        <select name="item_type" id="id_item_type" class="w-full rounded-lg border-gray-300 bg-white border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500" onchange="toggleDropdownOptions()">
+                            <option value="BOOLEAN">Yes / No</option>
+                            <option value="TEXT">Text</option>
+                            <option value="NUMBER">Number</option>
+                            <option value="PHOTO">Photo</option>
+                            <option value="DROPDOWN">Dropdown</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Order</label>
+                        <input name="order" type="number" class="w-full rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 bg-white" min="1" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Severity</label>
+                        <input name="severity_weight" type="number" class="w-full rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 bg-white" value="0" min="0">
+                    </div>
+                    <div class="pb-2">
+                         <div class="flex items-center">
+                            <input type="checkbox" name="required" class="w-4 h-4 text-sky-600 border-gray-300 rounded focus:ring-sky-500" id="newRequiredCheck">
+                            <label for="newRequiredCheck" class="ml-2 block text-sm font-medium text-gray-900">Required</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dropdown Options -->
+                <div id="dropdownOptions" class="space-y-3 hidden">
+                    <hr class="border-gray-200">
+                    <h6 class="text-sm font-bold text-gray-900 uppercase tracking-wide">Dropdown Options</h6>
+                    <div id="optionsContainer">
+                        <div class="flex gap-3">
+                            <input type="text" name="option_label[]" class="flex-1 rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 bg-white" placeholder="Label">
+                            <input type="text" name="option_value[]" class="flex-1 rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 bg-white" placeholder="Value">
+                        </div>
+                    </div>
+                    <button type="button" onclick="addOptionRow()" class="text-sm font-medium text-sky-600 hover:text-sky-700">+ Add Option</button>
+                </div>
+
+                <hr class="border-gray-200">
+
+                <!-- Rules -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Rule Type</label>
+                        <select name="rule_type" class="w-full rounded-lg border-gray-300 bg-white border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500">
+                            <option value="">No rule</option>
+                            <option value="PHOTO_REQUIRED">Photo Required</option>
+                            <option value="REMARK_REQUIRED">Remark Required</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Condition Value</label>
+                        <input
+                            type="text"
+                            name="condition_value"
+                            id="condition_value"
+                            class="w-full rounded-lg border-gray-300 bg-white border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500"
+                            placeholder="YES / NO / <5 / NG">
+
+                        <p id="conditionHelp" class="mt-1 text-xs text-gray-500">
+                            Depends on item type
+                        </p>
+                        <p class="mt-1 text-xs text-gray-500">Rule triggers when answer equals this value</p>
+                    </div>
+                </div>
+
+                <div class="text-end">
+                    <button class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                        <i class="fas fa-plus mr-2"></i> Add Item
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+
+    <!-- Items List -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-bold text-gray-900 flex items-center">
+                <i class="fas fa-list-check text-sky-500 mr-2"></i> Items in {{ section.title }}
+            </h3>
+        </div>
+        <div>
+            {% if items %}
+            <ul class="divide-y divide-gray-100">
+                {% for i in items %}
+                <li class="p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:bg-gray-50 transition-colors">
+                    <div class="flex-1">
+                        <div class="font-bold text-gray-900 text-lg">{{ i.label }}</div>
+                        <div class="text-sm text-gray-500 mt-1 flex flex-wrap gap-2">
+                            <span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs font-medium">{{ i.item_type }}</span>
+                            <span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs font-medium">Order {{ i.order }}</span>
+                            {% if i.required %}
+                                <span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-xs font-medium">Required</span>
+                            {% endif %}
+                            {% if i.rules.exists %}
+                                <span class="bg-sky-100 text-sky-800 px-2 py-0.5 rounded text-xs font-medium">Rule</span>
+                            {% endif %}
+                            {% if i.item_type == "DROPDOWN" %}
+                                <span class="bg-gray-200 text-gray-800 px-2 py-0.5 rounded text-xs font-medium">Dropdown</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3 w-full md:w-auto">
+                        <a href="{% url 'transs_admin_flow:edit_item' i.id %}" class="flex-1 md:flex-none text-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 hover:text-sky-600 transition-colors">
+                            <i class="fas fa-pencil-alt mr-2"></i> Edit
+                        </a>
+                        <a href="{% url 'transs_admin_flow:delete_item' i.id %}" class="flex-1 md:flex-none text-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                           onclick="return confirm('Delete this item?')">
+                            <i class="fas fa-trash-alt"></i>
+                        </a>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="p-8 text-center text-gray-500">No items created in this section yet.</div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<script>
+function toggleDropdownOptions() {
+  const type = document.getElementById("id_item_type").value;
+  const el = document.getElementById("dropdownOptions");
+  if(type === "DROPDOWN") el.classList.remove("hidden");
+  else el.classList.add("hidden");
+}
+
+function addOptionRow() {
+  const container = document.getElementById("optionsContainer");
+  const row = document.createElement("div");
+  row.className = "flex gap-3";
+  row.innerHTML = `
+    <input type="text" name="option_label[]" class="flex-1 rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 bg-white" placeholder="Label">
+    <input type="text" name="option_value[]" class="flex-1 rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 bg-white" placeholder="Value">
+  `;
+  container.appendChild(row);
+}
+
+function updateConditionHelp() {
+  const type = document.getElementById("id_item_type").value;
+
+  const booleanSelect = document.getElementById("condition_value_boolean");
+  const genericInput = document.getElementById("condition_value_generic");
+  const help = document.getElementById("conditionHelp");
+
+  if (type === "BOOLEAN") {
+    booleanSelect.classList.remove("hidden");
+    genericInput.classList.add("hidden");
+    genericInput.value = "";
+    help.textContent = "Rules can target YES or NO only (NA is ignored)";
+  } else {
+    booleanSelect.classList.add("hidden");
+    genericInput.classList.remove("hidden");
+    booleanSelect.value = "";
+    
+    const messages = {
+      "TEXT": "Exact match (e.g. DAMAGED)",
+      "NUMBER": "Use comparisons (e.g. <5, >=10)",
+      "DROPDOWN": "Use option value (e.g. NG)",
+      "PHOTO": "Usually leave empty"
+    };
+
+    help.textContent = messages[type] || "Condition depends on item type";
+  }
+}
+
+
+// hook into existing logic
+document.getElementById("id_item_type").addEventListener(
+  "change",
+  updateConditionHelp
+);
+
+document.addEventListener("DOMContentLoaded", updateConditionHelp);
+
+document.addEventListener("DOMContentLoaded", toggleDropdownOptions);
+</script>
+{% endblock %}

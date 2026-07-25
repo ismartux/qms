@@ -1,0 +1,102 @@
+	{% extends "shell/app.html" %}
+	{% block content %}
+	<style>
+	  /* Animations */
+	  @keyframes fadeInUp {
+	    from { opacity: 0; transform: translateY(20px); }
+	    to { opacity: 1; transform: translateY(0); }
+	  }
+	  @keyframes pulse-ring {
+	    0% { transform: scale(0.8); opacity: 0.5; }
+	    100% { transform: scale(2.4); opacity: 0; }
+	  }
+	  .animate-fade-in-up {
+	    animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+	  }
+	  .pulse-effect::before {
+	    content: '';
+	    position: absolute;
+	    left: 0; top: 0;
+	    width: 100%; height: 100%;
+	    border-radius: 50%;
+	    background-color: inherit;
+	    z-index: -1;
+	    animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+	  }
+	</style>
+	<div class="min-h-[80vh] flex items-center justify-center p-4 sm:p-6 bg-slate-50/50">
+	  <div class="w-full max-w-lg bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden animate-fade-in-up relative">
+	    <!-- Decorative Top Border (Optional) -->
+	    <div class="h-2 w-full bg-gradient-to-r from-green-400 to-emerald-500"></div>
+	    <div class="p-8 sm:p-10 text-center">
+	      <!-- Animated Success Icon -->
+	      <div class="relative w-24 h-24 mx-auto mb-6">
+	        <div class="absolute inset-0 bg-green-100 rounded-full pulse-effect"></div>
+	        <div class="relative w-full h-full bg-white border-4 border-green-50 rounded-full flex items-center justify-center shadow-lg shadow-green-100 z-10">
+	          <div class="w-16 h-16 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center text-white text-3xl shadow-inner">
+	            <i class="fas fa-check"></i>
+	          </div>
+	        </div>
+	      </div>
+	      <!-- Headers -->
+	      <h1 class="text-3xl font-extrabold text-gray-900 mb-2 tracking-tight">Inspection Submitted</h1>
+	      <!-- Template Badge -->
+	      <div class="inline-flex items-center gap-2 px-4 py-2 bg-sky-50 rounded-lg border border-sky-100 mb-8">
+	        <i class="fas fa-file-contract text-sky-500 text-sm"></i>
+	        <span class="text-sm font-bold text-sky-800">{{ template.name }}</span>
+	      </div>
+	      <!-- Details Summary Card (Receipt Style) -->
+	      <div class="bg-gray-50/80 rounded-2xl border border-gray-100 p-6 text-left space-y-4 mb-8">
+	        <!-- Status Row -->
+	        <div class="flex items-center justify-between pb-4 border-b border-gray-200 last:border-0 last:pb-0">
+	          <div class="flex items-center gap-3">
+	            <div class="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 shadow-sm">
+	              <i class="fas fa-lock text-xs"></i>
+	            </div>
+	            <span class="text-sm font-medium text-gray-500">Status</span>
+	          </div>
+	          <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200 uppercase tracking-wider shadow-sm">
+	            Locked
+	          </span>
+	        </div>
+	        <!-- Date Row -->
+	        <div class="flex items-center justify-between pb-4 border-b border-gray-200 last:border-0 last:pb-0">
+	          <div class="flex items-center gap-3">
+	            <div class="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 shadow-sm">
+	              <i class="fas fa-clock text-xs"></i>
+	            </div>
+	            <span class="text-sm font-medium text-gray-500">Submitted At</span>
+	          </div>
+	          <span class="text-sm font-bold text-gray-900">{{ submission.submitted_at }}</span>
+	        </div>
+	        <!-- User Row -->
+	        <div class="flex items-center justify-between">
+	          <div class="flex items-center gap-3">
+	            <div class="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 shadow-sm">
+	              <i class="fas fa-user text-xs"></i>
+	            </div>
+	            <span class="text-sm font-medium text-gray-500">Submitted By</span>
+	          </div>
+	          <div class="flex items-center gap-2">
+	            <div class="w-6 h-6 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[10px] font-bold">
+	              {{ submission.submitted_by.username|slice:":1"|upper }}
+	            </div>
+	            <span class="text-sm font-bold text-gray-900">{{ submission.submitted_by.username }}</span>
+	          </div>
+	        </div>
+	      </div>
+	      <!-- Primary Action -->
+	      <a href="{% url 'ui:forms_list' %}" class="group relative w-full inline-flex items-center justify-center px-8 py-4 text-base font-bold rounded-xl text-white bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 shadow-lg shadow-sky-500/30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-all duration-200 hover:-translate-y-0.5">
+	        <span>Back to Forms</span>
+	        <i class="fas fa-arrow-right ml-2 transition-transform group-hover:translate-x-1"></i>
+	      </a>
+	      <!-- Secondary Action (Visual only, typically goes here) -->
+	      <div class="mt-4">
+	        <a href="#" onclick="window.history.back(); return false;" class="text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors">
+	          Go Back
+	        </a>
+	      </div>
+	    </div>
+	  </div>
+	</div>
+	{% endblock %}

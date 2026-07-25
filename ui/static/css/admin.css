@@ -1,0 +1,222 @@
+/* Admin Dashboard Styles */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.dashboard-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.dashboard-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.metric-card {
+  background: white;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.metric-value {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.metric-label {
+  color: var(--secondary-color);
+  font-size: 0.875rem;
+}
+
+.dashboard-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.chart-container {
+  background: white;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.dashboard-recent {
+  background: white;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.activity-list {
+  margin-top: 1rem;
+}
+
+.activity-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.activity-item:last-child {
+  border-bottom: none;
+}
+
+.activity-icon {
+  margin-right: 1rem;
+  color: var(--primary-color);
+}
+
+.activity-content {
+  flex: 1;
+}
+
+.activity-title {
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.activity-time {
+  font-size: 0.875rem;
+  color: var(--secondary-color);
+}
+
+/* User Management Styles */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.search-box {
+  width: 250px;
+}
+
+.table-responsive {
+  overflow-x: auto;
+}
+
+.table-hover tbody tr:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* CAPA Management Styles */
+.severity-1 { background-color: #d4edda; color: #155724; }
+.severity-2 { background-color: #d4edda; color: #155724; }
+.severity-3 { background-color: #d1ecf1; color: #0c5460; }
+.severity-4 { background-color: #d1ecf1; color: #0c5460; }
+.severity-5 { background-color: #fff3cd; color: #856404; }
+.severity-6 { background-color: #fff3cd; color: #856404; }
+.severity-7 { background-color: #f8d7da; color: #721c24; }
+.severity-8 { background-color: #f8d7da; color: #721c24; }
+.severity-9 { background-color: #f5c6cb; color: #721c24; }
+.severity-10 { background-color: #f5c6cb; color: #721c24; }
+
+.status-open { background-color: #f8d7da; color: #721c24; }
+.status-assigned { background-color: #fff3cd; color: #856404; }
+.status-in_progress { background-color: #d1ecf1; color: #0c5460; }
+.status-action_done { background-color: #d4edda; color: #155724; }
+.status-verified { background-color: #d1ecf1; color: #0c5460; }
+.status-closed { background-color: #e2e3e5; color: #383d41; }
+
+/* Reports Styles */
+.report-header {
+  text-align: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.report-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.report-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.report-data {
+  margin-bottom: 2rem;
+}
+
+/* Form Styles */
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0 -0.5rem;
+}
+
+.form-group {
+  flex: 0 0 100%;
+  padding: 0 0.5rem;
+  margin-bottom: 1rem;
+}
+
+@media (min-width: 576px) {
+  .form-group {
+    flex: 0 0 50%;
+  }
+}
+
+@media (min-width: 768px) {
+  .form-group {
+    flex: 0 0 33.333333%;
+  }
+}
+
+.form-actions {
+  margin-top: 1.5rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.invalid-feedback {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  color: #dc3545;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .dashboard-metrics {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+  
+  .dashboard-charts {
+    grid-template-columns: 1fr;
+  }
+  
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .page-header .btn {
+    margin-top: 0.5rem;
+  }
+  
+  .search-box {
+    width: 100%;
+    margin-top: 1rem;
+  }
+}

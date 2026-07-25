@@ -1,0 +1,42 @@
+{% extends "shell/app.html" %}
+{% block content %}
+
+<div class="max-w-md mx-auto mt-12">
+
+  <div class="bg-white rounded-xl shadow p-6">
+
+    <!-- Title -->
+    <h1 class="text-xl font-bold text-gray-900 mb-3">
+      {{ title }}
+    </h1>
+
+    <!-- Warning -->
+    <p class="text-sm text-gray-600 mb-6">
+      Are you sure you want to delete
+      <span class="font-semibold text-gray-900">
+        {{ object }}
+      </span>?
+      <br>
+      <span class="text-red-600 font-semibold">
+        This action cannot be undone.
+      </span>
+    </p>
+
+    <!-- Actions -->
+    <form method="post" class="flex gap-4">
+      {% csrf_token %}
+
+      <button type="submit" class="btn btn-danger">
+        Delete
+      </button>
+
+      <a href="{% url cancel_url %}" class="btn btn-secondary">
+        Cancel
+      </a>
+    </form>
+
+  </div>
+
+</div>
+
+{% endblock %}

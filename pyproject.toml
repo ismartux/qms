@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=65.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "transsflow"
+version = "0.1.0"
+description = "Enterprise-grade Work Process Automation platform for manufacturing"
+readme = "README.md"
+requires-python = ">=3.10"
+
+dependencies = [
+    "Django>=4.2,<5.0",
+    "mysqlclient>=2.2.0",
+    "python-dotenv>=1.0.0",
+]

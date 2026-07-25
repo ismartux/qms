@@ -1,0 +1,37 @@
+{# ================= HEADER BASE ================= #}
+
+<div class="flex items-center gap-4 flex-shrink-0">
+
+  <button onclick="toggleSidebar()"
+          aria-label="Toggle sidebar"
+          class="sidebar-toggle touch-target relative"
+          title="Toggle Sidebar">
+
+    <i class="fas fa-bars text-gray-700 text-lg"></i>
+
+    {% if ehs_unread_notifications > 0 %}
+    <span class="absolute -top-1 -right-1 
+                 bg-red-600 text-white
+                 text-[10px] px-1.5 py-0.5 
+                 rounded-full font-bold shadow">
+      {{ ehs_unread_notifications }}
+    </span>
+    {% endif %}
+  </button>
+
+  <a href="{% url 'ui:operator_home' %}" class="hidden sm:block">
+    <div class="text-2xl font-bold text-sky-600 tracking-tight">
+      TranssFlow
+    </div>
+  </a>
+
+</div>
+
+<!-- CENTER TITLE -->
+<div class="absolute left-1/2 transform -translate-x-1/2 text-center px-2">
+  <div
+    class="text-gray-900 font-semibold text-base sm:text-lg md:text-xl truncate
+           max-w-[70vw] sm:max-w-[50vw]">
+    {% block title %}Dashboard{% endblock %}
+  </div>
+</div>

@@ -1,0 +1,6 @@
+>>> from org.models import Company, Plant
+>>> 
+>>> Company.objects.all().values("id", "name")
+<QuerySet [{'id': 1, 'name': 'Padget Electronics Pvt Ltd'}, {'id': 2, 'name': 'IsmartU India Private Limited'}]>
+>>> Plant.objects.all().values("id", "code", "company_id")
+<QuerySet [{'id': 1, 'code': 'TUW1', 'company_id': 1}, {'id': 2, 'code': 'TUW1', 'company_id': 2}]>

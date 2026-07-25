@@ -1,0 +1,284 @@
+{% extends "shell/app.html" %}
+{% block title %}
+    {% if item %}Edit EHS Item{% else %}Create EHS Item{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<div class="max-w-4xl mx-auto space-y-6">
+
+    <!-- ================= HEADER ================= -->
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-900">
+            {% if item %}Edit EHS Item{% else %}Create EHS Item{% endif %}
+        </h1>
+
+        {% if item and not item.section.version.is_published and not item.section.version.is_active %}
+        <form method="post"
+              action="{% url 'ehs_builder:item_delete' item.id %}"
+              onsubmit="return confirm('Delete this item permanently?');">
+            {% csrf_token %}
+            <button type="submit"
+                class="px-4 py-2 text-sm font-medium rounded-lg border border-red-300 text-red-600 bg-white hover:bg-red-50 transition">
+                Delete
+            </button>
+        </form>
+        {% endif %}
+    </div>
+
+
+    <!-- ================= MAIN FORM ================= -->
+    <form method="post"
+          class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        {% csrf_token %}
+
+        <div class="p-6 space-y-6">
+
+            <!-- ================= BASIC DETAILS ================= -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                <!-- SECTION -->
+                {% if item %}
+                    <input type="hidden" name="section" value="{{ item.section.id }}">
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Section
+                        </label>
+                        <div class="w-full rounded-lg border-gray-200 bg-gray-50 border p-2.5 text-sm text-gray-700">
+                            {{ item.section.title }}
+                        </div>
+                    </div>
+                {% else %}
+                    <input type="hidden" name="section" value="{{ section.id }}">
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Section
+                        </label>
+                        <div class="w-full rounded-lg border-gray-200 bg-gray-50 border p-2.5 text-sm text-gray-700">
+                            {{ section.title }}
+                        </div>
+                    </div>
+                {% endif %}
+
+
+                <!-- ITEM ID -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        Item ID
+                    </label>
+                    <input type="text"
+                        name="item_id"
+                        value="{{ item.item_id|default:'' }}"
+                        {% if item %}readonly{% endif %}
+                        required
+                        class="w-full rounded-lg border-gray-300 border p-2.5 text-sm font-mono bg-white">
+                </div>
+
+
+                <!-- LABEL -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        Label
+                    </label>
+                    <input type="text"
+                        name="label"
+                        value="{{ item.label|default:'' }}"
+                        required
+                        class="w-full rounded-lg border-gray-300 border p-2.5 text-sm bg-white">
+                </div>
+
+
+                <!-- ITEM TYPE -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        Item Type
+                    </label>
+                    <select name="item_type"
+                        id="id_item_type"
+                        onchange="toggleDropdownOptions(); toggleRuleSection();"
+                        {% if item %}disabled{% endif %}
+                        required
+                        class="w-full rounded-lg border-gray-300 bg-white border p-2.5 text-sm">
+
+                        {% for key, label in item_types %}
+                        <option value="{{ key }}"
+                            {% if item and key == item.item_type %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+
+                    {% if item %}
+                        <input type="hidden" name="item_type" value="{{ item.item_type }}">
+                    {% endif %}
+                </div>
+
+
+                <!-- ORDER -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        Order
+                    </label>
+                    <input type="number"
+                        name="order"
+                        value="{{ item.order|default:1 }}"
+                        min="1"
+                        required
+                        class="w-full rounded-lg border-gray-300 border p-2.5 text-sm bg-white">
+                </div>
+
+
+                <!-- SEVERITY -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        Severity Weight
+                    </label>
+                    <input type="number"
+                        name="severity_weight"
+                        value="{{ item.severity_weight|default:0 }}"
+                        min="0" max="10"
+                        class="w-full rounded-lg border-gray-300 border p-2.5 text-sm bg-white">
+                    <p class="mt-1 text-xs text-gray-500">
+                        Added to risk score if answered NO
+                    </p>
+                </div>
+
+
+                <!-- REQUIRED -->
+                <div class="flex items-center pt-6">
+                    <input type="checkbox"
+                        name="required"
+                        class="w-4 h-4 text-sky-600 border-gray-300 rounded"
+                        {% if item and item.required %}checked{% endif %}>
+                    <label class="ml-2 text-sm font-medium text-gray-900">
+                        Required Item
+                    </label>
+                </div>
+
+            </div>
+
+
+            <!-- ================= BOOLEAN RULE FLAGS ================= -->
+            <div id="ruleSection" class="hidden">
+                <hr class="border-gray-200">
+                <h6 class="text-sm font-bold text-gray-900 mt-4 uppercase tracking-wide">
+                    If Answer = NO
+                </h6>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+
+                    <label class="flex items-center">
+                        <input type="checkbox"
+                               name="require_photo_on_no"
+                               class="w-4 h-4 text-sky-600 border-gray-300 rounded"
+                               {% if item and item.require_photo_on_no %}checked{% endif %}>
+                        <span class="ml-2 text-sm text-gray-700">Require Photo</span>
+                    </label>
+
+                    <label class="flex items-center">
+                        <input type="checkbox"
+                               name="require_remark_on_no"
+                               class="w-4 h-4 text-sky-600 border-gray-300 rounded"
+                               {% if item and item.require_remark_on_no %}checked{% endif %}>
+                        <span class="ml-2 text-sm text-gray-700">Require Remark</span>
+                    </label>
+
+                    <label class="flex items-center">
+                        <input type="checkbox"
+                               name="escalate_on_no"
+                               class="w-4 h-4 text-red-600 border-gray-300 rounded"
+                               {% if item and item.escalate_on_no %}checked{% endif %}>
+                        <span class="ml-2 text-sm text-gray-700">Auto Escalate</span>
+                    </label>
+
+                </div>
+            </div>
+
+
+            <!-- ================= DROPDOWN OPTIONS ================= -->
+            <div id="dropdownOptions" class="hidden">
+                <hr class="border-gray-200">
+                <h6 class="text-sm font-bold text-gray-900 mt-4 uppercase tracking-wide">
+                    Dropdown Options
+                </h6>
+
+                <div id="optionsContainer" class="space-y-3 mt-3">
+                    {% if item and item.options.all %}
+                        {% for opt in item.options.all %}
+                        <div class="flex gap-3">
+                            <input type="text"
+                                   name="options"
+                                   value="{{ opt.label }}"
+                                   class="flex-1 rounded-lg border-gray-300 border p-2.5 text-sm bg-white">
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="flex gap-3">
+                            <input type="text"
+                                   name="options"
+                                   class="flex-1 rounded-lg border-gray-300 border p-2.5 text-sm bg-white"
+                                   placeholder="Option">
+                        </div>
+                    {% endif %}
+                </div>
+
+                <button type="button"
+                        onclick="addOptionRow()"
+                        class="mt-3 text-sm font-medium text-sky-600 hover:text-sky-700">
+                    + Add Option
+                </button>
+            </div>
+
+        </div>
+
+
+        <!-- ================= FOOTER ================= -->
+        <div class="bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t border-gray-200">
+
+            <a href="{% if item %}{% url 'ehs_builder:version_edit' item.section.version.id %}
+                      {% else %}{% url 'ehs_builder:version_edit' section.version.id %}{% endif %}"
+               class="px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50">
+                Cancel
+            </a>
+
+            <button type="submit"
+                    class="px-4 py-2 text-sm font-medium rounded-lg text-white bg-sky-600 hover:bg-sky-700">
+                {% if item %}Update Item{% else %}Create Item{% endif %}
+            </button>
+
+        </div>
+
+    </form>
+</div>
+
+
+<script>
+function toggleDropdownOptions() {
+    const type = document.getElementById("id_item_type").value;
+    document.getElementById("dropdownOptions").classList.toggle("hidden", type !== "DROPDOWN");
+}
+
+function toggleRuleSection() {
+    const type = document.getElementById("id_item_type").value;
+    document.getElementById("ruleSection").classList.toggle("hidden", type !== "BOOLEAN");
+}
+
+function addOptionRow() {
+    const container = document.getElementById("optionsContainer");
+    const row = document.createElement("div");
+    row.className = "flex gap-3";
+    row.innerHTML = `
+        <input type="text" name="options"
+            class="flex-1 rounded-lg border-gray-300 border p-2.5 text-sm bg-white"
+            placeholder="Option">
+    `;
+    container.appendChild(row);
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    toggleDropdownOptions();
+    toggleRuleSection();
+});
+</script>
+
+{% endblock %}

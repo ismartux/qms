@@ -1,0 +1,53 @@
+{% if can_fill_ehs_forms %}
+<div class="nav-dropdown {% if current_app == 'ehs' %}open{% endif %}">
+
+  <!-- ===== Parent: EHS ===== -->
+  <div class="nav-item nav-dropdown-toggle"
+       onclick="toggleNavDropdown(this)"
+       data-tooltip="EHS">
+
+    <div class="flex items-center gap-3">
+      <i class="fas fa-hard-hat"></i>
+      <span class="nav-text">EHS</span>
+    </div>
+
+    <i class="fas fa-chevron-down nav-text text-xs"></i>
+  </div>
+
+  <!-- ===== Dropdown Menu ===== -->
+  <div class="nav-dropdown-menu">
+
+    <a href="{% url 'ehs:ehs_home' %}"
+       class="nav-sub-item {% if current_url == 'ehs_home' %}active{% endif %}"
+       data-tooltip="EHS Home">
+      <i class="fas fa-house-chimney"></i>
+      <span class="nav-text">EHS Home</span>
+    </a>
+
+    {% if can_fill_ehs_forms %}
+    <a href="{% url 'ehs:ehs_daily_template_list' %}"
+       class="nav-sub-item {% if current_url == 'ehs_daily_template_list' %}active{% endif %}"
+       data-tooltip="Forms">
+      <i class="fas fa-file-pen"></i>
+      <span class="nav-text">Forms</span>
+    </a>
+    <a href="{% url 'ui:dynamic_forms_list' %}"
+       class="nav-sub-item {% if current_url == 'dynamic_forms_list' %}active{% endif %}"
+       data-tooltip="Forms">
+      <i class="fas fa-file-pen"></i>
+      <span class="nav-text">Special</span>
+    </a>
+    {% endif %}
+
+    {% if can_view_ehs_reports %}
+    <a href="{% url 'ehs:ehs_submission_list' %}"
+       class="nav-sub-item {% if current_url == 'ehs_submission_list' %}active{% endif %}"
+       data-tooltip="Submissions">
+      <i class="fas fa-file-shield"></i>
+      <span class="nav-text">Submissions</span>
+    </a>
+    {% endif %}
+
+  </div>
+</div>
+{% endif %}

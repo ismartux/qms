@@ -1,0 +1,280 @@
+{% extends "shell/app.html" %}
+{% block title %}EHS Submissions{% endblock %}
+{% block content %}
+
+<div class="max-w-7xl mx-auto space-y-8 pb-12">
+
+  <!-- ================= HEADER ================= -->
+  <div class="flex justify-between items-center flex-wrap gap-4">
+
+    <div>
+      <h1 class="text-3xl font-extrabold text-gray-900">
+        EHS Submissions
+      </h1>
+      <p class="text-sm text-gray-500 mt-1">
+        {{ request.user.get_full_name|default:request.user.username }}
+      </p>
+    </div>
+
+    <div class="flex gap-2">
+      <a href="?type=DAILY"
+         class="px-4 py-2 rounded-lg text-sm font-semibold border
+         {% if submission_type == 'DAILY' %}
+           bg-sky-600 text-white border-sky-600
+         {% else %}
+           bg-white text-gray-600 border-gray-300
+         {% endif %}">
+        Daily
+      </a>
+
+      <a href="?type=SPECIAL"
+         class="px-4 py-2 rounded-lg text-sm font-semibold border
+         {% if submission_type == 'SPECIAL' %}
+           bg-amber-600 text-white border-amber-600
+         {% else %}
+           bg-white text-gray-600 border-gray-300
+         {% endif %}">
+        Special
+      </a>
+    </div>
+  </div>
+
+
+  <!-- ================= KPI GRID ================= -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+
+    <div class="bg-white rounded-2xl border p-6">
+      <h6 class="text-xs font-bold text-gray-400 uppercase mb-2">Total</h6>
+      <h2 class="text-3xl font-extrabold text-gray-900">{{ total_count }}</h2>
+    </div>
+
+    <div class="bg-white rounded-2xl border p-6">
+      <h6 class="text-xs font-bold text-gray-400 uppercase mb-2">Avg Risk</h6>
+      <h2 class="text-3xl font-extrabold text-amber-600">
+        {{ avg_risk|floatformat:2 }}
+      </h2>
+    </div>
+
+    <div class="bg-white rounded-2xl border p-6">
+      <h6 class="text-xs font-bold text-gray-400 uppercase mb-2">High Risk</h6>
+      <h2 class="text-3xl font-extrabold text-red-600">
+        {{ high_risk_count }}
+      </h2>
+    </div>
+
+    <div class="bg-white rounded-2xl border p-6">
+      <h6 class="text-xs font-bold text-gray-400 uppercase mb-2">Page Count</h6>
+      <h2 class="text-3xl font-extrabold text-green-600">
+        {{ page_obj.paginator.count }}
+      </h2>
+    </div>
+
+  </div>
+
+
+  <!-- ================= SUBMISSIONS ================= -->
+  <div class="bg-white rounded-2xl border overflow-hidden shadow-sm">
+
+    <div class="px-6 py-4 border-b bg-gray-50 flex justify-between items-center">
+      <h3 class="font-bold text-lg">Submissions</h3>
+      <span class="text-xs font-bold bg-gray-200 px-3 py-1 rounded-full">
+        {{ page_obj.paginator.count }}
+      </span>
+    </div>
+
+    <div class="p-6">
+
+      {% if page_obj %}
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+
+        {% for s in page_obj %}
+        <div class="rounded-xl border p-5 flex flex-col bg-white hover:shadow-lg transition duration-300">
+
+          <div class="flex justify-between items-start mb-4">
+            <h4 class="font-bold text-lg leading-tight">
+              {{ s.version.template.name }}
+            </h4>
+
+            <span class="text-[10px] font-bold px-2 py-1 rounded border
+              {% if s.status == 'SUBMITTED' %}
+                bg-sky-50 text-sky-700 border-sky-200
+              {% elif s.status == 'UNDER_REVIEW' %}
+                bg-amber-50 text-amber-700 border-amber-200
+              {% elif s.status == 'APPROVED' %}
+                bg-green-50 text-green-700 border-green-200
+              {% elif s.status == 'REJECTED' %}
+                bg-red-50 text-red-700 border-red-200
+              {% else %}
+                bg-gray-100 text-gray-600 border-gray-200
+              {% endif %}">
+              {{ s.status }}
+            </span>
+          </div>
+
+          <div class="space-y-2 text-xs text-gray-500 mb-4">
+            <div>📅 {{ s.created_at|date:"d M Y, H:i" }}</div>
+            <div>👤 {{ s.reported_by.get_full_name|default:s.reported_by.username }}</div>
+            <div>🏭 {{ s.plant.name }}</div>
+          </div>
+
+          <div class="mt-auto pt-4 border-t">
+
+            <div class="flex justify-between items-center mb-3">
+              <span class="text-xs font-bold text-gray-400 uppercase">Risk</span>
+
+              <span class="px-3 py-1 rounded-full text-xs font-bold border
+                {% if s.risk_score >= 8 %}
+                  bg-red-100 text-red-700 border-red-200
+                {% elif s.risk_score >= 4 %}
+                  bg-amber-100 text-amber-700 border-amber-200
+                {% else %}
+                  bg-emerald-100 text-emerald-700 border-emerald-200
+                {% endif %}">
+                {{ s.risk_score }}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              class="w-full py-2 text-sm font-semibold rounded-lg
+                     bg-sky-50 text-sky-700 border border-sky-200
+                     hover:bg-sky-600 hover:text-white transition"
+              data-url="{% url 'ehs:ehs_submission_popup' s.pk %}"
+              onclick="openSubmissionModalFromBtn(this)">
+              View Full Report
+            </button>
+
+          </div>
+        </div>
+        {% endfor %}
+
+      </div>
+      {% else %}
+      <div class="text-center py-12 text-gray-400">
+        No submissions available.
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ================= MODAL ================= -->
+<div id="submissionOverlay"
+     class="fixed inset-0 bg-black/60 hidden flex items-center justify-center p-6 z-[9999]">
+
+  <div class="bg-white w-full max-w-5xl max-h-[90vh]
+              rounded-2xl overflow-hidden flex flex-col shadow-2xl">
+
+    <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+      <h3 class="font-bold text-gray-900">Submission Details</h3>
+      <button onclick="closeSubmissionModal()" class="text-gray-400 hover:text-red-600">
+        ✖
+      </button>
+    </div>
+
+    <div id="submissionContent"
+         class="overflow-y-auto flex-1 p-6 text-sm">
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+
+// ================= SUBMISSION MODAL =================
+
+function openSubmissionModalFromBtn(btn) {
+  const url = btn.dataset.url;
+  const overlay = document.getElementById("submissionOverlay");
+  const content = document.getElementById("submissionContent");
+
+  overlay.classList.remove("hidden");
+  content.innerHTML = "<div class='text-center py-6'>Loading...</div>";
+
+  fetch(url)
+    .then(r => r.text())
+    .then(html => content.innerHTML = html)
+    .catch(() => content.innerHTML =
+      "<div class='text-red-600 text-center py-6'>Error loading data</div>");
+}
+
+function closeSubmissionModal() {
+  document.getElementById("submissionOverlay").classList.add("hidden");
+}
+
+document.getElementById("submissionOverlay")
+  .addEventListener("click", function(e) {
+    const modalBox = this.querySelector(".bg-white");
+    if (!modalBox.contains(e.target)) {
+      closeSubmissionModal();
+    }
+});
+
+document.addEventListener("keydown", function(e) {
+  if (e.key === "Escape") {
+    closeSubmissionModal();
+    closeImagePreview();
+  }
+});
+
+
+// ================= IMAGE PREVIEW (FINAL FIXED) =================
+
+function closeImagePreview() {
+  const existing = document.getElementById("dynamicImagePreview");
+  if (existing) existing.remove();
+}
+
+document.addEventListener("click", function(e) {
+
+  const target = e.target.closest("[data-preview]");
+  if (!target) return;
+
+  // 🔥 STOP MODAL CLOSE
+  e.stopPropagation();
+
+  const imageUrl = target.getAttribute("data-preview");
+
+  closeImagePreview();
+
+  const overlay = document.createElement("div");
+  overlay.id = "dynamicImagePreview";
+  overlay.className =
+    "fixed inset-0 bg-black/80 flex items-center justify-center z-[10000]";
+
+  overlay.innerHTML = `
+    <div class="relative max-w-5xl w-full p-6">
+      <button id="imageCloseBtn"
+              class="absolute -top-2 right-2 text-white text-3xl font-bold">
+        ×
+      </button>
+      <img src="${imageUrl}"
+           class="w-full max-h-[85vh] object-contain rounded-xl shadow-2xl">
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  overlay.querySelector("#imageCloseBtn")
+    .addEventListener("click", function(event) {
+      event.stopPropagation();
+      closeImagePreview();
+    });
+
+  overlay.addEventListener("click", function(event) {
+    if (event.target === overlay) {
+      closeImagePreview();
+    }
+  });
+
+});
+
+</script>
+{% endblock %}

@@ -1,0 +1,263 @@
+{% extends "shell/app.html" %}
+{% block content %}
+
+<div class="max-w-3xl mx-auto space-y-6">
+    
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900">
+            {% if template %}Edit Template{% else %}Create Template{% endif %}
+        </h1>
+
+        <p class="text-gray-500">
+            {% if template %}
+                Update template configuration and scope.
+            {% else %}
+                Set up the basic information for your new EHS form.
+            {% endif %}
+        </p>
+
+        {% if has_published_version %}
+        <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            <i class="fas fa-lock mr-2"></i>
+            This template has a <strong>published version</strong>.
+            Editing is restricted.
+        </div>
+        {% endif %}
+    </div>
+
+    <form method="post"
+          class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden space-y-6">
+        {% csrf_token %}
+        
+        <div class="p-6 space-y-6">
+
+            <!-- ================= BASIC INFO ================= -->
+            <div class="space-y-4">
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Code</label>
+                    <input name="code"
+                           value="{{ template.code|default:'' }}"
+                           class="w-full rounded-lg border-gray-300 border p-2.5 text-sm font-mono"
+                           required
+                           {% if has_published_version %}readonly{% endif %}>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                    <input name="name"
+                           value="{{ template.name|default:'' }}"
+                           class="w-full rounded-lg border-gray-300 border p-2.5 text-sm"
+                           required
+                           {% if has_published_version %}readonly{% endif %}>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea name="description"
+                              rows="3"
+                              class="w-full rounded-lg border-gray-300 border p-2.5 text-sm"
+                              {% if has_published_version %}readonly{% endif %}>{{ template.description|default:'' }}</textarea>
+                </div>
+
+            </div>
+
+            <hr class="border-gray-200">
+
+            <!-- ================= TEMPLATE TYPE ================= -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-bold text-gray-900">Template Type</h3>
+
+                <select name="template_type"
+                        id="templateType"
+                        onchange="handleTemplateType()"
+                        class="w-full rounded-lg border-gray-300 border p-2.5 text-sm"
+                        {% if has_published_version %}disabled{% endif %}>
+
+                    <option value="DAILY"
+                        {% if template and template.template_type == "DAILY" %}selected{% endif %}>
+                        Daily Audit
+                    </option>
+
+                    <option value="SPECIAL"
+                        {% if template and template.template_type == "SPECIAL" %}selected{% endif %}>
+                        Special Audit
+                    </option>
+                </select>
+            </div>
+
+            <!-- ================= DAILY SETTINGS ================= -->
+            <div id="dailySettings" class="space-y-4 hidden">
+                <h4 class="font-semibold text-gray-800">Daily Settings</h4>
+
+                <!-- Recurrence Scope -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        Recurrence Scope
+                    </label>
+                    <select name="recurrence_scope"
+                            class="w-full rounded-lg border-gray-300 border p-2.5 text-sm"
+                            {% if has_published_version %}disabled{% endif %}>
+                        <option value="">Select scope</option>
+
+                        <option value="PER_SHIFT"
+                            {% if template and template.recurrence_scope == "PER_SHIFT" %}selected{% endif %}>
+                            Per Shift
+                        </option>
+
+                        <option value="PER_DAY"
+                            {% if template and template.recurrence_scope == "PER_DAY" %}selected{% endif %}>
+                            Per Day
+                        </option>
+
+                        <option value="PER_WEEK"
+                            {% if template and template.recurrence_scope == "PER_WEEK" %}selected{% endif %}>
+                            Per Week
+                        </option>
+                    </select>
+                </div>
+
+                <!-- Allowed Submissions -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        Allowed Submissions
+                    </label>
+                    <input type="number"
+                           name="allowed_submissions"
+                           min="1"
+                           value="{{ template.allowed_submissions|default:1 }}"
+                           class="w-full rounded-lg border-gray-300 border p-2.5 text-sm"
+                           {% if has_published_version %}readonly{% endif %}>
+                    <p class="text-xs text-gray-500 mt-1">
+                        Example: 1 = once, 2 = twice, 4 = four times in selected scope
+                    </p>
+                </div>
+            </div>
+
+            <!-- ================= SPECIAL SETTINGS ================= -->
+            <div id="specialSettings" class="space-y-4 hidden">
+                <h4 class="font-semibold text-gray-800">Special Audit Settings</h4>
+
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="checkbox"
+                           name="require_approval"
+                           value="true"
+                           {% if template and template.require_approval %}checked{% endif %}
+                           {% if has_published_version %}disabled{% endif %}>
+                    Require Approval Workflow
+                </label>
+
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="checkbox"
+                           name="allow_multiple_submissions_per_day"
+                           value="true"
+                           {% if template and template.allow_multiple_submissions_per_day %}checked{% endif %}
+                           {% if has_published_version %}disabled{% endif %}>
+                    Allow Multiple Submissions Per Day
+                </label>
+
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="checkbox"
+                           name="require_incident_reference"
+                           value="true"
+                           {% if template and template.require_incident_reference %}checked{% endif %}
+                           {% if has_published_version %}disabled{% endif %}>
+                    Require Incident Reference
+                </label>
+            </div>
+
+            <hr class="border-gray-200">
+
+            <!-- ================= SCOPE ================= -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-bold text-gray-900">Scope</h3>
+
+                {% if has_published_version %}
+                    <div class="flex flex-wrap gap-2">
+                        {% for p in template.plants.all %}
+                            <span class="px-3 py-1 text-xs bg-green-50 text-green-700 border border-green-200 rounded-md">
+                                {{ p.name }} ({{ p.company.name }})
+                            </span>
+                            <input type="hidden" name="plants" value="{{ p.id }}">
+                        {% empty %}
+                            <span class="text-sm text-gray-400">All Plants</span>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto border rounded-lg p-3">
+                        {% for p in plants %}
+                        <label class="flex items-center gap-2 text-sm">
+                            <input type="checkbox"
+                                   name="plants"
+                                   value="{{ p.id }}"
+                                   {% if template and p in template.plants.all %}checked{% endif %}>
+                            {{ p.name }} ({{ p.company.name }})
+                        </label>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
+            <hr class="border-gray-200">
+
+            <!-- ================= BITABLE ================= -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-bold text-gray-900">Bitable Integration</h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            App Token
+                        </label>
+                        <input name="bitable_app_token"
+                               value="{{ template.bitable_app_token|default:'' }}"
+                               class="w-full rounded-lg border-gray-300 border p-2.5 text-sm font-mono"
+                               required
+                               {% if has_published_version %}readonly{% endif %}>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Table ID
+                        </label>
+                        <input name="bitable_table_id"
+                               value="{{ template.bitable_table_id|default:'' }}"
+                               class="w-full rounded-lg border-gray-300 border p-2.5 text-sm font-mono"
+                               required
+                               {% if has_published_version %}readonly{% endif %}>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ================= ACTIONS ================= -->
+        <div class="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+
+            <a href="{% url 'ehs_builder:template_list' %}"
+               class="px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50">
+                Cancel
+            </a>
+
+            {% if not has_published_version %}
+            <button type="submit"
+                    class="inline-flex items-center px-6 py-2 text-sm font-medium rounded-lg text-white bg-sky-600 hover:bg-sky-700">
+                Save Template
+            </button>
+            {% endif %}
+
+        </div>
+    </form>
+</div>
+
+<script>
+function handleTemplateType() {
+    const type = document.getElementById("templateType").value;
+    document.getElementById("dailySettings").classList.toggle("hidden", type !== "DAILY");
+    document.getElementById("specialSettings").classList.toggle("hidden", type !== "SPECIAL");
+}
+
+document.addEventListener("DOMContentLoaded", handleTemplateType);
+</script>
+
+{% endblock %}

@@ -1,0 +1,213 @@
+{% extends "shell/app.html" %}
+{% block content %}
+
+<div class="max-w-7xl mx-auto space-y-6">
+    
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <h1 class="text-2xl font-bold text-gray-900">User Management</h1>
+
+        <div class="flex gap-3">
+            <a href="{% url 'accounts:bulk_user_upload' %}"
+               class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-100">
+                <i class="fas fa-upload mr-2"></i> Bulk Upload
+            </a>
+
+            <a href="{% url 'accounts:user_create' %}"
+               class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-sky-600 hover:bg-sky-700 focus:ring-2 focus:ring-offset-2 focus:ring-sky-500">
+                <i class="fas fa-plus mr-2"></i> Add User
+            </a>
+        </div>
+    </div>
+
+    <!-- Hidden URLs -->
+    <input type="hidden" id="csrf-token" value="{{ csrf_token }}">
+    <input type="hidden" id="url-activate" value="{% url 'accounts:activate_user' 0 %}">
+    <input type="hidden" id="url-deactivate" value="{% url 'accounts:deactivate_user' 0 %}">
+    <input type="hidden" id="url-delete" value="{% url 'accounts:delete_user' 0 %}">
+
+    <!-- Table Card -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        
+        <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+            <h3 class="font-bold text-gray-900">System Users</h3>
+
+            <div class="relative w-64">
+                <input type="text" id="userSearch"
+                       class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-sky-500 focus:border-sky-500"
+                       placeholder="Search users...">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-search text-gray-400"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plant</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody class="bg-white divide-y divide-gray-200" id="userTableBody">
+                    
+                    {% for user in users %}
+                    <tr class="hover:bg-gray-50 transition">
+                        
+                        <!-- User Info -->
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0 h-10 w-10 bg-sky-100 rounded-full flex items-center justify-center text-sky-600 font-bold">
+                                    {{ user.username|slice:":1"|upper }}
+                                </div>
+                                <div class="ml-4">
+                                    <div class="text-sm font-medium text-gray-900">
+                                        {{ user.get_full_name|default:user.username }}
+                                    </div>
+                                    <div class="text-xs text-gray-500">
+                                        {{ user.username }}
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ user.email }}
+                        </td>
+
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ user.scopes.first.role|default:"—" }}
+                        </td>
+
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ user.scopes.first.plant.name|default:"—" }}
+                        </td>
+
+                        <!-- Status -->
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if user.is_active %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    Active
+                                </span>
+                            {% else %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                    Inactive
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Actions -->
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            
+                            <a href="{% url 'accounts:user_edit' user.id %}"
+                               class="text-sky-600 hover:text-sky-900 mr-3">
+                                Edit
+                            </a>
+
+                            {% if user.is_active %}
+                                <button class="js-toggle-user text-amber-600 hover:text-amber-900 mr-3"
+                                        data-user-id="{{ user.id }}"
+                                        data-action="deactivate">
+                                    Deactivate
+                                </button>
+                            {% else %}
+                                <button class="js-toggle-user text-green-600 hover:text-green-900 mr-3"
+                                        data-user-id="{{ user.id }}"
+                                        data-action="activate">
+                                    Activate
+                                </button>
+                            {% endif %}
+
+                            <button class="js-delete-user text-red-600 hover:text-red-900"
+                                    data-user-id="{{ user.id }}">
+                                Delete
+                            </button>
+
+                        </td>
+
+                    </tr>
+                    {% endfor %}
+
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    // Search filter
+    document.getElementById('userSearch').addEventListener('keyup', function() {
+        const term = this.value.toLowerCase();
+        document.querySelectorAll('#userTableBody tr').forEach(row => {
+            row.style.display = row.textContent.toLowerCase().includes(term) ? '' : 'none';
+        });
+    });
+
+    // Activate / Deactivate
+    document.body.addEventListener('click', e => {
+        const btn = e.target.closest('.js-toggle-user');
+        if (!btn) return;
+
+        const userId = btn.dataset.userId;
+        const action = btn.dataset.action;
+
+        if (action === 'deactivate' && !confirm('Deactivate this user?')) return;
+
+        const url = document.getElementById(`url-${action}`)
+                      .value.replace('/0/', `/${userId}/`);
+
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.getElementById('csrf-token').value,
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) window.location.reload();
+            else alert(d.message || 'Error');
+        })
+        .catch(() => alert('Server error'));
+    });
+
+    // Delete User
+    document.body.addEventListener('click', e => {
+        const btn = e.target.closest('.js-delete-user');
+        if (!btn) return;
+
+        const userId = btn.dataset.userId;
+
+        if (!confirm('Are you sure you want to permanently delete this user?')) return;
+
+        const url = document.getElementById('url-delete')
+                      .value.replace('/0/', `/${userId}/`);
+
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.getElementById('csrf-token').value,
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) window.location.reload();
+            else alert(d.message || 'Delete failed.');
+        })
+        .catch(() => alert('Server error'));
+    });
+
+});
+</script>
+
+{% endblock %}

@@ -1,0 +1,170 @@
+{% extends "shell/app.html" %}
+{% block content %}
+
+<div class="max-w-7xl mx-auto space-y-6">
+
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">
+                Preview & Assign Roles
+            </h1>
+            <p class="text-sm text-gray-500">
+                Review users and assign Plant, Department, and Role before final creation.
+            </p>
+        </div>
+
+        <a href="{% url 'accounts:bulk_user_upload' %}"
+           class="text-sm font-medium text-gray-500 hover:text-gray-900 flex items-center">
+            <i class="fas fa-arrow-left mr-1"></i> Back
+        </a>
+    </div>
+
+    <!-- Table Card -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-600">#</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-600">Employee ID</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-600">Name</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-600">Email</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-600">Plant</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-600">Department</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-600">Role</th>
+                        </tr>
+                    </thead>
+
+                    <tbody class="divide-y divide-gray-100 bg-white">
+
+                        {% for user in users_data %}
+                        <tr class="hover:bg-gray-50 transition">
+
+                            <td class="px-4 py-3 text-gray-600">
+                                {{ forloop.counter }}
+                            </td>
+
+                            <td class="px-4 py-3 font-medium text-gray-900">
+                                {{ user.employee_id }}
+                            </td>
+
+                            <td class="px-4 py-3 text-gray-700">
+                                {{ user.first_name }} {{ user.last_name }}
+                            </td>
+
+                            <td class="px-4 py-3 text-gray-600">
+                                {{ user.email }}
+                            </td>
+
+                            <!-- Plant -->
+                            <td class="px-4 py-3">
+                                <select name="plant_{{ forloop.counter0 }}"
+                                        class="plant-select w-full rounded-lg border-gray-300 border p-2 text-sm focus:ring-sky-500 focus:border-sky-500"
+                                        data-row="{{ forloop.counter0 }}"
+                                        required>
+                                    <option value="">Select Plant</option>
+                                    {% for plant in plants %}
+                                        <option value="{{ plant.id }}">{{ plant.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+
+                            <!-- Department -->
+                            <td class="px-4 py-3">
+                                <select name="department_{{ forloop.counter0 }}"
+                                        class="department-select w-full rounded-lg border-gray-300 border p-2 text-sm focus:ring-sky-500 focus:border-sky-500"
+                                        required>
+                                    <option value="">Select Department</option>
+                                </select>
+                            </td>
+
+                            <!-- Role -->
+                            <td class="px-4 py-3">
+                                <select name="role_{{ forloop.counter0 }}"
+                                        class="w-full rounded-lg border-gray-300 border p-2 text-sm focus:ring-sky-500 focus:border-sky-500"
+                                        required>
+                                    <option value="">Select Role</option>
+                                    {% for role in roles %}
+                                        <option value="{{ role.id }}">{{ role.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+
+                        </tr>
+                        {% endfor %}
+
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
+
+                <a href="{% url 'accounts:bulk_user_upload' %}"
+                   class="px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100">
+                    Back
+                </a>
+
+                <button type="submit"
+                        class="px-6 py-2.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 shadow-sm">
+                    Final Submit & Create Users
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const deptBaseUrl = "{% url 'accounts:get_departments' 0 %}";
+
+    document.querySelectorAll(".plant-select").forEach(function(select) {
+
+        select.addEventListener("change", function() {
+
+            const plantId = this.value;
+            const rowIndex = this.dataset.row;
+            const deptSelect = document.querySelector(
+                `select[name="department_${rowIndex}"]`
+            );
+
+            deptSelect.innerHTML = '<option value="">Loading...</option>';
+
+            const url = deptBaseUrl.replace("/0/", `/${plantId}/`);
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+
+                    deptSelect.innerHTML = '<option value="">Select Department</option>';
+
+                    data.departments.forEach(function(dept) {
+                        const option = document.createElement("option");
+                        option.value = dept.id;
+                        option.textContent = dept.name;
+                        deptSelect.appendChild(option);
+                    });
+
+                })
+                .catch(() => {
+                    deptSelect.innerHTML = '<option value="">Error loading</option>';
+                });
+
+        });
+
+    });
+
+});
+</script>
+
+{% endblock %}

@@ -1,0 +1,154 @@
+{% extends "shell/app.html" %}
+{% block title %}PQE Dashboard{% endblock %}
+
+{% block content %}
+
+<div class="max-w-7xl mx-auto space-y-8 pb-12">
+
+  <!-- HEADER -->
+  <div class="flex items-center gap-4">
+    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-rose-500 to-red-600 text-white flex items-center justify-center text-xl shadow-lg">
+      <i class="fas fa-shield-alt"></i>
+    </div>
+    <div>
+      <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900">
+        PQE Dashboard
+      </h1>
+      <p class="text-sm text-gray-500 mt-1">
+        Quality analytics & defect insights
+      </p>
+    </div>
+  </div>
+
+
+  <!-- CHART GRID -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+    <!-- Pareto -->
+    <div class="bg-white rounded-xl shadow p-6">
+      <h3 class="font-bold text-gray-900 mb-4">
+        Top Defects (Pareto)
+      </h3>
+      <div class="h-80">
+        <canvas id="paretoChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Severity Trend -->
+    <div class="bg-white rounded-xl shadow p-6">
+      <h3 class="font-bold text-gray-900 mb-4">
+        Severity Trend
+      </h3>
+      <div class="h-80">
+        <canvas id="trendChart"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- Template Comparison -->
+  <div class="bg-white rounded-xl shadow p-6">
+    <h3 class="font-bold text-gray-900 mb-4">
+      Template Comparison (Avg Severity)
+    </h3>
+    <div class="h-96">
+      <canvas id="templateChart"></canvas>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}
+
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  const pareto = {{ pareto|default:"[]"|safe }};
+  const trend = {{ trend|default:"[]"|safe }};
+  const templateData = {{ template_comparison|default:"[]"|safe }};
+
+  const commonOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        grid: { color: "#f3f4f6" }
+      },
+      x: {
+        grid: { display: false }
+      }
+    }
+  };
+
+  // ================= PARETO =================
+  if (pareto.length > 0) {
+    new Chart(document.getElementById('paretoChart'), {
+      type: 'bar',
+      data: {
+        labels: pareto.map(x => x.item__label),
+        datasets: [{
+          label: 'NC Count',
+          data: pareto.map(x => x.count),
+          backgroundColor: '#ef4444'
+        }]
+      },
+      options: commonOptions
+    });
+  }
+
+
+  // ================= TREND =================
+  if (trend.length > 0) {
+    new Chart(document.getElementById('trendChart'), {
+      type: 'line',
+      data: {
+        labels: trend.map(x => {
+          if (!x.day) return "";
+          const d = new Date(x.day);
+          return d.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric"
+          });
+        }),
+        datasets: [{
+          label: 'Avg Severity',
+          data: trend.map(x => x.avg_severity),
+          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245,158,11,0.15)',
+          tension: 0.3,
+          fill: true
+        }]
+      },
+      options: commonOptions
+    });
+  }
+
+
+  // ================= TEMPLATE =================
+  if (templateData.length > 0) {
+    new Chart(document.getElementById('templateChart'), {
+      type: 'bar',
+      data: {
+        labels: templateData.map(x => x.template_version__template__code),
+        datasets: [{
+          label: 'Avg Severity',
+          data: templateData.map(x => x.avg),
+          backgroundColor: '#3b82f6'
+        }]
+      },
+      options: commonOptions
+    });
+  }
+
+});
+</script>
+{% endblock %}

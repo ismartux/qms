@@ -1,0 +1,287 @@
+{% extends "shell/app.html" %}
+{% block title %}IPQC Submissions{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-8 pb-12">
+
+  <!-- ================= HEADER ================= -->
+  <div class="flex justify-between items-center flex-wrap gap-4">
+
+    <div>
+      <h1 class="text-3xl font-extrabold text-gray-900">
+        IPQC Submissions
+      </h1>
+      <p class="text-sm text-gray-500 mt-1">
+        {{ request.user.get_full_name|default:request.user.username }}
+      </p>
+
+      {% if selected_range == "today" %}
+      <div class="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full
+                  bg-sky-100 text-sky-700 text-xs font-bold border border-sky-200">
+        Production Day (08:00 → 08:00)
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- RANGE FILTER -->
+    <form method="get" class="flex items-center gap-3">
+      <input type="hidden" name="per_page" value="{{ per_page }}">
+
+      <select name="range"
+              onchange="this.form.submit()"
+              class="border border-gray-300 rounded-lg px-4 py-2 text-sm font-semibold shadow-sm">
+
+        <option value="today" {% if selected_range == "today" %}selected{% endif %}>Today</option>
+        <option value="this_week" {% if selected_range == "this_week" %}selected{% endif %}>This Week</option>
+        <option value="last_week" {% if selected_range == "last_week" %}selected{% endif %}>Last Week</option>
+        <option value="this_month" {% if selected_range == "this_month" %}selected{% endif %}>This Month</option>
+
+      </select>
+    </form>
+
+  </div>
+
+
+  <!-- ================= KPI GRID ================= -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+
+    <div class="bg-white rounded-2xl border p-6">
+      <h6 class="text-xs font-bold text-gray-400 uppercase mb-2">Total Submissions</h6>
+      <h2 class="text-3xl font-extrabold text-gray-900">
+        {{ total_count|default:0 }}
+      </h2>
+    </div>
+
+    <div class="bg-white rounded-2xl border p-6">
+      <h6 class="text-xs font-bold text-gray-400 uppercase mb-2">Avg Severity</h6>
+      <h2 class="text-3xl font-extrabold text-amber-600">
+        {{ avg_severity|default:0|floatformat:2 }}
+      </h2>
+    </div>
+
+    <div class="bg-white rounded-2xl border p-6">
+      <h6 class="text-xs font-bold text-gray-400 uppercase mb-2">Critical (≥ 8)</h6>
+      <h2 class="text-3xl font-extrabold text-red-600">
+        {{ high_severity_count|default:0 }}
+      </h2>
+    </div>
+
+    <div class="bg-white rounded-2xl border p-6">
+      <h6 class="text-xs font-bold text-gray-400 uppercase mb-2">In Selected Range</h6>
+      <h2 class="text-3xl font-extrabold text-green-600">
+        {{ page_obj.paginator.count|default:0 }}
+      </h2>
+    </div>
+
+  </div>
+
+
+  <!-- ================= SUBMISSIONS ================= -->
+  <div class="bg-white rounded-2xl border overflow-hidden shadow-sm">
+
+    <div class="px-6 py-4 border-b bg-gray-50 flex justify-between items-center">
+      <h3 class="font-bold text-lg">Submissions</h3>
+      <span class="text-xs font-bold bg-gray-200 px-3 py-1 rounded-full">
+        {{ page_obj.paginator.count|default:0 }}
+      </span>
+    </div>
+
+    <div class="p-6">
+
+      {% if page_obj and page_obj.object_list %}
+
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+
+        {% for s in page_obj %}
+        <div class="rounded-xl border p-6 flex flex-col bg-white hover:shadow-xl transition duration-300">
+
+          <!-- Title + Workflow -->
+          <div class="flex justify-between items-start mb-4">
+            <h4 class="font-bold text-lg leading-tight">
+              {{ s.template_version.template.name|default:"IPQC Form" }}
+            </h4>
+
+            <span class="text-[10px] font-bold px-2 py-1 rounded border
+              {% if s.workflow_state == 'SUBMITTED' %}
+                bg-sky-50 text-sky-700 border-sky-200
+              {% else %}
+                bg-gray-100 text-gray-600 border-gray-200
+              {% endif %}">
+              {{ s.workflow_state|default:"-" }}
+            </span>
+          </div>
+
+          <!-- META -->
+          <div class="space-y-2 text-xs text-gray-500 mb-5">
+
+            <div>📅 {{ s.submitted_at|date:"d M Y, H:i" }}</div>
+
+            <div>
+              👤 Submitted by:
+              <span class="font-semibold text-gray-700">
+                {{ s.submitted_by.get_full_name|default:s.submitted_by.username }}
+              </span>
+            </div>
+
+            <div>
+              🏭 {{ s.work_context.plant.name|default:"-" }}
+            </div>
+
+            <div>
+              ⚙ {{ s.work_context.line.name|default:"-" }} —
+              {{ s.work_context.product.name|default:"-" }}
+            </div>
+
+            {% if s.approval_status %}
+            <div>
+              <span class="inline-flex px-2 py-1 rounded text-[10px] font-bold border
+                {% if s.approval_status == 'APPROVED' %}
+                  bg-green-50 text-green-700 border-green-200
+                {% elif s.approval_status == 'REJECTED' %}
+                  bg-red-50 text-red-700 border-red-200
+                {% else %}
+                  bg-yellow-50 text-yellow-700 border-yellow-200
+                {% endif %}">
+                {{ s.approval_status }}
+              </span>
+            </div>
+            {% endif %}
+
+          </div>
+
+          <!-- SEVERITY + ACTION -->
+          <div class="mt-auto pt-4 border-t">
+
+            <div class="flex justify-between items-center mb-4">
+              <span class="text-xs font-bold text-gray-400 uppercase">
+                Severity
+              </span>
+
+              <span class="px-3 py-1 rounded-full text-xs font-bold border
+                {% if s.normalized_score >= 8 %}
+                  bg-red-100 text-red-700 border-red-200
+                {% elif s.normalized_score >= 4 %}
+                  bg-amber-100 text-amber-700 border-amber-200
+                {% else %}
+                  bg-emerald-100 text-emerald-700 border-emerald-200
+                {% endif %}">
+                {{ s.normalized_score|default:0 }} / 10
+              </span>
+            </div>
+
+            <button
+              type="button"
+              class="w-full py-2 text-sm font-semibold rounded-lg
+                     bg-sky-50 text-sky-700 border border-sky-200
+                     hover:bg-sky-600 hover:text-white transition"
+              data-url="{% url 'ui:ipqc_submission_popup' s.submission_id %}"
+              onclick="openSubmissionModalFromBtn(this)">
+              View Full Report
+            </button>
+
+          </div>
+
+        </div>
+        {% endfor %}
+
+      </div>
+
+      <!-- ================= PAGINATION ================= -->
+      {% if page_obj.has_other_pages %}
+      <div class="mt-10 flex justify-center items-center gap-3 text-sm">
+
+        {% if page_obj.has_previous %}
+          <a href="?range={{ selected_range }}&page={{ page_obj.previous_page_number }}&per_page={{ per_page }}"
+             class="px-4 py-2 border rounded-lg hover:bg-gray-100">
+            ← Previous
+          </a>
+        {% endif %}
+
+        <span class="px-4 py-2 bg-gray-100 rounded-lg font-semibold">
+          Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+        </span>
+
+        {% if page_obj.has_next %}
+          <a href="?range={{ selected_range }}&page={{ page_obj.next_page_number }}&per_page={{ per_page }}"
+             class="px-4 py-2 border rounded-lg hover:bg-gray-100">
+            Next →
+          </a>
+        {% endif %}
+
+      </div>
+      {% endif %}
+
+      {% else %}
+      <div class="text-center py-12 text-gray-400">
+        No submissions found for selected range.
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ================= MODAL ================= -->
+<div id="submissionOverlay"
+     class="fixed inset-0 bg-black/60 hidden flex items-center justify-center p-6 z-[9999]">
+
+  <div class="bg-white w-full max-w-5xl max-h-[90vh]
+              rounded-2xl overflow-hidden flex flex-col shadow-2xl">
+
+    <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+      <h3 class="font-bold text-gray-900">Submission Details</h3>
+      <button onclick="closeSubmissionModal()" class="text-gray-400 hover:text-red-600">
+        ✖
+      </button>
+    </div>
+
+    <div id="submissionContent"
+         class="overflow-y-auto flex-1 p-6 text-sm">
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+
+function openSubmissionModalFromBtn(btn) {
+  const url = btn.dataset.url;
+  const overlay = document.getElementById("submissionOverlay");
+  const content = document.getElementById("submissionContent");
+
+  overlay.classList.remove("hidden");
+  content.innerHTML = "<div class='text-center py-6'>Loading...</div>";
+
+  fetch(url)
+    .then(r => r.text())
+    .then(html => content.innerHTML = html)
+    .catch(() => content.innerHTML =
+      "<div class='text-red-600 text-center py-6'>Error loading data</div>");
+}
+
+function closeSubmissionModal() {
+  document.getElementById("submissionOverlay").classList.add("hidden");
+}
+
+document.getElementById("submissionOverlay")
+  .addEventListener("click", function(e) {
+    const modalBox = this.querySelector(".bg-white");
+    if (!modalBox.contains(e.target)) {
+      closeSubmissionModal();
+    }
+});
+
+document.addEventListener("keydown", function(e) {
+  if (e.key === "Escape") {
+    closeSubmissionModal();
+  }
+});
+
+</script>
+{% endblock %}

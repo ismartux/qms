@@ -1,0 +1,262 @@
+{% extends "shell/app.html" %}
+{% block title %}Submissions{% endblock %}
+{% block content %}
+
+<div class="max-w-7xl mx-auto space-y-8 pb-12">
+
+  <!-- ================= HEADER ================= -->
+  <div class="flex justify-between items-center flex-wrap gap-4">
+    <div>
+      <h1 class="text-3xl font-extrabold text-gray-900">
+        Submissions
+      </h1>
+      <p class="text-sm text-gray-500 mt-1">
+        {{ request.user.get_full_name|default:request.user.username }}
+      </p>
+    </div>
+  </div>
+
+  <!-- ================= DATE FILTERS ================= -->
+  <div class="flex flex-wrap gap-2">
+
+    <a href="?range=today"
+       class="px-4 py-1.5 rounded-full text-sm font-semibold border transition
+       {% if selected_range == 'today' %}
+         bg-sky-600 text-white border-sky-600
+       {% else %}
+         bg-white text-gray-600 border-gray-300 hover:bg-gray-100
+       {% endif %}">
+      Today
+    </a>
+
+    <a href="?range=this_week"
+       class="px-4 py-1.5 rounded-full text-sm font-semibold border transition
+       {% if selected_range == 'this_week' %}
+         bg-sky-600 text-white border-sky-600
+       {% else %}
+         bg-white text-gray-600 border-gray-300 hover:bg-gray-100
+       {% endif %}">
+      This Week
+    </a>
+
+    <a href="?range=last_week"
+       class="px-4 py-1.5 rounded-full text-sm font-semibold border transition
+       {% if selected_range == 'last_week' %}
+         bg-sky-600 text-white border-sky-600
+       {% else %}
+         bg-white text-gray-600 border-gray-300 hover:bg-gray-100
+       {% endif %}">
+      Last Week
+    </a>
+
+    <a href="?range=this_month"
+       class="px-4 py-1.5 rounded-full text-sm font-semibold border transition
+       {% if selected_range == 'this_month' %}
+         bg-sky-600 text-white border-sky-600
+       {% else %}
+         bg-white text-gray-600 border-gray-300 hover:bg-gray-100
+       {% endif %}">
+      This Month
+    </a>
+
+  </div>
+
+  <!-- ================= UNIFIED SUBMISSIONS ================= -->
+  <div class="bg-white rounded-2xl border overflow-hidden shadow-sm">
+
+    <div class="px-6 py-4 border-b bg-gray-50 flex justify-between items-center">
+      <h3 class="font-bold text-lg">All Submissions</h3>
+      <span class="text-xs font-bold bg-gray-200 px-3 py-1 rounded-full">
+        {{ submissions|length }}
+      </span>
+    </div>
+
+    <div class="p-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+
+      {% for s in submissions %}
+      <div class="rounded-xl border p-5 flex flex-col bg-white hover:shadow-md transition">
+
+        <!-- ================= TITLE ================= -->
+        <h4 class="font-bold text-lg mb-3">
+          {{ s.template_name }}
+        </h4>
+
+        <!-- ================= META ================= -->
+        <div class="space-y-1 text-xs text-gray-500 mb-4">
+          <div>📅 {{ s.submitted_at|date:"d M Y, H:i" }}</div>
+          <div>👤 {{ s.submitter_name }}</div>
+          <div>🧩 Role: {{ s.submitter_role }}</div>
+
+          {% if s.line_name %}
+            <div>🏭 {{ s.line_name }} — {{ s.product_name }}</div>
+          {% endif %}
+        </div>
+
+        <!-- ================= APPROVAL STATUS ================= -->
+        <div class="mb-4">
+          {% if s.approval_status == "APPROVED" %}
+            <span class="text-[11px] font-bold px-2 py-1 rounded
+                         bg-green-100 text-green-700">
+              Approved
+            </span>
+          {% elif s.approval_status == "REJECTED" %}
+            <span class="text-[11px] font-bold px-2 py-1 rounded
+                         bg-red-100 text-red-700">
+              Rejected
+            </span>
+          {% elif s.approval_status == "NO_APPROVAL" %}
+            <span class="text-[11px] font-bold px-2 py-1 rounded
+                         bg-gray-100 text-gray-600">
+              No Approval
+            </span>
+          {% else %}
+            <span class="text-[11px] font-bold px-2 py-1 rounded
+                         bg-yellow-100 text-yellow-700">
+              Pending
+            </span>
+          {% endif %}
+        </div>
+
+        <!-- ================= ACTION ================= -->
+        <div class="mt-auto pt-4 border-t">
+          <button
+            type="button"
+            class="w-full py-2 text-sm font-semibold rounded-lg
+                   bg-sky-50 text-sky-700 border border-sky-200
+                   hover:bg-sky-600 hover:text-white transition"
+            data-url="{% url 'ui:submission_detail' s.id %}"
+            onclick="openSubmissionModalFromBtn(this)">
+            View Details
+          </button>
+        </div>
+
+      </div>
+      {% empty %}
+        <div class="col-span-full text-center text-gray-500 py-12">
+          No submissions found.
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- ================= SUBMISSION MODAL ================= -->
+<div id="submissionOverlay"
+     class="fixed inset-0 bg-black/60 hidden flex items-center justify-center p-6 z-[9999]">
+
+  <div class="bg-white w-full max-w-5xl max-h-[90vh]
+              rounded-2xl overflow-hidden flex flex-col shadow-2xl"
+       onclick="event.stopPropagation()">
+
+    <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+      <h3 class="font-bold text-gray-900">Submission Details</h3>
+      <button onclick="closeSubmissionModal()"
+              class="text-gray-400 hover:text-red-600">
+        ✖
+      </button>
+    </div>
+
+    <div id="submissionContent"
+         class="overflow-y-auto flex-1 p-6 text-sm"></div>
+
+  </div>
+</div>
+
+<!-- ================= IMAGE PREVIEW MODAL ================= -->
+<div id="imagePreviewOverlay"
+     class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-[10001]">
+
+  <div class="relative max-w-[90vw] max-h-[90vh]"
+       onclick="event.stopPropagation()">
+
+    <button onclick="closeImagePreview()"
+            class="absolute -top-10 right-0 text-white text-2xl hover:text-red-400">
+      ✖
+    </button>
+
+    <img id="previewImage"
+         src=""
+         class="max-w-full max-h-[90vh] rounded-xl shadow-2xl object-contain">
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* ============================================================
+   KEEP EXISTING MODAL + IMAGE PREVIEW BEHAVIOR
+============================================================ */
+
+/* 🔥 MOVE MODAL TO ROOT (FIXES Z-INDEX & IMAGE PREVIEW ISSUE) */
+document.addEventListener("DOMContentLoaded", function () {
+  const root = document.getElementById("modal-root");
+  const modal = document.getElementById("submissionOverlay");
+  if (root && modal && modal.parentElement !== root) {
+    root.appendChild(modal);
+  }
+});
+
+function openSubmissionModalFromBtn(btn) {
+  const url = btn.dataset.url;
+  const overlay = document.getElementById("submissionOverlay");
+  const content = document.getElementById("submissionContent");
+
+  overlay.classList.remove("hidden");
+  content.innerHTML = "<div class='text-center py-6'>Loading...</div>";
+
+  fetch(url)
+    .then(r => r.text())
+    .then(html => {
+      content.innerHTML = html;
+    })
+    .catch(() => {
+      content.innerHTML =
+        "<div class='text-red-600 text-center py-6'>Failed to load</div>";
+    });
+}
+
+function closeSubmissionModal() {
+  document.getElementById("submissionOverlay").classList.add("hidden");
+}
+
+/* Outside click */
+document.getElementById("submissionOverlay")
+  .addEventListener("click", function(e) {
+    if (e.target === this) closeSubmissionModal();
+  });
+
+/* ESC */
+document.addEventListener("keydown", function(e) {
+  if (e.key === "Escape") closeSubmissionModal();
+});
+
+/* ============================================================
+   IMAGE PREVIEW MODAL
+============================================================ */
+function openImagePreview(src) {
+  if (!src) return;
+  document.getElementById("previewImage").src = src;
+  document.getElementById("imagePreviewOverlay").classList.remove("hidden");
+}
+
+function closeImagePreview() {
+  document.getElementById("imagePreviewOverlay").classList.add("hidden");
+  document.getElementById("previewImage").src = "";
+}
+
+document.getElementById("imagePreviewOverlay")
+  ?.addEventListener("click", function (e) {
+    if (e.target === this) closeImagePreview();
+  });
+
+/* 🔥 ENSURE IMAGE MODAL IS ABOVE SUBMISSION MODAL */
+document.addEventListener("DOMContentLoaded", function () {
+  const root = document.getElementById("modal-root");
+  const imageModal = document.getElementById("imagePreviewOverlay");
+  if (root && imageModal && imageModal.parentElement !== root) {
+    root.appendChild(imageModal);
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,102 @@
+{% extends "shell/app.html" %}
+{% load static %}
+{% block title %}EHS Dashboard{% endblock %}
+{% block content %}
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 space-y-6 pb-12 pt-2">
+
+  <!-- Header -->
+  <div class="flex items-center gap-4">
+    <div class="h-14 w-14 rounded-full bg-gradient-to-tr from-red-400 to-rose-600 flex items-center justify-center text-white text-xl font-bold shadow-md">
+      EHS
+    </div>
+    <div>
+      <h1 class="text-2xl font-extrabold text-gray-900">
+        EHS Dashboard
+      </h1>
+      <p class="text-gray-500 text-sm">
+        Safety monitoring & inspections overview
+      </p>
+    </div>
+  </div>
+
+  <!-- GRID -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- 2️⃣ Quick Actions -->
+    <div class="dashboard-card rounded-2xl p-6 border bg-white shadow-sm">
+
+      <div class="text-xs font-bold text-gray-400 uppercase mb-6">
+        Quick Actions
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+
+        <a href="{% url 'ehs:ehs_daily_template_list' %}"
+           class="p-4 rounded-xl bg-gray-50 hover:bg-red-50 border border-gray-100 text-center">
+          <i class="fas fa-calendar-day text-red-500 text-lg"></i>
+          <div class="mt-2 text-sm font-bold">Daily Forms</div>
+          <div class="text-xs text-gray-400">{{ daily_templates }} available</div>
+        </a>
+
+        <a href="{% url 'ehs:ehs_special_template_list' %}"
+           class="p-4 rounded-xl bg-gray-50 hover:bg-rose-50 border border-gray-100 text-center">
+          <i class="fas fa-exclamation-triangle text-rose-500 text-lg"></i>
+          <div class="mt-2 text-sm font-bold">Special Forms</div>
+          <div class="text-xs text-gray-400">{{ special_templates }} available</div>
+        </a>
+
+        <a href="{% url 'ehs:ehs_submission_list' %}?type=DAILY"
+           class="p-4 rounded-xl bg-gray-50 hover:bg-blue-50 border border-gray-100 text-center">
+          <i class="fas fa-history text-blue-500 text-lg"></i>
+          <div class="mt-2 text-sm font-bold">My Submissions</div>
+        </a>
+
+        <a href="{% url 'ehs:ehs_notification_list' %}"
+           class="p-4 rounded-xl bg-gray-50 hover:bg-yellow-50 border border-gray-100 text-center">
+          <i class="fas fa-bell text-yellow-500 text-lg"></i>
+          <div class="mt-2 text-sm font-bold">Notifications</div>
+        </a>
+
+      </div>
+    </div>
+
+    <!-- 3️⃣ Recent Submissions -->
+    <div class="dashboard-card rounded-2xl p-6 border bg-white shadow-sm">
+
+      <div class="flex justify-between items-center mb-4">
+        <div class="text-xs font-bold text-gray-400 uppercase">
+          Recent Submissions
+        </div>
+        <div class="text-xs text-gray-500">
+          {{ total_count }} total
+        </div>
+      </div>
+
+      {% for submission in recent_submissions %}
+        <div class="p-3 rounded-xl bg-gray-50 mb-3 border border-gray-100">
+          <div class="font-bold text-sm text-gray-800">
+            {{ submission.version.template.name }}
+          </div>
+          <div class="text-xs text-gray-500">
+            {{ submission.created_at|date:"M d, Y" }}
+          </div>
+          <div class="text-xs mt-1">
+            Risk Score:
+            <span class="font-bold text-red-500">
+              {{ submission.risk_score|default:"-" }}
+            </span>
+          </div>
+        </div>
+      {% empty %}
+        <div class="text-sm text-gray-400 text-center py-6">
+          No previous submissions.
+        </div>
+      {% endfor %}
+
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,271 @@
+{% extends "shell/app.html" %}
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900">
+            {% if mode == "edit" %}Edit Template{% else %}Create Template{% endif %}
+        </h1>
+        <p class="text-gray-500">
+            {% if mode == "edit" %}
+                Update template details, scope and approval workflow.
+            {% else %}
+                Set up the basic information for your new form.
+            {% endif %}
+        </p>
+    </div>
+
+    <form method="post" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden space-y-6">
+        {% csrf_token %}
+
+        <div class="p-6 space-y-8">
+
+            <!-- ===================== -->
+            <!-- BASIC INFO -->
+            <!-- ===================== -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-bold text-gray-900">Basic Information</h3>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        Code
+                    </label>
+                    <input
+                        name="code"
+                        class="w-full rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 bg-white font-mono"
+                        placeholder="e.g. IPQC_GEN_01"
+                        value="{{ template.code|default:'' }}"
+                        required
+                    >
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        Name
+                    </label>
+                    <input
+                        name="name"
+                        class="w-full rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 bg-white"
+                        placeholder="Template Name"
+                        value="{{ template.name|default:'' }}"
+                        required
+                    >
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        Description
+                    </label>
+                    <textarea
+                        name="description"
+                        class="w-full rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 bg-white"
+                        rows="3"
+                    >{{ template.description|default:'' }}</textarea>
+                </div>
+
+                <div class="flex items-center">
+                    <input
+                        type="checkbox"
+                        name="is_active"
+                        class="w-4 h-4 text-sky-600 border-gray-300 rounded focus:ring-sky-500"
+                        {% if template.is_active or mode != "edit" %}checked{% endif %}
+                    >
+                    <label class="ml-2 block text-sm font-medium text-gray-900">
+                        Active
+                    </label>
+                </div>
+            </div>
+
+            <hr class="border-gray-200">
+
+            <!-- ===================== -->
+            <!-- OWNERSHIP -->
+            <!-- ===================== -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-bold text-gray-900">Ownership</h3>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        Department <span class="text-red-600">*</span>
+                    </label>
+                    <select
+                        name="department"
+                        class="w-full rounded-lg border-gray-300 bg-white border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500"
+                        required
+                    >
+                        <option value="">Select department</option>
+                        {% for d in departments %}
+                        <option
+                            value="{{ d.id }}"
+                            {% if template and template.department_id == d.id %}selected{% endif %}
+                        >
+                            {{ d.name }} ({{ d.plant.name }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <p class="mt-1 text-xs text-gray-500">
+                        Templates are owned by a department.
+                    </p>
+                </div>
+            </div>
+
+            <hr class="border-gray-200">
+
+            <!-- ================================================= -->
+            <!-- APPROVAL WORKFLOW -->
+            <!-- ================================================= -->
+            <div>
+            <h3 class="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-gray-100">
+                Approval Workflow
+            </h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Approval Flow
+                </label>
+
+                <select name="approval_flow"
+                        class="w-full rounded-lg border-gray-300 bg-white border p-2.5 text-sm"
+                        {% if has_published_version %}disabled{% endif %}>
+
+                    {% for value, label in ChecklistTemplate.APPROVAL_FLOW_CHOICES %}
+                    <option value="{{ value }}"
+                            {% if template and template.approval_flow == value %}
+                                selected
+                            {% elif not template and value == "NONE" %}
+                                selected
+                            {% endif %}>
+                        {{ label }}
+                    </option>
+                    {% endfor %}
+
+                </select>
+
+                <p class="mt-1 text-xs text-gray-500">
+                    Defines which roles must approve before submission closes.
+                </p>
+                </div>
+
+            </div>
+            </div>
+
+            <hr class="border-gray-200">
+
+            <!-- ===================== -->
+            <!-- SCOPE -->
+            <!-- ===================== -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-bold text-gray-900">Scope</h3>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        Plants
+                    </label>
+                    <select
+                        name="plants"
+                        multiple
+                        class="w-full rounded-lg border-gray-300 bg-white border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 h-32"
+                    >
+                        {% for p in plants %}
+                        <option
+                            value="{{ p.id }}"
+                            {% if template and p in template.plants.all %}selected{% endif %}
+                        >
+                            {{ p }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        Shops
+                    </label>
+                    <select
+                        name="shops"
+                        multiple
+                        class="w-full rounded-lg border-gray-300 bg-white border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 h-32"
+                    >
+                        {% for s in shops %}
+                        <option
+                            value="{{ s.id }}"
+                            {% if template and s in template.shops.all %}selected{% endif %}
+                        >
+                            {{ s }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        Products
+                    </label>
+                    <select
+                        name="products"
+                        multiple
+                        class="w-full rounded-lg border-gray-300 bg-white border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 h-32"
+                    >
+                        {% for p in products %}
+                        <option
+                            value="{{ p.id }}"
+                            {% if template and p in template.products.all %}selected{% endif %}
+                        >
+                            {{ p }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <hr class="border-gray-200">
+
+            <!-- ===================== -->
+            <!-- BITABLE -->
+            <!-- ===================== -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-bold text-gray-900">
+                    Bitable Integration
+                </h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            App Token
+                        </label>
+                        <input
+                            name="bitable_app_token"
+                            class="w-full rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 bg-white font-mono"
+                            value="{{ template.bitable_app_token|default:'' }}"
+                        >
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Table ID
+                        </label>
+                        <input
+                            name="bitable_table_id"
+                            class="w-full rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500 bg-white font-mono"
+                            value="{{ template.bitable_table_id|default:'' }}"
+                        >
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ===================== -->
+        <!-- ACTIONS -->
+        <!-- ===================== -->
+        <div class="bg-gray-50 px-6 py-4 border-t border-gray-200 text-right">
+            <button
+                class="inline-flex items-center px-6 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                Save & Continue
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

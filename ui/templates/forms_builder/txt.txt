@@ -1,0 +1,544 @@
+froms_engine/admin_views/dashboard.py
+
+from django.shortcuts import render
+from forms_engine.models import ChecklistTemplate
+
+
+def dashboard(request):
+    templates = ChecklistTemplate.objects.all().order_by("-created_at")
+    return render(
+        request,
+        "forms_builder/dashboard.html",
+        {"templates": templates},
+    )
+
+
+
+froms_engine/admin_views/item.py
+
+from django.shortcuts import render, redirect, get_object_or_404
+from forms_engine.models import ChecklistSection, ChecklistItem, ChecklistRule
+
+
+def manage_items(request, section_id):
+    section = get_object_or_404(ChecklistSection, id=section_id)
+
+    if request.method == "POST":
+        item = ChecklistItem.objects.create(
+            section=section,
+            item_id=request.POST["item_id"],
+            label=request.POST["label"],
+            item_type=request.POST["item_type"],
+            required=request.POST.get("required") == "on",
+            order=request.POST["order"],
+            severity_weight=request.POST.get("severity_weight", 1),
+        )
+
+        if request.POST.get("rule_type"):
+            ChecklistRule.objects.create(
+                item=item,
+                rule_type=request.POST["rule_type"],
+                condition_value=request.POST["condition_value"],
+            )
+
+        return redirect(request.path)
+
+    return render(
+        request,
+        "forms_builder/item_manage.html",
+        {
+            "section": section,
+            "items": section.items.all(),
+        },
+    )
+
+
+
+froms_engine/admin_views/role.py
+
+from django.shortcuts import render, redirect, get_object_or_404
+from forms_engine.models import ChecklistTemplate, TemplateRole
+from core.identity.models import UserScope
+from core.identity.models import Role
+
+
+def assign_roles(request, template_id):
+    template = get_object_or_404(ChecklistTemplate, id=template_id)
+
+    # 🔹 Get available roles from system
+    available_roles = Role.objects.filter(is_active=True)
+
+    if request.method == "POST":
+        # Clear old roles
+        TemplateRole.objects.filter(template=template).delete()
+
+        selected_roles = request.POST.getlist("roles")
+
+        for role_id in request.POST.getlist("roles"):
+            TemplateRole.objects.create(
+                template=template,
+                role_id=role_id
+            )
+
+        return redirect(
+            "create_version",
+            template_id=template.id
+        )
+
+    assigned_roles = (
+        template.role_assignments
+        .values_list("role", flat=True)
+    )
+
+    return render(
+        request,
+        "forms_builder/role_assign.html",
+        {
+            "template": template,
+            "available_roles": available_roles,
+            "assigned_roles": assigned_roles,
+        },
+    )
+
+
+froms_engine/admin_views/section.py
+
+from django.shortcuts import render, redirect, get_object_or_404
+from forms_engine.models import ChecklistVersion, ChecklistSection
+
+
+def manage_sections(request, version_id):
+    version = get_object_or_404(ChecklistVersion, id=version_id)
+
+    if request.method == "POST":
+        ChecklistSection.objects.create(
+            version=version,
+            title=request.POST["title"],
+            order=request.POST["order"],
+        )
+        return redirect(request.path)
+
+    return render(
+        request,
+        "forms_builder/section_manage.html",
+        {
+            "version": version,
+            "sections": version.sections.all(),
+        },
+    )
+
+
+
+froms_engine/admin_views/template.py
+
+from django.shortcuts import render, redirect
+from org.models import Plant, Product
+from forms_engine.models import ChecklistTemplate
+
+
+def create_template(request):
+    if request.method == "POST":
+        template = ChecklistTemplate.objects.create(
+            code=request.POST["code"],
+            name=request.POST["name"],
+            description=request.POST.get("description", ""),
+            is_active=request.POST.get("is_active") == "on",
+            bitable_app_token=request.POST.get("bitable_app_token"),
+            bitable_table_id=request.POST.get("bitable_table_id"),
+        )
+
+        template.plants.set(request.POST.getlist("plants"))
+        template.products.set(request.POST.getlist("products"))
+
+        return redirect(
+            "assign_roles",
+            template_id=template.id
+        )
+
+    return render(
+        request,
+        "forms_builder/template_create.html",
+        {
+            "plants": Plant.objects.all(),
+            "products": Product.objects.all(),
+        },
+    )
+
+
+
+templates/froms_builder/base.html
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}TranssFlow – Form Builder{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: Inter, system-ui, sans-serif;
+      background: #f4f6f9;
+      overflow-x: hidden;
+    }
+
+    /* ================= SIDEBAR ================= */
+    .sidebar {
+      width: 260px;
+      background: #0b1c2d;
+      color: #fff;
+      transition: transform .3s ease, width .25s ease;
+      z-index: 1050;
+    }
+
+    .sidebar a {
+      color: #cfd8dc;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+
+    .sidebar a:hover,
+    .sidebar a.active {
+      background: #1c2f4a;
+      color: #fff;
+    }
+
+    .sidebar .label {
+      white-space: nowrap;
+      transition: opacity .2s ease;
+    }
+
+    @media (min-width: 992px) {
+      .sidebar {
+        position: static;
+        transform: none;
+      }
+      .sidebar.collapsed {
+        width: 72px;
+      }
+      .sidebar.collapsed .label {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .sidebar-backdrop {
+        display: none !important;
+      }
+    }
+
+    @media (max-width: 991.98px) {
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        transform: translateX(-100%);
+      }
+      .sidebar.mobile-open {
+        transform: translateX(0);
+      }
+      .sidebar-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.45);
+        z-index: 1040;
+        display: none;
+      }
+      .sidebar-backdrop.show {
+        display: block;
+      }
+    }
+
+    /* ================= TOPBAR ================= */
+    .topbar {
+      height: 56px;
+      background: #fff;
+      border-bottom: 1px solid #dee2e6;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+    }
+
+    .content {
+      padding: 24px;
+      min-height: calc(100vh - 56px);
+    }
+
+    .card {
+      border-radius: 14px;
+      border: none;
+      box-shadow: 0 6px 18px rgba(0,0,0,.08);
+    }
+  </style>
+
+  {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+
+<div id="sidebarBackdrop" class="sidebar-backdrop" onclick="closeMobileSidebar()"></div>
+
+<div class="d-flex">
+
+  <!-- ================= SIDEBAR ================= -->
+  <aside id="sidebar" class="sidebar d-flex flex-column">
+
+    <!-- Logo -->
+    <div class="p-3 border-bottom">
+      <strong class="label">🏭 TranssFlow</strong>
+    </div>
+
+    <!-- ================= FORM BUILDER ================= -->
+    <hr class="text-secondary my-2">
+    <div class="px-3 text-uppercase text-muted small">Form Builder</div>
+
+    <a href="{% url 'form_builder_dashboard' %}"
+       class="{% if request.resolver_match.url_name == 'form_builder_dashboard' %}active{% endif %}">
+      <i class="bi bi-ui-checks"></i>
+      <span class="label">Dashboard</span>
+    </a>
+
+    <a href="{% url 'create_template' %}"
+       class="{% if request.resolver_match.url_name == 'create_template' %}active{% endif %}">
+      <i class="bi bi-plus-circle"></i>
+      <span class="label">Create Template</span>
+    </a>
+
+    <!-- ================= GLOBAL NAV ================= -->
+    <hr class="text-secondary my-2">
+    <div class="px-3 text-uppercase text-muted small">System</div>
+
+    <a href="{% url 'ui:dashboard_home' %}">
+      <i class="bi bi-speedometer2"></i>
+      <span class="label">Main Dashboard</span>
+    </a>
+
+    <a href="{% url 'admin:index' %}">
+      <i class="bi bi-shield-lock"></i>
+      <span class="label">Django Admin</span>
+    </a>
+
+  </aside>
+
+  <!-- ================= MAIN ================= -->
+  <div class="flex-grow-1">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <button class="btn btn-sm btn-light me-3" onclick="toggleSidebar()">
+        <i class="bi bi-list"></i>
+      </button>
+
+      <div class="ms-auto d-flex align-items-center gap-3">
+        <span class="text-muted small">{{ request.user.username }}</span>
+        <a href="{% url 'logout' %}" class="btn btn-sm btn-outline-danger">
+          Logout
+        </a>
+      </div>
+    </header>
+
+    <!-- CONTENT -->
+    <main class="content">
+      {% block content %}{% endblock %}
+    </main>
+
+  </div>
+</div>
+
+<!-- ================= JS ================= -->
+<script>
+  function toggleSidebar() {
+    const sidebar = document.getElementById("sidebar");
+    const backdrop = document.getElementById("sidebarBackdrop");
+
+    if (window.innerWidth < 992) {
+      sidebar.classList.toggle("mobile-open");
+      backdrop.classList.toggle("show");
+    } else {
+      sidebar.classList.toggle("collapsed");
+    }
+  }
+
+  function closeMobileSidebar() {
+    document.getElementById("sidebar").classList.remove("mobile-open");
+    document.getElementById("sidebarBackdrop").classList.remove("show");
+  }
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+{% block extra_js %}{% endblock %}
+
+</body>
+</html>
+
+templates/froms_builder/dashboard.html
+
+{% extends "forms_builder/base.html" %}
+{% block content %}
+<h3>Form Builder</h3>
+
+<a href="{% url 'create_template' %}"
+   class="btn btn-primary mb-3">
+  + Create New Template
+</a>
+
+<ul class="list-group">
+  {% for t in templates %}
+    <li class="list-group-item">
+      {{ t.code }} – {{ t.name }}
+    </li>
+  {% endfor %}
+</ul>
+{% endblock %}
+
+
+templates/froms_builder/item_manage.html
+
+{% extends "forms_builder/base.html" %}
+{% block content %}
+<h4>Items for {{ section.title }}</h4>
+
+<form method="post">
+{% csrf_token %}
+<input name="item_id" class="form-control mb-2" placeholder="Item ID">
+<input name="label" class="form-control mb-2" placeholder="Label">
+
+<select name="item_type" class="form-control mb-2">
+  <option value="BOOLEAN">Yes / No</option>
+  <option value="TEXT">Text</option>
+  <option value="NUMBER">Number</option>
+  <option value="PHOTO">Photo</option>
+</select>
+
+<label><input type="checkbox" name="required"> Required</label>
+
+<input name="order" class="form-control mb-2" placeholder="Order">
+<input name="severity_weight" class="form-control mb-2" value="1">
+
+<h6>Rule (Optional)</h6>
+<select name="rule_type" class="form-control mb-2">
+  <option value="">---</option>
+  <option value="PHOTO_REQUIRED">Photo Required</option>
+  <option value="REMARK_REQUIRED">Remark Required</option>
+</select>
+
+<select name="condition_value" class="form-control mb-2">
+  <option value="YES">YES</option>
+  <option value="NO">NO</option>
+</select>
+
+<button class="btn btn-success">Add Item</button>
+</form>
+
+<hr>
+
+<ul>
+{% for i in items %}
+  <li>{{ i.label }} ({{ i.item_type }})</li>
+{% endfor %}
+</ul>
+{% endblock %}
+
+
+templates/froms_builder/role_assign.html
+
+{% extends "forms_builder/base.html" %}
+{% block content %}
+
+<h4>Assign Roles to Template</h4>
+
+<p>
+  <strong>Template:</strong> {{ template.code }} – {{ template.name }}
+</p>
+
+<form method="post">
+  {% csrf_token %}
+
+  <div class="list-group mb-3">
+    {% for role in available_roles %}
+    <label class="list-group-item">
+        <input type="checkbox"
+            name="roles"
+            value="{{ role.id }}"
+            {% if role in assigned_roles %}checked{% endif %}>
+        {{ role.name }}
+    </label>
+    {% endfor %}
+  </div>
+
+  <button class="btn btn-success">
+    Save & Continue
+  </button>
+</form>
+
+{% endblock %}
+
+
+templates/froms_builder/section_manage.html
+
+{% extends "forms_builder/base.html" %}
+{% block content %}
+<h4>Sections for {{ version }}</h4>
+
+<form method="post">
+{% csrf_token %}
+<input name="title" class="form-control mb-2" placeholder="Title">
+<input name="order" class="form-control mb-2" placeholder="Order">
+<button class="btn btn-primary">Add Section</button>
+</form>
+
+<ul class="mt-3">
+{% for s in sections %}
+  <li>
+    {{ s.title }}
+    <a href="{% url 'manage_items' s.id %}">Items →</a>
+  </li>
+{% endfor %}
+</ul>
+{% endblock %}
+
+
+templates/froms_builder/template_create.html
+
+
+{% extends "forms_builder/base.html" %}
+{% block content %}
+<h4>Create Template</h4>
+
+<form method="post">
+{% csrf_token %}
+
+<input name="code" class="form-control mb-2" placeholder="Code">
+<input name="name" class="form-control mb-2" placeholder="Name">
+<textarea name="description" class="form-control mb-2"></textarea>
+
+<label><input type="checkbox" name="is_active"> Active</label>
+
+<h5>Plants</h5>
+<select name="plants" multiple class="form-control">
+  {% for p in plants %}
+    <option value="{{ p.id }}">{{ p }}</option>
+  {% endfor %}
+</select>
+
+<h5>Products</h5>
+<select name="products" multiple class="form-control">
+  {% for p in products %}
+    <option value="{{ p.id }}">{{ p }}</option>
+  {% endfor %}
+</select>
+
+<h5>Bitable</h5>
+<input name="bitable_app_token" class="form-control mb-2">
+<input name="bitable_table_id" class="form-control mb-2">
+
+<button class="btn btn-success">Save & Continue</button>
+</form>
+{% endblock %}

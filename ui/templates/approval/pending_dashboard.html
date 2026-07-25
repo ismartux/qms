@@ -1,0 +1,368 @@
+{% extends "shell/app.html" %}
+{% block title %}Pending Approvals{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-8 pb-12">
+
+  <!-- HEADER -->
+  <div class="flex justify-between items-center">
+    <div>
+      <h1 class="text-3xl font-extrabold text-gray-900">
+        Pending Approvals
+      </h1>
+      <p class="text-sm text-gray-500 mt-1">
+        Multi-role approval dashboard (Checklist & Dynamic)
+      </p>
+    </div>
+
+    <div class="text-sm font-semibold bg-yellow-100 text-yellow-800 px-3 py-1 rounded-lg">
+      {{ cards|length }} Pending
+    </div>
+  </div>
+
+  {% if cards %}
+  <!-- CARD GRID -->
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+
+    {% for c in cards %}
+    <div
+      class="rounded-xl border p-5 flex flex-col bg-white shadow-sm transition
+             {% if not c.can_approve %}
+               opacity-40 pointer-events-none
+             {% else %}
+               hover:shadow-md
+             {% endif %}"
+      data-submission-id="{{ c.submission.submission_id }}">
+
+      <!-- TITLE -->
+      <div class="flex justify-between items-start mb-3">
+        <h4 class="font-bold text-lg">
+          {{ c.template_name }}
+        </h4>
+      </div>
+
+      <!-- META -->
+      <div class="space-y-1 text-xs text-gray-500 mb-4">
+        <div>📅 {{ c.submitted_at|date:"d M Y, H:i" }}</div>
+        <div>👤 {{ c.submitted_by.get_full_name|default:c.submitted_by.username }}</div>
+      </div>
+
+      <!-- APPROVAL FLOW -->
+      <div class="flex flex-wrap gap-2 mb-4 text-xs">
+        {% for step in c.approval_flow %}
+          <span class="px-2 py-1 rounded border font-semibold
+            {% if step in c.approved %}
+              bg-green-100 text-green-800 border-green-300
+            {% elif step == c.current %}
+              bg-yellow-100 text-yellow-800 border-yellow-300
+            {% else %}
+              bg-gray-100 text-gray-400 border-gray-200
+            {% endif %}
+          ">
+            {{ step }}
+          </span>
+        {% endfor %}
+      </div>
+
+      <!-- ACTIONS -->
+      <div class="mt-auto pt-4 border-t space-y-2">
+
+        <!-- REVIEW -->
+        <button
+          type="button"
+          class="w-full py-2 text-sm font-semibold rounded-lg
+                 bg-sky-50 text-sky-700 border border-sky-200
+                 hover:bg-sky-600 hover:text-white transition"
+          data-url="{% if c.engine == 'CHECKLIST' %}
+                      {% url 'ui:pqe_review_popup' c.submission.submission_id %}
+                    {% else %}
+                      {% url 'ui:dynamic_submission_popup' c.submission.submission_id %}
+                    {% endif %}"
+          onclick="openSubmissionModalFromBtn(this)">
+          Review Details
+        </button>
+
+        {% if c.can_approve %}
+        <!-- APPROVE -->
+        <button
+          type="button"
+          class="w-full py-2 text-sm font-semibold rounded-lg
+                 bg-green-50 text-green-700 border border-green-200
+                 hover:bg-green-600 hover:text-white transition"
+          onclick="confirmDirectApprove(
+            '{% url 'ui:approve_submission' c.submission.submission_id %}',
+            '{{ c.current }}'
+          )">
+          ✔ Approve ({{ c.current }})
+        </button>
+        {% endif %}
+      </div>
+
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="bg-white rounded-2xl border p-12 text-center text-gray-400">
+    🎉 No pending approvals.
+  </div>
+  {% endif %}
+</div>
+
+<!-- ================= CONFIRM APPROVE MODAL ================= -->
+<div id="confirmApproveModal"
+     class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-[10000]">
+  <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+    <h3 class="text-lg font-bold mb-3">Confirm Approval</h3>
+    <p class="text-sm text-gray-600 mb-6">
+      Are you sure you want to approve this submission?
+    </p>
+
+    <div class="flex justify-end gap-3">
+      <button onclick="closeConfirmModal()"
+              class="px-4 py-2 rounded-lg border text-gray-600">
+        Cancel
+      </button>
+
+      <button id="confirmApproveBtn"
+              class="px-4 py-2 rounded-lg bg-green-600 text-white font-semibold">
+        Yes, Approve
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= SUBMISSION REVIEW MODAL ================= -->
+<div id="submissionOverlay"
+     class="fixed inset-0 bg-black/60 hidden flex items-center justify-center p-6 z-[9999]">
+  <div class="bg-white w-full max-w-5xl max-h-[90vh]
+              rounded-2xl overflow-hidden flex flex-col relative">
+
+    <!-- Loader -->
+    <div id="modalLoader"
+         class="absolute inset-0 bg-white/80 hidden flex items-center justify-center z-10">
+      <div class="w-10 h-10 border-4 border-sky-200 border-t-sky-600
+                  rounded-full animate-spin"></div>
+    </div>
+
+    <!-- Header -->
+    <div class="p-4 border-b flex justify-between items-center">
+      <h3 class="font-bold">Submission Review</h3>
+      <button onclick="closeSubmissionModal()">✖</button>
+    </div>
+
+    <!-- Content -->
+    <div id="submissionContent"
+         class="overflow-y-auto flex-1 p-6"></div>
+  </div>
+</div>
+
+<!-- ================= IMAGE PREVIEW MODAL ================= -->
+<div id="imagePreviewOverlay"
+     class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-[10001]">
+
+  <div class="relative max-w-[90vw] max-h-[90vh]">
+
+    <button onclick="closeImagePreview()"
+            class="absolute -top-10 right-0 text-white text-2xl hover:text-red-400">
+      ✖
+    </button>
+
+    <img id="previewImage"
+         src=""
+         class="max-w-full max-h-[90vh] rounded-xl shadow-2xl object-contain">
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* ============================================================
+   MODAL PORTAL FIX (SIDEBAR / HEADER SAFE)
+============================================================ */
+document.addEventListener("DOMContentLoaded", function () {
+
+  const modalRoot = document.getElementById("modal-root");
+  if (modalRoot) {
+    [
+      "submissionOverlay",
+      "confirmApproveModal",
+      "imagePreviewOverlay",
+    ].forEach(id => {
+      const modal = document.getElementById(id);
+      if (modal && modal.parentElement !== modalRoot) {
+        modalRoot.appendChild(modal);
+      }
+    });
+  }
+
+});
+
+/* ============================================================
+   APPROVAL STATE
+============================================================ */
+let approveUrl = null;
+let approveCategory = null;
+
+/* ============================================================
+   CONFIRM APPROVE MODAL
+============================================================ */
+function confirmDirectApprove(url, category) {
+  approveUrl = url;
+  approveCategory = category;
+
+  const modal = document.getElementById("confirmApproveModal");
+  if (modal) modal.classList.remove("hidden");
+}
+
+function closeConfirmModal() {
+  const modal = document.getElementById("confirmApproveModal");
+  if (modal) modal.classList.add("hidden");
+}
+
+/* ============================================================
+   🔥 APPROVE BUTTON (EVENT DELEGATION – FIXED)
+============================================================ */
+document.addEventListener("click", function (e) {
+
+  const btn = e.target.closest("#confirmApproveBtn");
+  if (!btn) return;
+
+  if (!approveUrl || !approveCategory) {
+    alert("Approval data missing. Please try again.");
+    return;
+  }
+
+  btn.disabled = true;
+  btn.classList.add("opacity-50", "cursor-not-allowed");
+  btn.textContent = "Approving...";
+
+  fetch(approveUrl, {
+    method: "POST",
+    headers: {
+      "X-CSRFToken": getCookie("csrftoken"),
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      category: approveCategory,
+    }),
+  })
+  .then(r => r.json())
+  .then(data => {
+
+    if (data.success) {
+      location.reload();
+      return;
+    }
+
+    if (data.error_type === "ORDER_BLOCKED") {
+      alert(
+        "Approval blocked ❌\n\n" +
+        "Flow:\n" + data.approval_flow.join(" → ")
+      );
+      closeConfirmModal();
+      return;
+    }
+
+    alert(data.message || "Approval failed");
+
+  })
+  .catch(err => {
+    console.error("Approve error:", err);
+    alert("Approval failed due to a system error.");
+  })
+  .finally(() => {
+    btn.disabled = false;
+    btn.classList.remove("opacity-50", "cursor-not-allowed");
+    btn.textContent = "Yes, Approve";
+  });
+});
+
+/* ============================================================
+   CSRF
+============================================================ */
+function getCookie(name) {
+  let v = null;
+  document.cookie.split(";").forEach(c => {
+    c = c.trim();
+    if (c.startsWith(name + "=")) {
+      v = decodeURIComponent(c.slice(name.length + 1));
+    }
+  });
+  return v;
+}
+
+/* ============================================================
+   SUBMISSION REVIEW MODAL
+============================================================ */
+function openSubmissionModalFromBtn(btn) {
+  const url = btn.dataset.url;
+  if (!url) {
+    console.error("Popup URL missing");
+    return;
+  }
+
+  const overlay = document.getElementById("submissionOverlay");
+  const content = document.getElementById("submissionContent");
+  const loader = document.getElementById("modalLoader");
+
+  overlay.classList.remove("hidden");
+  loader.classList.remove("hidden");
+  content.innerHTML = "";
+
+  fetch(url)
+    .then(r => r.text())
+    .then(html => {
+      loader.classList.add("hidden");
+      content.innerHTML = html;
+    })
+    .catch(err => {
+      loader.classList.add("hidden");
+      content.innerHTML =
+        "<p class='text-red-600'>Failed to load submission.</p>";
+      console.error(err);
+    });
+}
+
+function closeSubmissionModal() {
+  document.getElementById("submissionOverlay").classList.add("hidden");
+}
+
+/* ESC close */
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    closeSubmissionModal();
+    closeConfirmModal();
+    closeImagePreview();
+  }
+});
+
+/* Outside click close */
+document.addEventListener("click", function (e) {
+  const overlay = document.getElementById("submissionOverlay");
+  if (overlay && !overlay.classList.contains("hidden") && e.target === overlay) {
+    closeSubmissionModal();
+  }
+});
+
+/* ============================================================
+   IMAGE PREVIEW MODAL
+============================================================ */
+function openImagePreview(src) {
+  if (!src) return;
+  document.getElementById("previewImage").src = src;
+  document.getElementById("imagePreviewOverlay").classList.remove("hidden");
+}
+
+function closeImagePreview() {
+  document.getElementById("imagePreviewOverlay").classList.add("hidden");
+  document.getElementById("previewImage").src = "";
+}
+
+document.getElementById("imagePreviewOverlay")
+  ?.addEventListener("click", function (e) {
+    if (e.target === this) closeImagePreview();
+  });
+</script>
+{% endblock %}

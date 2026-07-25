@@ -1,0 +1,412 @@
+	{% extends "shell/app.html" %}
+	{% load form_extras %}
+	{% block title %}{{ template.name }}{% endblock %}
+	<!-- UX FIX: Hide the global mobile bottom bar on this page to prevent overlap and reduce distraction -->
+	<style>
+	  @media (max-width: 768px) {
+	    .mobile-bottom-nav {
+	      display: none !important;
+	    }
+	  }
+	</style>
+	{% block content %}
+	<!-- Mobile-first Container -->
+	<!-- pb-32 ensures content doesn't get hidden behind the fixed footer -->
+	<div class="max-w-2xl mx-auto pb-32 md:pb-24 min-h-screen bg-gray-50">
+	  <!-- Sticky Header -->
+		<header class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-gray-200 shadow-sm">
+
+		<div class="px-5 py-4 space-y-4">
+
+			<!-- ROW 1: Section + Progress -->
+			<div class="flex justify-between items-start">
+
+			<div class="flex-1 pr-4">
+				<h1 class="text-lg font-bold text-gray-900 leading-tight">
+				{{ section.title }}
+				</h1>
+
+				<!-- ISO Info (lighter, structured) -->
+				<div class="flex items-center gap-4 mt-2 text-[11px] font-semibold">
+
+				<div class="flex items-center gap-1 text-blue-600 uppercase tracking-wide">
+					<i class="fas fa-file-alt text-[10px] opacity-70"></i>
+					<span>Form No: {{ template.code }}</span>
+				</div>
+
+				{% if version %}
+				<div class="flex items-center gap-1 text-gray-500 uppercase tracking-wide">
+					<i class="fas fa-layer-group text-[10px] opacity-70"></i>
+					<span>Ver {{ version.version_number }}</span>
+				</div>
+				{% endif %}
+
+				</div>
+			</div>
+
+			<!-- Progress -->
+			<div class="text-right flex-shrink-0">
+				<div class="text-2xl font-bold text-sky-600 tabular-nums" id="progressText">0%</div>
+				<div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Done</div>
+			</div>
+
+			</div>
+
+			<!-- ROW 2: Production Context (Cleaner grouping) -->
+			<div class="flex flex-wrap items-center gap-3 text-xs text-gray-600">
+
+			<div class="flex items-center gap-1">
+				<i class="fas fa-sitemap text-gray-400 text-[10px]"></i>
+				<span>{{ work_context.line.code }}</span>
+			</div>
+
+			<span class="text-gray-300">|</span>
+
+			<div class="flex items-center gap-1 max-w-[140px]">
+				<i class="fas fa-box text-gray-400 text-[10px]"></i>
+				<span class="truncate">{{ work_context.product }}</span>
+			</div>
+
+			<span class="text-gray-300">|</span>
+
+			<div class="flex items-center gap-1">
+				<i class="far fa-calendar text-gray-400 text-[10px]"></i>
+				<span>{{ work_context.work_date }}</span>
+			</div>
+
+			<span class="text-gray-300">|</span>
+
+			<div class="flex items-center gap-1">
+				<i class="far fa-clock text-gray-400 text-[10px]"></i>
+				<span>{{ work_context.shift }}</span>
+			</div>
+
+			<span class="text-gray-300">|</span>
+
+			<div class="flex items-center gap-1">
+				<i class="fas fa-palette text-gray-400 text-[10px]"></i>
+				<span>{{ work_context.model_color }}</span>
+			</div>
+
+			</div>
+
+			<!-- Progress Bar -->
+			<div class="relative h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+			<div id="itemProgressBar"
+				class="absolute top-0 left-0 h-full bg-sky-500 rounded-full transition-all duration-500 ease-out"
+				style="width: 0%">
+			</div>
+			</div>
+
+			<!-- Step Indicator -->
+			<div class="flex justify-between text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+			<span>Step {{ step }} <span class="text-gray-300">/</span> {{ total_steps }}</span>
+			</div>
+
+		</div>
+
+		</header>
+	  <main class="p-4 space-y-4">
+	    <!-- Alert Messages -->
+	    {% if messages %}
+	      {% for message in messages %}
+	      <div class="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded shadow-sm flex items-center gap-3 animate-fade-in-down" role="alert">
+	        <i class="fas fa-exclamation-circle text-red-500"></i>
+	        <span class="text-sm font-medium">{{ message }}</span>
+	      </div>
+	      {% endfor %}
+	    {% endif %}
+	    {% if not submission.is_editable %}
+	    <div class="bg-green-50 border border-green-200 text-green-800 p-6 rounded-xl text-center shadow-sm">
+	      <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+	        <i class="fas fa-check text-green-600 text-xl"></i>
+	      </div>
+	      <h3 class="font-bold text-lg">Inspection Submitted</h3>
+	      <p class="text-sm mt-1 opacity-80">This record is now locked and read-only.</p>
+	    </div>
+	    {% else %}
+	    <!-- Form Card -->
+	    <form method="post" enctype="multipart/form-data" id="inspectionForm" class="space-y-4">
+	      {% csrf_token %}
+	      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+	        <div class="divide-y divide-gray-100">
+	          {% for item in section.items.all %}
+	          {% with response=responses_by_item|get_item:item.id %}
+	          {% with att=attachments_by_item|get_item:item.id %}
+	          <div class="p-5 form-item relative
+	               {% if item.id in missing_item_ids %}bg-red-50/30 border-l-4 border-red-500 -ml-[1px]{% endif %}"
+	               data-item-id="{{ item.id }}"
+	               data-required="{{ item.required|yesno:'1,0' }}"
+	               {% for rule in item.rules.all %}
+	                 {% if rule.rule_type == "PHOTO_REQUIRED" %}data-photo-cond="{{ rule.condition_value }}"{% endif %}
+	                 {% if rule.rule_type == "REMARK_REQUIRED" %}data-remark-cond="{{ rule.condition_value }}"{% endif %}
+	               {% endfor %}>
+	            <!-- Question Header -->
+	            <div class="mb-4">
+	              <label class="text-sm font-bold text-gray-900 block leading-snug">
+	                {{ forloop.counter }}. {{ item.label }}
+	                {% if item.required %}
+	                  <span class="text-red-500 align-top ml-0.5">*</span>
+	                {% endif %}
+	              </label>
+	              {% if item.required and item.id in missing_item_ids %}
+	                <p class="text-red-500 text-[11px] font-bold mt-1.5 flex items-center">
+	                  <i class="fas fa-exclamation-triangle mr-1.5"></i> Required field missing
+	                </p>
+	              {% endif %}
+	            </div>
+	            <!-- INPUTS -->
+	            <div class="space-y-3">
+	              {% if item.item_type == "BOOLEAN" %}
+	                <!-- Mobile Optimized Pass/Fail Cards -->
+	                <div class="grid grid-cols-3 gap-3">
+	                  <label class="cursor-pointer group relative">
+	                    <input type="radio" name="item_{{ item.id }}" value="YES" class="peer sr-only" {% if response and response.value == "YES" %}checked{% endif %}>
+	                    <div class="h-full p-4 rounded-xl border-2 border-gray-200 bg-white flex flex-col items-center justify-center gap-2 transition-all duration-200 peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:shadow-md active:scale-[0.98] group-hover:border-green-200">
+	                      <div class="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-green-100 transition-colors peer-checked:bg-green-100">
+	                        <i class="fas fa-check text-gray-400 peer-checked:text-green-600 text-lg"></i>
+	                      </div>
+	                      <span class="font-bold text-gray-600 peer-checked:text-green-700 text-sm">Pass</span>
+	                    </div>
+	                  </label>
+	                  <label class="cursor-pointer group relative">
+	                    <input type="radio" name="item_{{ item.id }}" value="NO" class="peer sr-only" {% if response and response.value == "NO" %}checked{% endif %}>
+	                    <div class="h-full p-4 rounded-xl border-2 border-gray-200 bg-white flex flex-col items-center justify-center gap-2 transition-all duration-200 peer-checked:border-red-500 peer-checked:bg-red-50 peer-checked:shadow-md active:scale-[0.98] group-hover:border-red-200">
+	                      <div class="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-red-100 transition-colors peer-checked:bg-red-100">
+	                        <i class="fas fa-times text-gray-400 peer-checked:text-red-600 text-lg"></i>
+	                      </div>
+	                      <span class="font-bold text-gray-600 peer-checked:text-red-700 text-sm">Fail</span>
+	                    </div>
+	                  </label>
+                    <label class="cursor-pointer group relative">
+                    <input type="radio"
+                          name="item_{{ item.id }}"
+                          value="NA"
+                          class="peer sr-only"
+                          {% if response and response.value == "NA" %}checked{% endif %}>
+
+                    <div class="h-full p-4 rounded-xl border-2 border-gray-200 bg-white
+                                flex flex-col items-center justify-center gap-2
+                                transition-all duration-200
+                                peer-checked:border-gray-500
+                                peer-checked:bg-gray-100
+                                peer-checked:shadow-md
+                                active:scale-[0.98]
+                                group-hover:border-gray-300">
+
+                      <div class="w-10 h-10 rounded-full bg-gray-50
+                                  flex items-center justify-center
+                                  group-hover:bg-gray-200
+                                  transition-colors
+                                  peer-checked:bg-gray-300">
+                        <i class="fas fa-minus text-gray-400 peer-checked:text-gray-700 text-lg"></i>
+                      </div>
+
+                      <span class="font-bold text-gray-600 peer-checked:text-gray-700 text-sm">
+                        NA
+                      </span>
+                    </div>
+                  </label>
+	                </div>
+	              {% elif item.item_type == "TEXT" or item.item_type == "NUMBER" %}
+	                <div class="relative">
+	                  <input type="{% if item.item_type == 'NUMBER' %}number{% else %}text{% endif %}" 
+	                         name="item_{{ item.id }}" 
+	                         value="{{ response.value|default:'' }}" 
+	                         class="w-full rounded-xl border-gray-300 bg-gray-50 border focus:bg-white focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 p-4 text-base transition-all placeholder-gray-400" 
+	                         placeholder="Tap to enter answer...">
+	                </div>
+	              {% elif item.item_type == "DROPDOWN" %}
+	                <div class="relative">
+	                  <select name="item_{{ item.id }}" class="w-full appearance-none rounded-xl border-gray-300 bg-gray-50 border focus:bg-white focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 p-4 text-base transition-all cursor-pointer">
+	                    <option value="" disabled {% if not response %}selected{% endif %}>— Select Option —</option>
+	                    {% for opt in item.options.all %}
+	                      <option value="{{ opt.value }}" {% if response and response.value == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+	                    {% endfor %}
+	                  </select>
+	                  <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+	                    <i class="fas fa-chevron-down text-xs"></i>
+	                  </div>
+	                </div>
+	              {% elif item.item_type == "PHOTO" %}
+	                <!-- Improved Photo Upload Card -->
+	                <div class="relative">
+	                  <input type="file" name="item_file_{{ item.id }}" id="file_{{ item.id }}" class="hidden" accept="image/*" onchange="previewImage(this, 'preview_{{ item.id }}')">
+	                  <label for="file_{{ item.id }}" class="block w-full border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:bg-gray-50 hover:border-sky-400 transition-all cursor-pointer group bg-gray-50/50">
+	                    <div id="preview_{{ item.id }}" class="hidden mb-3">
+	                      <img src="" class="h-32 mx-auto rounded-lg shadow-md object-cover w-full">
+	                      <p class="text-xs text-gray-500 mt-2 font-medium">Tap to change photo</p>
+	                    </div>
+	                    <div id="placeholder_{{ item.id }}" {% if att and att.BASE %}class="hidden"{% endif %}>
+	                      <div class="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+	                        <i class="fas fa-camera text-sky-500 text-xl"></i>
+	                      </div>
+	                      <p class="text-sm font-medium text-gray-700">Upload Photo</p>
+	                      <p class="text-xs text-gray-400 mt-1">Support JPG, PNG</p>
+	                    </div>
+	                  </label>
+	                  {% if att and att.BASE %}
+	                  <script>document.addEventListener('DOMContentLoaded', () => {
+	                    const prev = document.getElementById('preview_{{ item.id }}');
+	                    const ph = document.getElementById('placeholder_{{ item.id }}');
+	                    prev.querySelector('img').src = "{{ att.BASE.file.url }}";
+	                    prev.classList.remove('hidden');
+	                    ph.classList.add('hidden');
+	                  })</script>
+	                  {% endif %}
+	                </div>
+	              {% endif %}
+	            </div>
+	            <!-- RULES (Conditional) -->
+	            {% if item.item_type == "BOOLEAN" %}
+	              <!-- Remark Rule -->
+	              <div class="mt-4 bg-gray-50 rounded-xl p-4 border border-gray-200 rule-remark hidden transition-all duration-300 origin-top">
+	                <label class="block text-xs font-bold text-gray-500 uppercase mb-2 flex items-center">
+	                  <i class="fas fa-pen mr-1.5"></i> Add Remark
+	                </label>
+	                <textarea name="item_remark_{{ item.id }}" rows="2" class="w-full rounded-lg border-gray-300 bg-white border p-3 text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 resize-none" placeholder="Explain why this failed...">{{ response.remark|default:'' }}</textarea>
+	              </div>
+	              <!-- Photo Rule -->
+	              <div class="mt-4 bg-amber-50 rounded-xl p-4 border border-amber-200 rule-photo hidden transition-all duration-300 origin-top">
+	                <label class="block text-xs font-bold text-amber-700 uppercase mb-2 flex items-center">
+	                  <i class="fas fa-camera mr-1.5"></i> Proof Photo Required
+	                </label>
+	                <div class="flex items-center gap-4">
+	                  {% if att and att.RULE %}
+	                    <img src="{{ att.RULE.file.url }}" class="h-16 w-16 rounded-lg shadow-sm object-cover border border-amber-200 bg-white">
+	                  {% endif %}
+	                  <input type="file" name="item_rule_photo_{{ item.id }}" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-100 file:text-amber-700 hover:file:bg-amber-200 cursor-pointer">
+	                </div>
+	              </div>
+	            {% endif %}
+	          </div>
+	          {% endwith %}
+	          {% endwith %}
+	          {% endfor %}
+	        </div>
+	      </div>
+	    </form>
+	    {% endif %}
+	  </main>
+	</div>
+	<!-- Sticky Mobile Navigation Footer -->
+	<!-- FIX: Increased z-index to z-[60] to ensure it sits above the base template's navbar (z-50) -->
+	<div class="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-gray-200 z-[60] md:static md:bg-transparent md:border-0 md:backdrop-blur-none md:pb-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+	  <div class="max-w-2xl mx-auto flex justify-between items-center gap-4">
+	    {% if step > 1 %}
+	    <a href="?step={{ step|add:'-1' }}" class="flex-1 md:flex-none flex justify-center items-center px-4 py-3.5 border border-gray-300 shadow-sm text-sm font-bold rounded-xl text-gray-700 bg-white hover:bg-gray-50 active:bg-gray-100 transition-colors">
+	      <i class="fas fa-arrow-left mr-2"></i> Back
+	    </a>
+	    {% else %}
+	    <div class="flex-1 md:w-0"></div>
+	    {% endif %}
+	    {% if step < total_steps %}
+	    <button type="submit" form="inspectionForm" class="flex-[2] md:flex-none flex justify-center items-center px-6 py-3.5 border border-transparent shadow-lg shadow-sky-500/30 text-sm font-bold rounded-xl text-white bg-sky-600 hover:bg-sky-700 active:scale-[0.98] transition-all">
+	      Next Step <i class="fas fa-arrow-right ml-2"></i>
+	    </button>
+	    {% else %}
+	    <button type="submit" form="inspectionForm" class="flex-[2] md:flex-none flex justify-center items-center px-6 py-3.5 border border-transparent shadow-lg shadow-green-500/30 text-sm font-bold rounded-xl text-white bg-green-600 hover:bg-green-700 active:scale-[0.98] transition-all">
+	      Submit Inspection <i class="fas fa-check ml-2"></i>
+	    </button>
+	    {% endif %}
+	  </div>
+	  <!-- Safe Area Spacing for iPhone X+ -->
+	  <div class="h-[env(safe-area-inset-bottom)] w-full"></div>
+	</div>
+	{% endblock %}
+	{% block extra_js %}
+	<script>
+	document.addEventListener("DOMContentLoaded", function () {
+	  // Rule Engine
+	  document.querySelectorAll(".form-item").forEach(function (itemEl) {
+	    const itemId = itemEl.dataset.itemId;
+	    const radios = itemEl.querySelectorAll('input[name="item_' + itemId + '"]');
+	    const rulePhotoDiv  = itemEl.querySelector(".rule-photo");
+	    const ruleRemarkDiv = itemEl.querySelector(".rule-remark");
+	    const photoCondition  = itemEl.dataset.photoCond;
+	    const remarkCondition = itemEl.dataset.remarkCond;
+	    function evaluateRules() {
+        let selected = "";
+        radios.forEach(r => { if (r.checked) selected = r.value; });
+
+        // 🚫 NA never triggers rules
+        if (selected === "NA") {
+          if (ruleRemarkDiv) ruleRemarkDiv.classList.add("hidden");
+          if (rulePhotoDiv) rulePhotoDiv.classList.add("hidden");
+          return;
+        }
+
+        if (ruleRemarkDiv) {
+          const shouldShow = remarkCondition && selected === remarkCondition;
+          ruleRemarkDiv.classList.toggle("hidden", !shouldShow);
+        }
+
+        if (rulePhotoDiv) {
+          const shouldShow = photoCondition && selected === photoCondition;
+          rulePhotoDiv.classList.toggle("hidden", !shouldShow);
+        }
+      }
+	    evaluateRules();
+	    radios.forEach(r => r.addEventListener("change", evaluateRules));
+	  });
+	  // Progress Logic
+	  function updateProgress() {
+	    const items = document.querySelectorAll(".form-item");
+	    let filled = 0;
+	    items.forEach(item => {
+	      const required = item.dataset.required === "1";
+	      let completed = false;
+	      item.querySelectorAll("input, textarea, select").forEach(input => {
+	        if (
+	          (input.type === "radio" && input.checked) ||
+	          (input.tagName === "SELECT" && input.value) ||
+	          ((input.type === "text" || input.type === "number") && input.value.trim()) ||
+	          (input.type === "file" && input.files.length)
+	        ) {
+	          completed = true;
+	        }
+	      });
+	      if (!required || completed) filled++;
+	    });
+	    const percent = Math.round((filled / items.length) * 100);
+	    document.getElementById("itemProgressBar").style.width = percent + "%";
+	    document.getElementById("progressText").innerText = percent + "%";
+	    // Dynamic Color for Progress
+	    const bar = document.getElementById("itemProgressBar");
+	    const text = document.getElementById("progressText");
+	    bar.className = "absolute top-0 left-0 h-full rounded-full transition-all duration-500 ease-out";
+	    text.className = "text-2xl font-bold tabular-nums";
+	    if(percent < 30) {
+	      bar.classList.add("bg-red-500");
+	      text.classList.add("text-red-500");
+	    } else if(percent < 70) {
+	      bar.classList.add("bg-amber-500");
+	      text.classList.add("text-amber-500");
+	    } else {
+	      bar.classList.add("bg-sky-500");
+	      text.classList.add("text-sky-600");
+	    }
+	  }
+	  document.querySelectorAll("input, textarea, select").forEach(el => {
+	    el.addEventListener("change", updateProgress);
+	    el.addEventListener("keyup", updateProgress);
+	  });
+	  updateProgress();
+	});
+	// Helper for Image Preview
+	window.previewImage = function(input, previewId) {
+	  const preview = document.getElementById(previewId);
+	  const placeholder = preview.nextElementSibling;
+	  if (input.files && input.files[0]) {
+	    const reader = new FileReader();
+	    reader.onload = function(e) {
+	      const img = preview.querySelector('img');
+	      img.src = e.target.result;
+	      preview.classList.remove('hidden');
+	      placeholder.classList.add('hidden');
+	    }
+	    reader.readAsDataURL(input.files[0]);
+	  }
+	}
+	</script>
+	{% endblock %}

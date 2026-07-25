@@ -1,0 +1,336 @@
+{% extends "shell/app.html" %}
+{% block title %}
+  {% if mode == "edit" %}Edit Template{% else %}Create Template{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+
+  <!-- HEADER -->
+  <div>
+    {% if has_published_version %}
+      <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 mb-4">
+        <h1 class="text-2xl font-bold text-gray-900">
+          {% if mode == "edit" %}Edit Template{% else %}Create Template{% endif %}
+        </h1>
+        <i class="fas fa-lock mr-2"></i>
+        This template has published versions.
+        Only activation status can be changed.
+      </div>
+    {% else %}
+      <h1 class="text-2xl font-bold text-gray-900">
+        {% if mode == "edit" %}Edit Template{% else %}Create Template{% endif %}
+      </h1>
+      <p class="text-sm text-gray-500">
+        Configure template details, ownership, scope, and integrations.
+      </p>
+    {% endif %}
+  </div>
+
+  <form method="post"
+        class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden space-y-8">
+
+    {% csrf_token %}
+
+    <div class="p-6 space-y-8">
+
+      <!-- ================================================= -->
+      <!-- BASIC INFO -->
+      <!-- ================================================= -->
+      <div>
+        <h3 class="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-gray-100">
+          Basic Information
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              Template Code
+            </label>
+            <input name="code" required
+                   class="w-full rounded-lg border-gray-300 border p-2.5 text-sm bg-white font-mono"
+                   {% if has_published_version %}disabled{% endif %}
+                   value="{{ template.code|default:'' }}">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              Template Name
+            </label>
+            <input name="name" required
+                   class="w-full rounded-lg border-gray-300 border p-2.5 text-sm bg-white"
+                   {% if has_published_version %}disabled{% endif %}
+                   value="{{ template.name|default:'' }}">
+          </div>
+
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              Description
+            </label>
+            <textarea name="description" rows="3"
+                      class="w-full rounded-lg border-gray-300 border p-2.5 text-sm bg-white"
+                      {% if has_published_version %}disabled{% endif %}>{{ template.description|default:'' }}</textarea>
+          </div>
+
+          <div class="flex items-center">
+            <input type="checkbox" name="is_active"
+                   class="w-4 h-4 text-sky-600 border-gray-300 rounded"
+                   {% if template.is_active or mode != "edit" %}checked{% endif %}>
+            <label class="ml-2 text-sm font-medium text-gray-900">
+              Template Active
+            </label>
+          </div>
+
+        </div>
+      </div>
+
+
+      <!-- ================================================= -->
+      <!-- OWNERSHIP -->
+      <!-- ================================================= -->
+      <div>
+        <h3 class="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-gray-100">
+          Ownership
+        </h3>
+
+        {% if mode == "edit" %}
+          <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm">
+            <i class="fas fa-lock mr-2 text-gray-500"></i>
+            Department:
+            <strong>{{ template.department.name }} ({{ template.department.plant.name }})</strong>
+          </div>
+        {% else %}
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              Department <span class="text-red-600">*</span>
+            </label>
+            <select name="department" required
+                    class="select2 w-full rounded-lg border-gray-300 bg-white border p-2.5 text-sm"
+                    {% if has_published_version %}disabled{% endif %}>
+              <option value=""></option>
+              {% for d in departments %}
+                <option value="{{ d.id }}"
+                        {% if template and template.department_id == d.id %}selected{% endif %}>
+                  {{ d.name }} ({{ d.plant.name }})
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        {% endif %}
+      </div>
+
+
+      	<!-- ================================================= -->
+		<!-- APPROVAL WORKFLOW -->
+		<!-- ================================================= -->
+		<div>
+		<h3 class="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-gray-100">
+			Approval Workflow
+		</h3>
+
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+			<div>
+			<label class="block text-sm font-medium text-gray-700 mb-1">
+				Approval Flow
+			</label>
+
+			<select name="approval_flow"
+					class="w-full rounded-lg border-gray-300 bg-white border p-2.5 text-sm"
+					{% if has_published_version %}disabled{% endif %}>
+
+				{% for value, label in approval_flow_choices %}
+				<option value="{{ value }}"
+					{% if template and template.approval_flow == value %}
+						selected
+					{% elif not template and value == "NONE" %}
+						selected
+					{% endif %}>
+					{{ label }}
+				</option>
+				{% endfor %}
+
+			</select>
+
+			<p class="mt-1 text-xs text-gray-500">
+				Defines which roles must approve before submission closes.
+			</p>
+			</div>
+
+		</div>
+		</div>
+
+
+      <!-- ================================================= -->
+      <!-- SCOPE -->
+      <!-- ================================================= -->
+      <div>
+        <h3 class="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-gray-100">
+          Scope
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+          <!-- PLANTS -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              Plants
+            </label>
+            <select id="plantsSelect"
+                    name="plants"
+                    multiple
+                    class="select2 w-full rounded-lg border-gray-300 bg-white border p-2.5 text-sm"
+                    {% if has_published_version %}disabled{% endif %}>
+              {% for p in plants %}
+                <option value="{{ p.id }}"
+                        {% if template and p in template.plants.all %}selected{% endif %}>
+                  {{ p }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- SHOPS -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              Shops
+            </label>
+            <select id="shopsSelect"
+                    multiple
+                    class="select2 w-full rounded-lg border-gray-300 bg-white border p-2.5 text-sm">
+              {% for s in shops %}
+                <option value="{{ s.id }}"
+                        data-plant="{{ s.plant_id }}"
+                        {% if template and s in template.shops.all %}selected{% endif %}>
+                  {{ s }}
+                </option>
+              {% endfor %}
+            </select>
+            <p class="mt-1 text-xs text-gray-500">
+              Shops appear based on selected plants
+            </p>
+          </div>
+
+          <!-- PRODUCTS -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              Products
+            </label>
+            <select name="products"
+                    multiple
+                    class="select2 w-full rounded-lg border-gray-300 bg-white border p-2.5 text-sm"
+                    {% if has_published_version %}disabled{% endif %}>
+              {% for p in products %}
+                <option value="{{ p.id }}"
+                        {% if template and p in template.products.all %}selected{% endif %}>
+                  {{ p }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+        </div>
+      </div>
+
+
+      <!-- ================================================= -->
+      <!-- BITABLE -->
+      <!-- ================================================= -->
+      <div>
+        <h3 class="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-gray-100">
+          Bitable Integration
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <input name="bitable_app_token"
+                 class="w-full rounded-lg border-gray-300 border p-2.5 text-sm font-mono"
+                 placeholder="App Token"
+                 {% if has_published_version %}disabled{% endif %}
+                 value="{{ template.bitable_app_token|default:'' }}">
+
+          <input name="bitable_table_id"
+                 class="w-full rounded-lg border-gray-300 border p-2.5 text-sm font-mono"
+                 placeholder="Table ID"
+                 {% if has_published_version %}disabled{% endif %}
+                 value="{{ template.bitable_table_id|default:'' }}">
+        </div>
+      </div>
+
+    </div>
+
+    <div id="shopsHiddenInputs"></div>
+
+
+    <!-- ACTIONS -->
+    <div class="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+      <a href="{% url 'transs_admin_flow:form_builder_dashboard' %}"
+         class="px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700">
+        Cancel
+      </a>
+
+      <button type="submit"
+              class="px-6 py-2 rounded-lg text-sm text-white bg-green-600 hover:bg-green-700">
+        {% if mode == "edit" %}Save Changes{% else %}Create Template{% endif %}
+      </button>
+    </div>
+
+  </form>
+</div>
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+$(document).ready(function () {
+
+  $('.select2').select2({
+    width: '100%',
+    closeOnSelect: false
+  });
+
+  const $plants = $('#plantsSelect');
+  const $shops  = $('#shopsSelect');
+  const $hidden = $('#shopsHiddenInputs');
+
+  function filterShops() {
+    const selectedPlants = $plants.val() || [];
+
+    if (selectedPlants.length === 0) {
+      $shops.val(null).trigger('change');
+      return;
+    }
+
+    $shops.find('option').each(function () {
+      const plantId = String($(this).data('plant'));
+      $(this).prop('disabled', !selectedPlants.includes(plantId));
+    });
+
+    $shops.trigger('change.select2');
+  }
+
+  $plants.on('change', filterShops);
+  filterShops();
+
+  // 🔥 CRITICAL PART
+  $('form').on('submit', function () {
+
+    // Remove old hidden inputs
+    $hidden.empty();
+
+    // Copy selected shops into hidden inputs
+    const selectedShops = $shops.val() || [];
+
+    selectedShops.forEach(function (shopId) {
+      $('<input>')
+        .attr('type', 'hidden')
+        .attr('name', 'shops')
+        .val(shopId)
+        .appendTo($hidden);
+    });
+
+  });
+
+});
+</script>
+{% endblock %}

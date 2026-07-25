@@ -1,0 +1,139 @@
+{% extends "shell/app.html" %}
+{% block title %}TL / AM Dashboard{% endblock %}
+
+{% block content %}
+
+<div class="max-w-7xl mx-auto space-y-8 pb-12">
+
+  <!-- ================= HEADER ================= -->
+  <div class="flex items-center gap-4">
+    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-orange-600 text-white flex items-center justify-center text-xl shadow-lg">
+      <i class="fas fa-exclamation-triangle"></i>
+    </div>
+    <div>
+      <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900">
+        TL / AM Dashboard
+      </h1>
+      <p class="text-sm text-gray-500 mt-1">
+        Operational risk & CAPA monitoring
+      </p>
+    </div>
+  </div>
+
+
+  <!-- ================= KPI GRID ================= -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+
+    <!-- Risk Index -->
+    <div class="bg-white rounded-xl shadow p-6 text-center border">
+
+      <div class="text-gray-500 text-sm uppercase font-bold tracking-wide">
+        Risk Index
+      </div>
+
+      <div class="text-4xl font-extrabold mt-3
+        {% if risk_index >= 50 %}
+          text-red-600
+        {% elif risk_index >= 25 %}
+          text-amber-600
+        {% else %}
+          text-green-600
+        {% endif %}
+      ">
+        {{ risk_index }}
+      </div>
+
+      <div class="mt-3 text-xs font-semibold
+        {% if risk_index >= 50 %}
+          text-red-500
+        {% elif risk_index >= 25 %}
+          text-amber-500
+        {% else %}
+          text-green-500
+        {% endif %}
+      ">
+        {% if risk_index >= 50 %}
+          High Risk
+        {% elif risk_index >= 25 %}
+          Moderate Risk
+        {% else %}
+          Stable
+        {% endif %}
+      </div>
+
+    </div>
+
+
+    <!-- Total CAPA -->
+    <div class="bg-white rounded-xl shadow p-6 border">
+      <div class="text-sm text-gray-500 uppercase font-bold tracking-wide">
+        Total CAPA
+      </div>
+      <div class="text-3xl font-extrabold mt-2 text-indigo-600">
+        {{ capa.total|default:0 }}
+      </div>
+    </div>
+
+
+    <!-- Open CAPA -->
+    <div class="bg-white rounded-xl shadow p-6 border">
+      <div class="text-sm text-gray-500 uppercase font-bold tracking-wide">
+        Open CAPA
+      </div>
+      <div class="text-3xl font-extrabold mt-2 text-amber-600">
+        {{ capa.open_count|default:0 }}
+      </div>
+    </div>
+
+
+    <!-- Overdue CAPA -->
+    <div class="bg-white rounded-xl shadow p-6 border">
+      <div class="text-sm text-gray-500 uppercase font-bold tracking-wide">
+        Overdue CAPA
+      </div>
+      <div class="text-3xl font-extrabold mt-2 text-red-600">
+        {{ capa.overdue|default:0 }}
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- ================= SUBMISSION METRICS ================= -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+    <!-- Total Submissions -->
+    <div class="bg-white rounded-xl shadow p-6 border">
+      <div class="text-sm text-gray-500 uppercase font-bold tracking-wide">
+        Total Submissions
+      </div>
+      <div class="text-3xl font-extrabold mt-2 text-gray-900">
+        {{ kpis.total|default:0 }}
+      </div>
+    </div>
+
+    <!-- Avg Severity -->
+    <div class="bg-white rounded-xl shadow p-6 border">
+      <div class="text-sm text-gray-500 uppercase font-bold tracking-wide">
+        Avg Severity
+      </div>
+      <div class="text-3xl font-extrabold mt-2 text-amber-600">
+        {{ kpis.avg_severity|default:0|floatformat:2 }}
+      </div>
+    </div>
+
+    <!-- High Severity -->
+    <div class="bg-white rounded-xl shadow p-6 border">
+      <div class="text-sm text-gray-500 uppercase font-bold tracking-wide">
+        High Severity (≥8)
+      </div>
+      <div class="text-3xl font-extrabold mt-2 text-red-600">
+        {{ kpis.high_severity|default:0 }}
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+{% endblock %}
