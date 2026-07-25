@@ -26,18 +26,24 @@
         
         <a href="{% url 'identity:permission_list' %}"
             class="nav-sub-item {% if current_app == 'identity' %}active{% endif %}" data-tooltip="Roles">
-            <i class="fas fa-users"></i>
+            <i class="fas fa-key"></i>
             <span class="nav-text">Access Control</span>
         </a>
 
+        <a href="{% url 'admin_panel:company_list' %}"
+            class="nav-sub-item {% if active_tab %}active{% endif %}" data-tooltip="Organization">
+            <i class="fas fa-sitemap"></i>
+            <span class="nav-text">Organization Setup</span>
+        </a>
+
         <a href="{% url 'admin_panel:admin_capas' %}"
-            class="nav-sub-item {% if current_app == 'admin_panel' %}active{% endif %}" data-tooltip="CAPA">
+            class="nav-sub-item {% if current_app == 'admin_panel' and not active_tab %}active{% endif %}" data-tooltip="CAPA">
             <i class="fas fa-clipboard-check"></i>
             <span class="nav-text">CAPA</span>
         </a>
 
         <a href="{% url 'admin_panel:reports' %}"
-            class="nav-sub-item {% if current_app == 'admin_panel' %}active{% endif %}" data-tooltip="Reports">
+            class="nav-sub-item {% if current_app == 'admin_panel' and current_url == 'reports' %}active{% endif %}" data-tooltip="Reports">
             <i class="fas fa-chart-line"></i>
             <span class="nav-text">Reports</span>
         </a>

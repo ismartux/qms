@@ -1,0 +1,71 @@
+{% extends "shell/app.html" %}
+{% load static %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+
+    <!-- Header & Back Button -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">{{ title }}</h1>
+            <p class="text-xs text-gray-500 mt-1">Fill in the fields below to {% if instance %}update{% else %}create{% endif %} this record.</p>
+        </div>
+        <a href="{% url back_url_name %}" class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg shadow-sm transition">
+            <i class="fas fa-arrow-left mr-2 text-gray-400"></i> Back to List
+        </a>
+    </div>
+
+    <!-- Form Card -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sm:p-8">
+        <form method="POST" class="space-y-6" novalidate>
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+                <div class="p-4 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-sm">
+                    {% for error in form.non_field_errors %}
+                        <p><i class="fas fa-exclamation-circle mr-1"></i> {{ error }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <div class="grid grid-cols-1 gap-6">
+                {% for field in form %}
+                    <div class="space-y-1">
+                        <label class="block text-sm font-semibold text-gray-700">
+                            {{ field.label }}
+                            {% if field.field.required %}<span class="text-rose-500">*</span>{% endif %}
+                        </label>
+
+                        {% if field.field.widget.input_type == "checkbox" %}
+                            <div class="flex items-center gap-3 pt-1">
+                                {{ field }}
+                                <span class="text-sm text-gray-600">Enabled / Active status</span>
+                            </div>
+                        {% else %}
+                            {{ field }}
+                        {% endif %}
+
+                        {% if field.help_text %}
+                            <p class="text-xs text-gray-400">{{ field.help_text }}</p>
+                        {% endif %}
+
+                        {% for error in field.errors %}
+                            <p class="text-xs text-rose-600 font-medium"><i class="fas fa-exclamation-triangle mr-1"></i> {{ error }}</p>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+            </div>
+
+            <!-- Submit Button Footer -->
+            <div class="pt-6 border-t border-gray-100 flex justify-end gap-3">
+                <a href="{% url back_url_name %}" class="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg transition">
+                    Cancel
+                </a>
+                <button type="submit" class="px-6 py-2.5 bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold rounded-lg shadow-md transition">
+                    <i class="fas fa-check mr-2"></i> Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

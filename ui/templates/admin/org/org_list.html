@@ -1,0 +1,201 @@
+{% extends "shell/app.html" %}
+{% load static %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+
+    <!-- Header & Action Bar -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Organization Setup</h1>
+            <p class="text-xs text-gray-500 mt-1">Manage Companies, Plants, Departments, Shops, Lines, Stations, and Products.</p>
+        </div>
+
+        {% if entity_type == "company" %}
+            <a href="{% url 'admin_panel:company_create' %}" class="inline-flex items-center px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold rounded-lg shadow-sm transition">
+                <i class="fas fa-plus mr-2"></i> Add Company
+            </a>
+        {% elif entity_type == "plant" %}
+            <a href="{% url 'admin_panel:plant_create' %}" class="inline-flex items-center px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold rounded-lg shadow-sm transition">
+                <i class="fas fa-plus mr-2"></i> Add Plant
+            </a>
+        {% elif entity_type == "department" %}
+            <a href="{% url 'admin_panel:department_create' %}" class="inline-flex items-center px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold rounded-lg shadow-sm transition">
+                <i class="fas fa-plus mr-2"></i> Add Department
+            </a>
+        {% elif entity_type == "shop" %}
+            <a href="{% url 'admin_panel:shop_create' %}" class="inline-flex items-center px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold rounded-lg shadow-sm transition">
+                <i class="fas fa-plus mr-2"></i> Add Shop
+            </a>
+        {% elif entity_type == "line" %}
+            <a href="{% url 'admin_panel:line_create' %}" class="inline-flex items-center px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold rounded-lg shadow-sm transition">
+                <i class="fas fa-plus mr-2"></i> Add Line
+            </a>
+        {% elif entity_type == "station" %}
+            <a href="{% url 'admin_panel:station_create' %}" class="inline-flex items-center px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold rounded-lg shadow-sm transition">
+                <i class="fas fa-plus mr-2"></i> Add Station
+            </a>
+        {% elif entity_type == "product" %}
+            <a href="{% url 'admin_panel:product_create' %}" class="inline-flex items-center px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold rounded-lg shadow-sm transition">
+                <i class="fas fa-plus mr-2"></i> Add Product
+            </a>
+        {% endif %}
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="border-b border-gray-200 bg-white rounded-t-xl px-4 pt-2 shadow-sm">
+        <nav class="flex space-x-6 overflow-x-auto text-sm font-medium">
+            <a href="{% url 'admin_panel:company_list' %}" class="py-3 px-1 border-b-2 whitespace-nowrap {% if active_tab == 'companies' %}border-sky-600 text-sky-600 font-bold{% else %}border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300{% endif %}">
+                <i class="fas fa-building mr-2"></i> Companies
+            </a>
+            <a href="{% url 'admin_panel:plant_list' %}" class="py-3 px-1 border-b-2 whitespace-nowrap {% if active_tab == 'plants' %}border-sky-600 text-sky-600 font-bold{% else %}border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300{% endif %}">
+                <i class="fas fa-industry mr-2"></i> Plants
+            </a>
+            <a href="{% url 'admin_panel:department_list' %}" class="py-3 px-1 border-b-2 whitespace-nowrap {% if active_tab == 'departments' %}border-sky-600 text-sky-600 font-bold{% else %}border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300{% endif %}">
+                <i class="fas fa-sitemap mr-2"></i> Departments
+            </a>
+            <a href="{% url 'admin_panel:shop_list' %}" class="py-3 px-1 border-b-2 whitespace-nowrap {% if active_tab == 'shops' %}border-sky-600 text-sky-600 font-bold{% else %}border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300{% endif %}">
+                <i class="fas fa-store mr-2"></i> Shops
+            </a>
+            <a href="{% url 'admin_panel:line_list' %}" class="py-3 px-1 border-b-2 whitespace-nowrap {% if active_tab == 'lines' %}border-sky-600 text-sky-600 font-bold{% else %}border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300{% endif %}">
+                <i class="fas fa-grip-lines mr-2"></i> Lines
+            </a>
+            <a href="{% url 'admin_panel:station_list' %}" class="py-3 px-1 border-b-2 whitespace-nowrap {% if active_tab == 'stations' %}border-sky-600 text-sky-600 font-bold{% else %}border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300{% endif %}">
+                <i class="fas fa-desktop mr-2"></i> Stations
+            </a>
+            <a href="{% url 'admin_panel:product_list' %}" class="py-3 px-1 border-b-2 whitespace-nowrap {% if active_tab == 'products' %}border-sky-600 text-sky-600 font-bold{% else %}border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300{% endif %}">
+                <i class="fas fa-box mr-2"></i> Products
+            </a>
+        </nav>
+    </div>
+
+    <!-- Search & Filter Card -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <form method="GET" class="flex gap-4">
+            <div class="relative flex-1">
+                <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                <input type="text" name="q" value="{{ search_query }}" placeholder="Search by code or name..." class="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
+            </div>
+            <button type="submit" class="px-4 py-2 bg-gray-900 hover:bg-black text-white text-sm font-medium rounded-lg shadow-sm transition">
+                Filter
+            </button>
+            {% if search_query %}
+                <a href="?" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition flex items-center">
+                    Reset
+                </a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Data Table Card -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 text-sm text-left">
+                <thead class="bg-gray-50 text-gray-700 font-semibold uppercase text-xs tracking-wider">
+                    <tr>
+                        <th class="px-6 py-3">Code</th>
+                        <th class="px-6 py-3">Name</th>
+
+                        {% if entity_type == "plant" %}
+                            <th class="px-6 py-3">Company</th>
+                            <th class="px-6 py-3">Timezone</th>
+                        {% elif entity_type == "department" %}
+                            <th class="px-6 py-3">Plant</th>
+                            <th class="px-6 py-3">Description</th>
+                        {% elif entity_type == "shop" %}
+                            <th class="px-6 py-3">Plant</th>
+                        {% elif entity_type == "line" %}
+                            <th class="px-6 py-3">Shop</th>
+                        {% elif entity_type == "station" %}
+                            <th class="px-6 py-3">Line</th>
+                        {% elif entity_type == "product" %}
+                            <th class="px-6 py-3">Company</th>
+                            <th class="px-6 py-3">Plant</th>
+                            <th class="px-6 py-3">Category</th>
+                        {% endif %}
+
+                        <th class="px-6 py-3">Status</th>
+                        <th class="px-6 py-3 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 bg-white">
+                    {% for item in items %}
+                    <tr class="hover:bg-gray-50 transition">
+                        <td class="px-6 py-4 font-mono font-semibold text-sky-700">{{ item.code }}</td>
+                        <td class="px-6 py-4 font-medium text-gray-900">{{ item.name }}</td>
+
+                        {% if entity_type == "plant" %}
+                            <td class="px-6 py-4 text-gray-600">{{ item.company.name }}</td>
+                            <td class="px-6 py-4 font-mono text-xs text-gray-500">{{ item.timezone }}</td>
+                        {% elif entity_type == "department" %}
+                            <td class="px-6 py-4 text-gray-600">{% if item.plant %}{{ item.plant.name }}{% else %}<span class="text-gray-400 font-italic">Global</span>{% endif %}</td>
+                            <td class="px-6 py-4 text-gray-500 text-xs">{{ item.description|truncatewords:10|default:"-" }}</td>
+                        {% elif entity_type == "shop" %}
+                            <td class="px-6 py-4 text-gray-600">{% if item.plant %}{{ item.plant.name }}{% else %}<span class="text-gray-400 font-italic">Global</span>{% endif %}</td>
+                        {% elif entity_type == "line" %}
+                            <td class="px-6 py-4 text-gray-600">{{ item.shop.name }}</td>
+                        {% elif entity_type == "station" %}
+                            <td class="px-6 py-4 text-gray-600">{{ item.line.name }}</td>
+                        {% elif entity_type == "product" %}
+                            <td class="px-6 py-4 text-gray-600">{{ item.company.name }}</td>
+                            <td class="px-6 py-4 text-gray-600">{% if item.plant %}{{ item.plant.name }}{% else %}<span class="text-gray-400 font-italic">All Plants</span>{% endif %}</td>
+                            <td class="px-6 py-4 text-gray-500 text-xs">{{ item.category|default:"-" }}</td>
+                        {% endif %}
+
+                        <td class="px-6 py-4">
+                            {% if item.is_active %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                                    Active
+                                </span>
+                            {% else %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                                    Inactive
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            {% if entity_type == "company" %}
+                                <a href="{% url 'admin_panel:company_edit' item.pk %}" class="inline-flex items-center text-xs font-semibold text-sky-600 hover:text-sky-800 bg-sky-50 px-3 py-1.5 rounded-md hover:bg-sky-100 transition">
+                                    <i class="fas fa-edit mr-1"></i> Edit
+                                </a>
+                            {% elif entity_type == "plant" %}
+                                <a href="{% url 'admin_panel:plant_edit' item.pk %}" class="inline-flex items-center text-xs font-semibold text-sky-600 hover:text-sky-800 bg-sky-50 px-3 py-1.5 rounded-md hover:bg-sky-100 transition">
+                                    <i class="fas fa-edit mr-1"></i> Edit
+                                </a>
+                            {% elif entity_type == "department" %}
+                                <a href="{% url 'admin_panel:department_edit' item.pk %}" class="inline-flex items-center text-xs font-semibold text-sky-600 hover:text-sky-800 bg-sky-50 px-3 py-1.5 rounded-md hover:bg-sky-100 transition">
+                                    <i class="fas fa-edit mr-1"></i> Edit
+                                </a>
+                            {% elif entity_type == "shop" %}
+                                <a href="{% url 'admin_panel:shop_edit' item.pk %}" class="inline-flex items-center text-xs font-semibold text-sky-600 hover:text-sky-800 bg-sky-50 px-3 py-1.5 rounded-md hover:bg-sky-100 transition">
+                                    <i class="fas fa-edit mr-1"></i> Edit
+                                </a>
+                            {% elif entity_type == "line" %}
+                                <a href="{% url 'admin_panel:line_edit' item.pk %}" class="inline-flex items-center text-xs font-semibold text-sky-600 hover:text-sky-800 bg-sky-50 px-3 py-1.5 rounded-md hover:bg-sky-100 transition">
+                                    <i class="fas fa-edit mr-1"></i> Edit
+                                </a>
+                            {% elif entity_type == "station" %}
+                                <a href="{% url 'admin_panel:station_edit' item.pk %}" class="inline-flex items-center text-xs font-semibold text-sky-600 hover:text-sky-800 bg-sky-50 px-3 py-1.5 rounded-md hover:bg-sky-100 transition">
+                                    <i class="fas fa-edit mr-1"></i> Edit
+                                </a>
+                            {% elif entity_type == "product" %}
+                                <a href="{% url 'admin_panel:product_edit' item.pk %}" class="inline-flex items-center text-xs font-semibold text-sky-600 hover:text-sky-800 bg-sky-50 px-3 py-1.5 rounded-md hover:bg-sky-100 transition">
+                                    <i class="fas fa-edit mr-1"></i> Edit
+                                </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                            <i class="fas fa-folder-open text-3xl text-gray-300 mb-2 block"></i>
+                            No {{ title|lower }} found matching your criteria.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
