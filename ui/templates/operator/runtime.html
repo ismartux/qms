@@ -1,5 +1,6 @@
 	{% extends "shell/app.html" %}
 	{% load form_extras %}
+{% load image_tags %}
 	{% block title %}{{ template.name }}{% endblock %}
 	<!-- UX FIX: Hide the global mobile bottom bar on this page to prevent overlap and reduce distraction -->
 	<style>
@@ -249,7 +250,7 @@
 	                  <script>document.addEventListener('DOMContentLoaded', () => {
 	                    const prev = document.getElementById('preview_{{ item.id }}');
 	                    const ph = document.getElementById('placeholder_{{ item.id }}');
-	                    prev.querySelector('img').src = "{{ att.BASE.file.url }}";
+	                    prev.querySelector('img').src = "{{ att.BASE|attachment_url }}";
 	                    prev.classList.remove('hidden');
 	                    ph.classList.add('hidden');
 	                  })</script>
@@ -272,9 +273,9 @@
 	                  <i class="fas fa-camera mr-1.5"></i> Proof Photo Required
 	                </label>
 	                <div class="flex items-center gap-4">
-	                  {% if att and att.RULE %}
-	                    <img src="{{ att.RULE.file.url }}" class="h-16 w-16 rounded-lg shadow-sm object-cover border border-amber-200 bg-white">
-	                  {% endif %}
+                  {% if att and att.RULE %}
+                    <img src="{{ att.RULE|attachment_url }}" class="h-16 w-16 rounded-lg shadow-sm object-cover border border-amber-200 bg-white">
+                  {% endif %}
 	                  <input type="file" name="item_rule_photo_{{ item.id }}" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-100 file:text-amber-700 hover:file:bg-amber-200 cursor-pointer">
 	                </div>
 	              </div>

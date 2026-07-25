@@ -186,7 +186,7 @@ class ChecklistItem(models.Model):
         help_text="Stable identifier (used in rules & integrations)"
     )
 
-    label = models.CharField(max_length=255)
+    label = models.TextField()
     item_type = models.CharField(max_length=20, choices=ITEM_TYPES)
     required = models.BooleanField(default=False)
 

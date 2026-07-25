@@ -503,11 +503,21 @@ def unified_form_runtime_view(request, engine, template_id):
             if str(r.item_id).isdigit()
         }
 
+        # Check old SubmissionAttachment (R2 legacy)
         for att in submission.attachments.all():
             try:
                 attachments_by_item.setdefault(
                     int(att.checklist_item_id), {}
                 )[att.attachment_type] = att
+            except (TypeError, ValueError):
+                continue
+
+        # Check new SubmissionImage (PostgreSQL binary)
+        for img in submission.db_images.all():
+            try:
+                attachments_by_item.setdefault(
+                    int(img.checklist_item_id), {}
+                )[img.attachment_type] = img
             except (TypeError, ValueError):
                 continue
 
@@ -1410,6 +1420,23 @@ def submission_detail_view(request, submission_id):
         answers = {str(r.item_id): r.value for r in responses_qs}
         responses = {str(r.item_id): r for r in responses_qs}
 
+        # Build unified attachments map (old + new)
+        attachments_by_item = {}
+        for att in submission.attachments.all():
+            try:
+                attachments_by_item.setdefault(
+                    int(att.checklist_item_id), {}
+                )[att.attachment_type] = att
+            except (TypeError, ValueError):
+                continue
+        for img in submission.db_images.all():
+            try:
+                attachments_by_item.setdefault(
+                    int(img.checklist_item_id), {}
+                )[img.attachment_type] = img
+            except (TypeError, ValueError):
+                continue
+
         return render(
             request,
             "operator/submission_detail.html",
@@ -1419,6 +1446,7 @@ def submission_detail_view(request, submission_id):
                 "sections": sections,
                 "answers": answers,
                 "responses": responses,
+                "attachments_by_item": attachments_by_item,
                 "approval": submission.approvals.order_by("created_at").last(),
             },
         )

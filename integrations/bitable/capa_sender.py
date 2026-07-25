@@ -5,8 +5,14 @@ from integrations.bitable.upsert_client import upsert_bitable_record_via_relay
 from django.conf import settings
 import traceback
 
-app_token = settings.CAPA_BITABLE_APP_TOKEN
-table_id = settings.CAPA_BITABLE_TABLE_ID
+
+def _get_capa_bitable_config():
+    """Resolve CAPA Bitable credentials from admin config, fallback to settings."""
+    from notifications.models import BitableConfig
+    config = BitableConfig.objects.filter(name="CAPA").first()
+    if config:
+        return config.app_token.strip(), config.table_id.strip()
+    return settings.CAPA_BITABLE_APP_TOKEN.strip(), settings.CAPA_BITABLE_TABLE_ID.strip()
 
 
 # =========================================================
@@ -114,9 +120,10 @@ def send_capa_create_async(capa, creator):
                 "Created_At": int(capa.created_at.timestamp() * 1000),
             }
 
+            capa_app_token, capa_table_id = _get_capa_bitable_config()
             result = upsert_bitable_record_via_relay(
-                app_token=settings.CAPA_BITABLE_APP_TOKEN.strip(),
-                table_id=settings.CAPA_BITABLE_TABLE_ID.strip(),
+                app_token=capa_app_token,
+                table_id=capa_table_id,
                 records=[fields],
                 match_field="CAPA_ID",
             )
@@ -166,9 +173,10 @@ def send_capa_update_async(capa, actor):
             if capa.status == "CLOSED":
                 fields["Approved_By"] = actor.username
 
+            capa_app_token, capa_table_id = _get_capa_bitable_config()
             upsert_bitable_record_via_relay(
-                app_token=settings.CAPA_BITABLE_APP_TOKEN.strip(),
-                table_id=settings.CAPA_BITABLE_TABLE_ID.strip(),
+                app_token=capa_app_token,
+                table_id=capa_table_id,
                 records=[fields],
                 match_field="CAPA_ID",
             )

@@ -18,6 +18,17 @@ ACTIVE_WORK_CONTEXT_KEY = "active_work_context_id"
 # PLANT RESOLUTION
 # -------------------------------------------------------------------
 
+def get_current_plant(request: HttpRequest) -> Plant:
+    """
+    Utility to get the plant associated with the current session context.
+    Falls back to user assignment resolution.
+    """
+    ctx = get_execution_context(request)
+    if ctx and ctx.get("plant_id"):
+        return Plant.objects.get(id=ctx["plant_id"])
+    return resolve_user_plant(request.user)
+
+
 def resolve_user_plant(user) -> Plant:
     """
     Resolve plant for the logged-in user.
@@ -171,38 +182,3 @@ def get_active_work_context(request: HttpRequest) -> Optional[WorkContext]:
         request.session.pop(ACTIVE_WORK_CONTEXT_KEY, None)
         request.session.modified = True
         return None
-
-
-# -------------------------------------------------------------------
-# CURRENT PLANT (SAFE RESOLUTION)
-# -------------------------------------------------------------------
-
-def get_current_plant(request: HttpRequest) -> Plant:
-    """
-    Resolve current plant safely.
-
-    Priority:
-    1. Superuser bypass
-    2. Execution context
-    3. UserScope
-    """
-
-    if request.user.is_superuser:
-        plant = Plant.objects.filter(is_active=True).first()
-        if plant:
-            return plant
-        raise RuntimeError("No active plants exist in the system")
-
-    # 1️⃣ Execution context
-    context = request.session.get(CONTEXT_SESSION_KEY)
-
-    if isinstance(context, dict):
-        plant_id = context.get("plant_id")
-        if plant_id:
-            try:
-                return Plant.objects.get(id=plant_id, is_active=True)
-            except Plant.DoesNotExist:
-                pass
-
-    # 2️⃣ Fallback to user scope
-    return resolve_user_plant(request.user)

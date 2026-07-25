@@ -1,4 +1,5 @@
 {% load form_extras %}
+{% load image_tags %}
 
 <div class="space-y-8 pt-4">
 
@@ -114,9 +115,34 @@
               <div class="relative aspect-square bg-gray-100 rounded-xl overflow-hidden
                           border border-gray-200 shadow-sm cursor-pointer
                           hover:shadow-md hover:border-sky-300 transition-all duration-300"
-                  onclick="openImagePreview('{{ attachment.file.url }}'); event.stopPropagation();">
+                  onclick="openImagePreview('{{ attachment|attachment_url }}'); event.stopPropagation();">
 
-                <img src="{{ attachment.file.url }}"
+                <img src="{{ attachment|attachment_url }}"
+                    class="w-full h-full object-cover"
+                    alt="Attachment">
+
+                <div class="absolute bottom-2 left-2 px-2 py-0.5 rounded 
+                  {% if attachment.attachment_type == 'BASE' %}
+                    bg-black/60
+                  {% else %}
+                    bg-sky-600/90
+                  {% endif %}
+                  text-white text-[10px] font-bold uppercase tracking-wider">
+                  {{ attachment.attachment_type }}
+                </div>
+
+              </div>
+              {% endif %}
+            {% endfor %}
+
+            {% for attachment in submission.db_images.all %}
+              {% if attachment.checklist_item_id == item.id %}
+              <div class="relative aspect-square bg-gray-100 rounded-xl overflow-hidden
+                          border border-gray-200 shadow-sm cursor-pointer
+                          hover:shadow-md hover:border-sky-300 transition-all duration-300"
+                  onclick="openImagePreview('{{ attachment|attachment_url }}'); event.stopPropagation();">
+
+                <img src="{{ attachment|attachment_url }}"
                     class="w-full h-full object-cover"
                     alt="Attachment">
 

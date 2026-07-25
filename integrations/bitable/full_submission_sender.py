@@ -3,7 +3,7 @@
 import requests
 import threading
 from django.conf import settings
-from submissions.models import SubmissionResponse, SubmissionAttachment
+from submissions.models import SubmissionResponse, SubmissionAttachment, SubmissionImage
 from forms_engine.models import ChecklistItem
 from django.utils import timezone
 
@@ -40,26 +40,38 @@ def send_full_submission_to_worker(submission):
         value = response.value if response else ""
         remark = response.remark if response else ""
 
-        photo = (
-            SubmissionAttachment.objects
+        # Try new SubmissionImage first, fallback to old SubmissionAttachment
+        photo_image = (
+            SubmissionImage.objects
             .filter(submission=submission, checklist_item=item)
             .first()
         )
 
         photo_field = None
-        if photo:
-            file_url = photo.file.url
-
-            # If already absolute (R2 / S3 etc), use directly
-            if file_url.startswith("http"):
-                full_url = file_url
-            else:
-                full_url = f"{settings.SITE_BASE_URL}{file_url}"
-
+        if photo_image:
+            # NEW: Use /api/image/<uuid>/ URL
+            image_url = f"{settings.SITE_BASE_URL}/api/image/{photo_image.id}/"
             photo_field = {
-                "link": full_url,
+                "link": image_url,
                 "text": "View Photo"
             }
+        else:
+            # FALLBACK: Check old SubmissionAttachment (for existing R2 images)
+            photo_attachment = (
+                SubmissionAttachment.objects
+                .filter(submission=submission, checklist_item=item)
+                .first()
+            )
+            if photo_attachment:
+                file_url = photo_attachment.file.url
+                if file_url.startswith("http"):
+                    full_url = file_url
+                else:
+                    full_url = f"{settings.SITE_BASE_URL}{file_url}"
+                photo_field = {
+                    "link": full_url,
+                    "text": "View Photo"
+                }
 
         date_ms = None
         if work_context and work_context.work_date:
@@ -96,9 +108,19 @@ def send_full_submission_to_worker(submission):
 
         records.append(fields)
 
+    # Retrieve Bitable credentials from admin config, fallback to template fields
+    from notifications.models import BitableConfig
+    config = BitableConfig.objects.filter(name=template.code).first()
+    if config:
+        _app_token = config.app_token.strip()
+        _table_id = config.table_id.strip()
+    else:
+        _app_token = template.bitable_app_token.strip()
+        _table_id = template.bitable_table_id.strip()
+
     payload = {
-        "app_token": template.bitable_app_token.strip(),
-        "table_id": template.bitable_table_id.strip(),
+        "app_token": _app_token,
+        "table_id": _table_id,
         "records": records,
     }
 

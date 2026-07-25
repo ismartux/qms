@@ -1,4 +1,5 @@
 {% load form_extras %}
+{% load image_tags %}
 
 <div class="space-y-8 pt-4">
 
@@ -137,9 +138,34 @@
                 <div
                   class="group relative aspect-square bg-gray-100 rounded-xl overflow-hidden
                          border border-gray-200 shadow-sm cursor-pointer hover:shadow-md transition"
-                  onclick="openImagePreview('{{ attachment.file.url }}')">
+                  onclick="openImagePreview('{{ attachment|attachment_url }}')">
 
-                  <img src="{{ attachment.file.url }}"
+                  <img src="{{ attachment|attachment_url }}"
+                       class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">
+
+                  <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition flex items-center justify-center">
+                    <div class="opacity-0 group-hover:opacity-100 transition bg-white/90 p-2 rounded-full shadow">
+                      <i class="fas fa-search-plus text-gray-800"></i>
+                    </div>
+                  </div>
+
+                  <div class="absolute bottom-2 left-2 px-2 py-0.5 rounded
+                              bg-sky-600/90 text-white text-[10px] font-bold uppercase tracking-wide">
+                    {{ attachment.attachment_type }}
+                  </div>
+
+                </div>
+                {% endif %}
+              {% endfor %}
+
+              {% for attachment in submission.db_images.all %}
+                {% if attachment.checklist_item_id == item.id %}
+                <div
+                  class="group relative aspect-square bg-gray-100 rounded-xl overflow-hidden
+                         border border-gray-200 shadow-sm cursor-pointer hover:shadow-md transition"
+                  onclick="openImagePreview('{{ attachment|attachment_url }}')">
+
+                  <img src="{{ attachment|attachment_url }}"
                        class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">
 
                   <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition flex items-center justify-center">

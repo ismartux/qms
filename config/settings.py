@@ -62,10 +62,10 @@ INSTALLED_APPS = [
     "integrations",
 
     "accounts",
-    "storages",
 
     # UI
-    "ui",
+    "notifications",
+
 ]
 
 # MIDDLEWARE
@@ -227,36 +227,6 @@ CLOUDFLARE_READ_RELAY_SECRET = "this_is_transsflow_bitable_read_relay_secrete_co
 DJANGO_SNAPSHOT_URL = "https://mrsingh29.pythonanywhere.com/bitable/internal/bitable/snapshot/"
 
 
-# ========== STORAGE (Cloudflare R2) ==========
-
-
-STORAGES = {
-    "default": {
-        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
-    },
-    "staticfiles": {
-        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
-    },
-}
-
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "")
-
-AWS_STORAGE_BUCKET_NAME = "transsflow-media"
-
-AWS_S3_ENDPOINT_URL = "https://2a8162f925f71a20a709d4dead129da9.r2.cloudflarestorage.com"
-AWS_S3_REGION_NAME = "auto"
-AWS_S3_SIGNATURE_VERSION = "s3v4"
-AWS_S3_ADDRESSING_STYLE = "path"
-
-AWS_DEFAULT_ACL = None
-AWS_QUERYSTRING_AUTH = False  # Public files
-AWS_S3_FILE_OVERWRITE = False
-AWS_S3_VERIFY = True
-AWS_S3_CUSTOM_DOMAIN = "pub-c701654ca9e940aca12af7f4bb0d66d6.r2.dev"
-# Public delivery URL (NOT S3 endpoint)
-MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/"
-
 LARK_WEBHOOKS = {
     "EHS": "https://open.larksuite.com/open-apis/bot/v2/hook/9189e378-1b8b-4292-b60f-d945e93c5e30",
     "IPQC": "https://open.larksuite.com/open-apis/bot/v2/hook/d7bcd5af-7068-4bc8-8a64-318126a05692",
@@ -308,5 +278,15 @@ LOGGING = {
     "root": {
         "handlers": ["file", "console"],
         "level": "WARNING",
+    },
+}
+
+# Celery configuration
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+CELERY_BEAT_SCHEDULE = {
+    'check-missed-forms-every-5-min': {
+        'task': 'scheduler.tasks.check_missed_forms',
+        'schedule': 300,  # every 5 minutes
     },
 }

@@ -10,6 +10,9 @@ from core.identity.models import Role
 # DYNAMIC FORM TEMPLATE (METADATA ONLY)
 # =========================================================
 class DynamicFormTemplate(models.Model):
+    scheduled_time = models.DateTimeField(null=True, blank=True, help_text="Scheduled time for the template to be filled")
+    alert_enabled = models.BooleanField(default=False, help_text="Enable alert if not filled on schedule")
+    lark_config = models.ForeignKey('notifications.LarkConfig', null=True, blank=True, on_delete=models.SET_NULL, related_name='templates')
     id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,

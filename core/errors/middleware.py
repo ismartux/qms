@@ -81,7 +81,12 @@ class GlobalExceptionMiddleware:
             # ---------------------------------------
             # 📤 Send To Lark
             # ---------------------------------------
-            webhook = getattr(settings, "TRANSS_FLOW_BUG_WEBHOOK", None)
+            webhook = None
+            try:
+                from notifications.models import LarkConfig
+                webhook = LarkConfig.objects.filter(name="Error").first().webhook_url if LarkConfig.objects.filter(name="Error").exists() else None
+            except Exception:
+                webhook = None
 
             if webhook:
                 LarkService.send_message(

@@ -5,6 +5,7 @@ from django.utils import timezone
 from submissions.models import (
     SubmissionResponse,
     SubmissionAttachment,
+    SubmissionImage,
     SubmissionSyncLog,
 )
 from forms_engine.models import ChecklistItem
@@ -82,16 +83,27 @@ def sync_submission_chunk_bitable(submission, log):
             value = response.value if response else ""
             remark = response.remark if response else ""
 
-            photo = (
-                SubmissionAttachment.objects
+            # Try new SubmissionImage first, fallback to old SubmissionAttachment
+            photo_image = (
+                SubmissionImage.objects
                 .filter(submission=submission, checklist_item=item)
                 .first()
             )
 
             photo_url = None
-            if photo:
-                file_url = photo.file.url
-                photo_url = file_url if file_url.startswith("http") else f"{settings.SITE_BASE_URL}{file_url}"
+            if photo_image:
+                # NEW: Use /api/image/<uuid>/ URL
+                photo_url = f"{settings.SITE_BASE_URL}/api/image/{photo_image.id}/"
+            else:
+                # FALLBACK: Check old SubmissionAttachment (for existing R2 images)
+                photo_attachment = (
+                    SubmissionAttachment.objects
+                    .filter(submission=submission, checklist_item=item)
+                    .first()
+                )
+                if photo_attachment:
+                    file_url = photo_attachment.file.url
+                    photo_url = file_url if file_url.startswith("http") else f"{settings.SITE_BASE_URL}{file_url}"
 
             date_ms = None
             if work_context and work_context.work_date:
@@ -137,9 +149,18 @@ def sync_submission_chunk_bitable(submission, log):
     # =====================================================
     # 🚀 OUTSIDE TRANSACTION (network call)
     # =====================================================
+    # Retrieve Bitable credentials from admin config, fallback to template fields
+    from notifications.models import BitableConfig
+    config = BitableConfig.objects.filter(name=template.code).first()
+    if config:
+        app_token = config.app_token.strip()
+        table_id = config.table_id.strip()
+    else:
+        app_token = template.bitable_app_token.strip()
+        table_id = template.bitable_table_id.strip()
     result = create_bitable_record_via_relay(
-        app_token=template.bitable_app_token.strip(),
-        table_id=template.bitable_table_id.strip(),
+        app_token=app_token,
+        table_id=table_id,
         records=records,
     )
 

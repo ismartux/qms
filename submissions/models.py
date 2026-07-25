@@ -281,9 +281,7 @@ class SubmissionSyncLog(models.Model):
         on_delete=models.CASCADE,
         related_name="sync_logs",
     )
-
     target = models.CharField(max_length=50)
-
     status = models.CharField(
         max_length=20,
         choices=[
@@ -295,7 +293,6 @@ class SubmissionSyncLog(models.Model):
         default="PENDING",
         db_index=True,
     )
-
     cursor = models.PositiveIntegerField(default=0)
     attempts = models.PositiveIntegerField(default=0)
     error = models.TextField(blank=True)
@@ -306,6 +303,36 @@ class SubmissionSyncLog(models.Model):
         indexes = [
             models.Index(fields=["target", "status"]),
         ]
+
+class SubmissionImage(models.Model):
+    """Store uploaded evidence images directly in the DB (binary)."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    submission = models.ForeignKey(
+        Submission, on_delete=models.CASCADE, related_name="db_images"
+    )
+    checklist_item = models.ForeignKey(
+        ChecklistItem,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+    attachment_type = models.CharField(
+        max_length=10,
+        choices=[("BASE", "Base"), ("RULE", "Rule")],
+        default="BASE",
+    )
+    image = models.BinaryField()
+    content_type = models.CharField(max_length=100, default="image/jpeg")
+    filename = models.CharField(max_length=255, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["submission"]),
+        ]
+
+    def __str__(self):
+        return f"Image {self.id} for {self.submission_id}"
 
 
 # =========================================================

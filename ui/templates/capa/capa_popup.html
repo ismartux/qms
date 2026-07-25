@@ -1,4 +1,5 @@
 {% load form_extras %}
+{% load image_tags %}
 
 <!-- WRAPPER FIX FOR STICKY HEADER OVERLAP -->
 <div class="space-y-10 pt-20 md:pt-24 pb-10 px-2 sm:px-0">
@@ -227,10 +228,30 @@
                   {% for attachment in submission.attachments.all %}
                     {% if attachment.checklist_item_id == item.id %}
                     <div class="relative aspect-square bg-gray-100 rounded-xl overflow-hidden border shadow-sm">
-                      <img src="{{ attachment.file.url }}"
+                      <img src="{{ attachment|attachment_url }}"
                            class="w-full h-full object-cover cursor-pointer"
                            alt="Attachment"
-                           onclick="openImagePreview('{{ attachment.file.url }}')">
+                           onclick="openImagePreview('{{ attachment|attachment_url }}')">
+
+                      <div class="absolute bottom-2 left-2 px-2 py-0.5 rounded text-white text-[10px] font-bold uppercase
+                        {% if attachment.attachment_type == 'BASE' %}
+                          bg-black/70
+                        {% else %}
+                          bg-sky-600
+                        {% endif %}">
+                        {{ attachment.attachment_type }}
+                      </div>
+                    </div>
+                    {% endif %}
+                  {% endfor %}
+
+                  {% for attachment in submission.db_images.all %}
+                    {% if attachment.checklist_item_id == item.id %}
+                    <div class="relative aspect-square bg-gray-100 rounded-xl overflow-hidden border shadow-sm">
+                      <img src="{{ attachment|attachment_url }}"
+                           class="w-full h-full object-cover cursor-pointer"
+                           alt="Attachment"
+                           onclick="openImagePreview('{{ attachment|attachment_url }}')">
 
                       <div class="absolute bottom-2 left-2 px-2 py-0.5 rounded text-white text-[10px] font-bold uppercase
                         {% if attachment.attachment_type == 'BASE' %}

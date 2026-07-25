@@ -99,9 +99,19 @@ def send_submission_approval_record(submission):
     # --------------------------------------------------
     # BITABLE PAYLOAD
     # --------------------------------------------------
+    # Retrieve Bitable credentials from admin config, fallback to settings
+    from notifications.models import BitableConfig
+    _config = BitableConfig.objects.filter(name="Approval").first()
+    if _config:
+        _app_token = _config.app_token.strip()
+        _table_id = _config.table_id.strip()
+    else:
+        _app_token = settings.BITABLE_APPROVAL_APP_TOKEN.strip()
+        _table_id = settings.BITABLE_APPROVAL_TABLE_ID.strip()
+
     payload = {
-        "app_token": settings.BITABLE_APPROVAL_APP_TOKEN.strip(),
-        "table_id": settings.BITABLE_APPROVAL_TABLE_ID.strip(),
+        "app_token": _app_token,
+        "table_id": _table_id,
         "records": [fields],
         "match_field": "Submission_ID",
     }
@@ -224,9 +234,19 @@ def send_dynamic_submission_approval_record(submission):
     # --------------------------------------------------
     # BITABLE PAYLOAD
     # --------------------------------------------------
+    # Retrieve Bitable credentials from admin config, fallback to settings
+    from notifications.models import BitableConfig
+    _config = BitableConfig.objects.filter(name="Approval").first()
+    if _config:
+        _app_token = _config.app_token.strip()
+        _table_id = _config.table_id.strip()
+    else:
+        _app_token = settings.BITABLE_APPROVAL_APP_TOKEN.strip()
+        _table_id = settings.BITABLE_APPROVAL_TABLE_ID.strip()
+
     payload = {
-        "app_token": settings.BITABLE_APPROVAL_APP_TOKEN.strip(),
-        "table_id": settings.BITABLE_APPROVAL_TABLE_ID.strip(),
+        "app_token": _app_token,
+        "table_id": _table_id,
         "records": [fields],
         "match_field": "Submission_ID",
     }

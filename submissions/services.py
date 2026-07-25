@@ -7,6 +7,7 @@ from submissions.models import (
     SubmissionSyncLog,
     WorkContext,
     SubmissionAttachment,
+    SubmissionImage,
 )
 
 from forms_engine.models import (
@@ -18,6 +19,7 @@ from forms_engine.models import (
 from core.workflow.states import WorkflowState
 from core.audit.models import AuditLog, DomainEvent
 from capa.services import maybe_trigger_capa
+from core.utils.image_utils import compress_uploaded_image
 
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import User
@@ -165,7 +167,7 @@ def save_submission_responses(submission, post_data, files=None):
         )
 
     # --------------------------------
-    # Attachments
+    # Attachments (NEW: store in SubmissionImage)
     # --------------------------------
 
     for key, file in files.items():
@@ -186,17 +188,33 @@ def save_submission_responses(submission, post_data, files=None):
 
         item_id = int(suffix)
 
-        SubmissionAttachment.objects.filter(
+        # Compress image before storing
+        try:
+            compressed = compress_uploaded_image(file)
+            file.seek(0)
+            image_bytes = compressed.read()
+            content_type = getattr(compressed, "content_type", "image/jpeg")
+        except Exception:
+            # Fallback: store original file bytes
+            file.seek(0)
+            image_bytes = file.read()
+            content_type = getattr(file, "content_type", "image/jpeg")
+
+        # Remove old images for this item
+        SubmissionImage.objects.filter(
             submission=submission,
             checklist_item_id=item_id,
             attachment_type=attachment_type,
         ).delete()
 
-        SubmissionAttachment.objects.create(
+        # Create new SubmissionImage record
+        SubmissionImage.objects.create(
             submission=submission,
             checklist_item_id=item_id,
             attachment_type=attachment_type,
-            file=file,
+            image=image_bytes,
+            content_type=content_type,
+            filename=file.name,
         )
 
 
@@ -231,16 +249,22 @@ def submit_submission(submission, user):
     # --------------------------------------------------
     # Bitable configuration guard
     # --------------------------------------------------
-    if not template.bitable_app_token or not template.bitable_table_id:
-        raise ValidationError(
-            {
-                "bitable": (
-                    f"Bitable is not configured for checklist template "
-                    f"'{template.code}'. "
-                    f"Please set Bitable App Token and Table ID."
-                )
-            }
-        )
+    # Retrieve Bitable credentials from admin config, fallback to template fields
+    from notifications.models import BitableConfig
+    config = BitableConfig.objects.filter(name=template.code).first()
+    if config:
+        app_token = config.app_token
+        table_id = config.table_id
+    else:
+        app_token = template.bitable_app_token
+        table_id = template.bitable_table_id
+    if not app_token or not table_id:
+        raise ValidationError({
+            "bitable": (
+                f"Bitable is not configured for checklist template '{template.code}'. "
+                "Please set Bitable credentials in admin panel."
+            )
+        })
 
     # --------------------------------------------------
     # Validation & preprocessing (UNCHANGED)
@@ -431,11 +455,18 @@ def validate_required_items(submission):
         for r in SubmissionResponse.objects.filter(submission=submission)
     }
 
-    # ---------------- ATTACHMENTS ----------------
+    # ---------------- ATTACHMENTS (check both old and new models) ----------------
     attachments = {}
+    # Check old SubmissionAttachment (R2 legacy)
     for att in SubmissionAttachment.objects.filter(submission=submission):
         try:
             attachments.setdefault(str(att.checklist_item_id), []).append(att)
+        except Exception:
+            continue
+    # Check new SubmissionImage (PostgreSQL binary)
+    for img in SubmissionImage.objects.filter(submission=submission):
+        try:
+            attachments.setdefault(str(img.checklist_item_id), []).append(img)
         except Exception:
             continue
 

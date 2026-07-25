@@ -1,6 +1,6 @@
 # ui/utils/required_validation.py
 
-from submissions.models import SubmissionAttachment
+from submissions.models import SubmissionAttachment, SubmissionImage
 from submissions.models import DynamicFormSubmission
 
 
@@ -29,18 +29,31 @@ def get_missing_required_items(
     missing_items = []
 
     # =====================================================
-    # EXISTING ATTACHMENTS
+    # EXISTING ATTACHMENTS (check both old and new models)
     # =====================================================
+    attachment_map = {}
+
+    # Check old SubmissionAttachment (R2 legacy)
     attachments = SubmissionAttachment.objects.filter(
         submission=submission
     )
-
-    attachment_map = {}
     for att in attachments:
         try:
             attachment_map.setdefault(
                 int(att.checklist_item_id), set()
             ).add(att.attachment_type)
+        except (TypeError, ValueError):
+            continue
+
+    # Check new SubmissionImage (PostgreSQL binary)
+    images = SubmissionImage.objects.filter(
+        submission=submission
+    )
+    for img in images:
+        try:
+            attachment_map.setdefault(
+                int(img.checklist_item_id), set()
+            ).add(img.attachment_type)
         except (TypeError, ValueError):
             continue
 

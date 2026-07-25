@@ -101,8 +101,15 @@ def sync_dynamic_submission(submission: DynamicFormSubmission):
 
     template = submission.template_version.template
 
-    app_token = template.submission_bitable_app_token
-    table_id = template.submission_bitable_table_id
+    # Retrieve Bitable credentials from admin config, fallback to template fields
+    from notifications.models import BitableConfig
+    config = BitableConfig.objects.filter(name=template.code).first()
+    if config:
+        app_token = config.app_token
+        table_id = config.table_id
+    else:
+        app_token = template.submission_bitable_app_token
+        table_id = template.submission_bitable_table_id
 
     if not app_token or not table_id:
         log.status = "FAILED"
