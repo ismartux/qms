@@ -31,7 +31,8 @@ def bitable_send_lark_broadcast(request):
     current_plant = get_current_plant()
 
     if not current_plant:
-        raise PermissionDenied("No active plant context.")
+        messages.error(request, "No active plant context. Please select a plant.")
+        return redirect(request.META.get("HTTP_REFERER", "/"))
 
     # =========================================
     # RESOLVE USER ROLE FOR CURRENT PLANT
@@ -58,13 +59,9 @@ def bitable_send_lark_broadcast(request):
             f"No webhook mapping for role: {role_code}"
         )
 
-    # Try admin-configured webhook first, fallback to settings
-    from notifications.models import LarkConfig
-    lark_cfg = LarkConfig.objects.filter(name=webhook_key).first()
-    if lark_cfg:
-        webhook = lark_cfg.webhook_url
-    else:
-        webhook = settings.LARK_WEBHOOKS.get(webhook_key)
+    # Try get_lark_webhook (DB -> settings.LARK_WEBHOOKS -> settings.LARK_DEFAULT_WEBHOOK)
+    from notifications.utils import get_lark_webhook
+    webhook = get_lark_webhook(webhook_key)
 
     if not webhook:
         raise PermissionDenied(

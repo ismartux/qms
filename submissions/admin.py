@@ -6,13 +6,18 @@ from submissions.models import (
     SubmissionResponse,
     SubmissionAttachment,
     SubmissionSyncLog,
+    SubmissionImage,
+    ChecklistResponse,
     WorkContext,
     SubmissionApproval,
 
     # 🔥 Dynamic Forms
     DynamicFormSubmission,
     DynamicFormSubmissionValue,
+    DynamicSubmissionSyncLog,
+    DynamicSubmissionApproval,
 )
+
 
 
 # =========================================================
@@ -293,3 +298,48 @@ class DynamicFormSubmissionValueAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(SubmissionResponse)
+class SubmissionResponseAdmin(admin.ModelAdmin):
+    list_display = ("submission", "item_id", "value", "is_non_conformance")
+    list_filter = ("is_non_conformance",)
+    search_fields = ("submission__submission_id", "item_id", "value", "remark")
+
+
+@admin.register(SubmissionSyncLog)
+class SubmissionSyncLogAdmin(admin.ModelAdmin):
+    list_display = ("submission", "target", "status", "attempts", "last_attempt_at")
+    list_filter = ("status", "target", "last_attempt_at")
+    search_fields = ("submission__submission_id", "target", "error")
+    readonly_fields = ("submission", "target", "status", "cursor", "attempts", "error", "last_attempt_at")
+
+
+@admin.register(SubmissionImage)
+class SubmissionImageAdmin(admin.ModelAdmin):
+    list_display = ("submission", "checklist_item", "attachment_type", "filename", "uploaded_at")
+    list_filter = ("attachment_type", "uploaded_at")
+    search_fields = ("submission__submission_id", "filename")
+    readonly_fields = ("uploaded_at",)
+
+
+@admin.register(ChecklistResponse)
+class ChecklistResponseAdmin(admin.ModelAdmin):
+    list_display = ("submission", "item", "value", "created_at")
+    list_filter = ("created_at",)
+    search_fields = ("submission__submission_id", "value", "remark")
+
+
+@admin.register(DynamicSubmissionSyncLog)
+class DynamicSubmissionSyncLogAdmin(admin.ModelAdmin):
+    list_display = ("submission", "target", "status", "attempts", "http_status", "last_attempt_at")
+    list_filter = ("status", "target", "http_status", "last_attempt_at")
+    search_fields = ("submission__submission_id", "target", "error")
+    readonly_fields = ("submission", "target", "status", "attempts", "error", "request_payload", "response_payload", "http_status", "last_attempt_at")
+
+
+@admin.register(DynamicSubmissionApproval)
+class DynamicSubmissionApprovalAdmin(admin.ModelAdmin):
+    list_display = ("submission", "category", "approver_role", "status", "approver_name", "created_at")
+    list_filter = ("category", "status", "created_at")
+    search_fields = ("submission__submission_id", "approver_name", "rejection_reason")

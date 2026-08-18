@@ -31,6 +31,12 @@ def login_view(request):
 
         if user is not None:
             login(request, user)
+            # 🔑 RESPECT 'next' PARAMETER (from @login_required redirect)
+            # This ensures users are redirected back to the approval page
+            # after login, instead of being sent to the home page.
+            next_url = request.POST.get("next") or request.GET.get("next")
+            if next_url:
+                return redirect(next_url)
             return redirect("/")
         else:
             messages.error(request, "Invalid username or password")

@@ -44,3 +44,24 @@ class UserScopeAdmin(admin.ModelAdmin):
     list_filter = ("plant", "role")
     search_fields = ("user__username", "user__email")
     autocomplete_fields = ("user", "plant", "role")
+
+
+from core.audit.models import AuditLog, DomainEvent
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    list_display = ("action", "actor", "object_type", "object_id", "created_at")
+    list_filter = ("action", "object_type", "created_at")
+    search_fields = ("action", "object_type", "object_id", "actor__username")
+    readonly_fields = ("actor", "action", "object_type", "object_id", "metadata", "created_at")
+    ordering = ("-created_at",)
+
+
+@admin.register(DomainEvent)
+class DomainEventAdmin(admin.ModelAdmin):
+    list_display = ("event_type", "event_id", "object_type", "object_id", "created_at")
+    list_filter = ("event_type", "object_type", "created_at")
+    search_fields = ("event_type", "event_id", "object_type", "object_id")
+    readonly_fields = ("event_id", "event_type", "object_type", "object_id", "payload", "created_at")
+    ordering = ("-created_at",)

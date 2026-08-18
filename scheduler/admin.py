@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import FormSchedule, ScheduledInstance, SchedulerControl
+from .models import FormSchedule, ScheduledInstance, SchedulerControl, MissedFormAlert
 
 
 # ==========================================================
@@ -98,3 +98,37 @@ class SchedulerControlAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+# ==========================================================
+# MissedFormAlert Admin
+# ==========================================================
+
+@admin.register(MissedFormAlert)
+class MissedFormAlertAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "template",
+        "user",
+        "expected_at",
+        "business_date",
+        "shift",
+        "notification_sent",
+        "group_alert_sent",
+        "created_at",
+    )
+
+    list_filter = (
+        "shift",
+        "notification_sent",
+        "group_alert_sent",
+        "business_date",
+        "created_at",
+    )
+
+    search_fields = (
+        "template__name",
+        "user__username",
+    )
+
+    readonly_fields = ("created_at",)

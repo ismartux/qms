@@ -12,7 +12,7 @@ class HQMetrics:
             .filter(workflow_state="SUBMITTED")
             .values("plant__name")
             .annotate(
-                total=Count("id"),
+                total=Count("pk"),
                 avg_severity=Avg("severity_score"),
             )
             .order_by("plant__name")
@@ -26,7 +26,7 @@ class HQMetrics:
             .annotate(month=TruncMonth("submitted_at"))
             .values("month")
             .annotate(
-                total=Count("id"),
+                total=Count("pk"),
                 avg_severity=Avg("severity_score"),
             )
             .order_by("month")

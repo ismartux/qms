@@ -150,12 +150,94 @@
           {{ template.name }}
         </h3>
 
-        <!-- Description -->
-        <p class="text-sm text-gray-500 mb-4 line-clamp-2">
-          {{ template.description|default:"No description provided." }}
-        </p>
+         <!-- Description -->
+         <p class="text-sm text-gray-500 mb-4 line-clamp-2">
+           {{ template.description|default:"No description provided." }}
+         </p>
 
-        <!-- Action (✅ FIXED) -->
+         <!-- Timeline & Progress Section -->
+         {% if template.schedule %}
+         <div class="mb-4 space-y-3">
+           
+           <!-- Shift Limit Progress -->
+           {% if progress and progress.required > 0 %}
+           <div class="bg-gray-50 rounded-lg p-3">
+             <div class="flex justify-between items-center mb-2">
+               <span class="text-xs font-bold text-gray-600">Shift Progress</span>
+               <span class="text-xs font-bold text-gray-900">
+                 {{ progress.completed }}/{{ progress.required }}
+               </span>
+             </div>
+             <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+               <div class="bg-[var(--theme-color)] h-2 rounded-full transition-all duration-500"
+                    style="width: {% widthratio progress.completed progress.required 100 %}%">
+               </div>
+             </div>
+             <div class="mt-1.5 text-[10px] text-gray-500 font-medium">
+               {% if progress.remaining > 0 %}
+                 {{ progress.remaining }} remaining
+               {% else %}
+                 ✓ Completed for shift
+               {% endif %}
+             </div>
+           </div>
+           {% endif %}
+
+           <!-- Interval / Daily Timeline -->
+           {% if interval_status %}
+           <div class="bg-gray-50 rounded-lg p-3">
+             <div class="flex justify-between items-center mb-2">
+               <span class="text-xs font-bold text-gray-600">
+                 {% if interval_status.type == "interval" %}
+                   Next Due
+                 {% else %}
+                   Daily Target
+                 {% endif %}
+               </span>
+               {% if interval_status.is_due %}
+                 <span class="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded">
+                   DUE NOW
+                 </span>
+               {% endif %}
+             </div>
+             
+             {% if interval_status.type == "interval" %}
+             <!-- Interval Progress Bar -->
+             <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden mb-2">
+               <div class="h-2 rounded-full transition-all duration-500
+                           {% if interval_status.is_due %}
+                             bg-red-500
+                           {% else %}
+                             bg-[var(--theme-color)]
+                           {% endif %}"
+                    style="width: {{ interval_status.percent }}%">
+               </div>
+             </div>
+             <div class="text-[10px] text-gray-500 font-medium">
+               {{ interval_status.elapsed_minutes }}/{{ interval_status.interval_minutes }} min elapsed
+             </div>
+             {% else %}
+             <!-- Daily Status -->
+             <div class="text-[10px] font-medium
+                         {% if interval_status.is_due %}
+                           text-red-600
+                         {% else %}
+                           text-emerald-600
+                         {% endif %}">
+               {% if interval_status.is_due %}
+                 ⚠ Not completed today
+               {% else %}
+                 ✓ Completed today
+               {% endif %}
+             </div>
+             {% endif %}
+           </div>
+           {% endif %}
+
+         </div>
+         {% endif %}
+
+         <!-- Action (✅ FIXED) -->
         <a
           href="
             {% if requires_work_context %}
@@ -183,10 +265,10 @@
       </div>
     </div>
 
-    {% endwith %}
-    {% endwith %}
-    {% endwith %}
-    {% endfor %}
+     {% endwith %}
+     {% endwith %}
+     {% endwith %}
+     {% endfor %}
 
   </div>
   {% endif %}

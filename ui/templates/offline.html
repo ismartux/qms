@@ -1,0 +1,74 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Offline - QIsmartuX</title>
+    <!-- PWA / Mobile meta -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0ea5e9" />
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="{% static 'icons/apple-touch-icon.png' %}">
+    <meta name="msapplication-TileColor" content="#0ea5e9">
+    <meta name="msapplication-config" content="{% static 'browserconfig.xml' %}">
+    <link rel="icon" type="image/png" href="{% static 'icons/apple-touch-icon.png' %}">
+    <!-- Tailwind (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #f8fafc;
+            background-image: radial-gradient(#e0f2fe 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+    </style>
+</head>
+<body class="h-screen w-full flex items-center justify-center p-4">
+
+    <div class="w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+        <!-- Header -->
+        <div class="bg-sky-600 p-8 text-center relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-sky-500 to-blue-600 opacity-90"></div>
+            <div class="absolute -top-10 -right-10 w-32 h-32 bg-white opacity-10 rounded-full"></div>
+            <div class="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full"></div>
+            <div class="relative z-10">
+                <div class="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-xl mx-auto flex items-center justify-center mb-4 border border-white/30">
+                    <i class="fas fa-wifi text-white text-2xl"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-white tracking-tight">QIsmartuX</h1>
+                <p class="text-sky-100 text-sm mt-1 font-medium">You are offline</p>
+            </div>
+        </div>
+
+        <!-- Content -->
+        <div class="p-8 text-center">
+            <div class="w-20 h-20 bg-gray-100 rounded-full mx-auto flex items-center justify-center mb-6">
+                <i class="fas fa-cloud-slash text-gray-400 text-3xl"></i>
+            </div>
+
+            <h2 class="text-xl font-bold text-gray-900 mb-4">No Internet Connection</h2>
+
+            <p class="text-sm text-gray-500 mb-6 leading-relaxed">
+                You are currently offline. Please check your network connection
+                and try again. Some features may still be available.
+            </p>
+
+            <button onclick="location.reload()"
+                    class="w-full bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white font-bold py-3 rounded-xl shadow-lg transform transition hover:-translate-y-0.5 active:translate-y-0 focus:ring-4 focus:ring-sky-500/20">
+                <i class="fas fa-redo mr-2"></i>
+                Try Again
+            </button>
+        </div>
+
+        <div class="mt-8 text-center pb-6">
+            <p class="text-xs text-gray-400">
+                &copy; 2026 QIsmartuX Enterprise.
+            </p>
+        </div>
+    </div>
+
+</body>
+</html>

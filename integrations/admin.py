@@ -20,3 +20,10 @@ class IntegrationTemplateMappingAdmin(admin.ModelAdmin):
 @admin.register(IntegrationTarget)
 class IntegrationTargetAdmin(admin.ModelAdmin):
     list_display = ("code", "name", "is_active")
+    search_fields = ("code", "name")
+
+
+@admin.register(IntegrationFieldMapping)
+class IntegrationFieldMappingAdmin(admin.ModelAdmin):
+    list_display = ("template_mapping", "item_id", "external_field", "transform")
+    search_fields = ("template_mapping__template__code", "item_id", "external_field")

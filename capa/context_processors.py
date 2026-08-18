@@ -1,4 +1,5 @@
 from django.db.models import Q
+from django.core.cache import cache
 from capa.models import CAPA
 from submissions.models import Submission, WorkflowState
 from core.identity.permissions import has_permission
@@ -9,10 +10,16 @@ def global_nav_notifications(request):
         return {}
 
     user = request.user
+    cache_key = f"qms_nav_notif_{user.id}"
+    cached_data = cache.get(cache_key)
+
+    if cached_data is not None:
+        return cached_data
+
     scopes = user.scopes.select_related("plant", "role")
 
-    plant_ids = scopes.values_list("plant_id", flat=True)
-    role_ids = scopes.values_list("role_id", flat=True)
+    plant_ids = list(scopes.values_list("plant_id", flat=True))
+    role_ids = list(scopes.values_list("role_id", flat=True))
 
     # =========================================================
     # ===================== CAPA BASE =========================
@@ -100,7 +107,7 @@ def global_nav_notifications(request):
     if has_permission(user, "can_approve_ipqc"):
         total_notifications += ipqc_pending_approval_count
 
-    return {
+    result = {
         # CAPA
         "approval_count": approval_count,
         "my_pending_rca_count": rca_pending,
@@ -113,3 +120,7 @@ def global_nav_notifications(request):
         # TOGGLE TOTAL
         "total_notifications": total_notifications,
     }
+
+    # Cache for 30 seconds
+    cache.set(cache_key, result, 30)
+    return result

@@ -6,7 +6,7 @@
 	<meta charset="UTF-8">
 	<!-- Viewport + safe-area for notches -->
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-	<title>TranssFlow - Manufacturing Control</title>
+	<title>QIsmartuX - Manufacturing Control</title>
 	<!-- PWA / Mobile meta -->
 	<link rel="manifest" href="/manifest.json">
 	<meta name="theme-color" content="#0ea5e9" />
@@ -17,7 +17,7 @@
 	<meta name="msapplication-TileColor" content="#0ea5e9">
 	<meta name="msapplication-config" content="{% static 'browserconfig.xml' %}">
 	<!-- Favicon -->
-	<link rel="icon" type="image/png" href="{% static 'screenshots/favicon.png' %}">
+	<link rel="icon" type="image/png" href="{% static 'icons/apple-touch-icon.png' %}">
 	<!-- Tailwind (CDN) -->
 	<script src="https://cdn.tailwindcss.com"></script>
 	<!-- FontAwesome -->
@@ -40,7 +40,7 @@
 		<div class="pwa-logo">
 			<i class="fas fa-industry text-white text-3xl"></i>
 		</div>
-		<div class="text-xl font-bold text-gray-800">Transs Flow</div>
+		<div class="text-xl font-bold text-gray-800">QIsmartuX</div>
 		<div class="text-sm text-gray-600 mt-2">Loading...</div>
 	</div>
 	<!-- Header -->
@@ -50,14 +50,17 @@
 			{# LEFT + CENTER #}
 			{% include "partials/header_base.html" %}
 
-
 			{# USER DROPDOWN #}
 			{% include "partials/header_user_menu.html" %}
 
 		</div>
 	</header>
+
+
 	<!-- App Shell -->
+
 	<div class="app-shell">
+
 		<div class="app-container w-full">
 
 			<!-- ================= SIDEBAR ================= -->
@@ -90,19 +93,27 @@
 						{# ================= NORMAL MODE ======================= #}
 						{# ===================================================== #}
 
-						<a href="{% url 'ui:main_home' %}"
-							class="nav-item {% if current_url == 'main_home' %}active{% endif %}" data-tooltip="Home">
-							<i class="fas fa-home"></i>
-							<span class="nav-text">Home</span>
-						</a>
+					<a href="{% url 'ui:main_home' %}"
+						class="nav-item {% if current_url == 'main_home' %}active{% endif %}" data-tooltip="Home">
+						<i class="fas fa-home"></i>
+						<span class="nav-text">Home</span>
+					</a>
 
-						{% if can_view_submissions or is_admin %}
-						<a href="{% url 'ui:submission_list' %}"
-							class="nav-item {% if current_url == 'submission_list_view' %}active{% endif %}" data-tooltip="IPQC Submissions">
-							<i class="fas fa-clipboard-list"></i>
-							<span class="nav-text">Submissions</span>
-						</a>
-						{% endif %}
+					{% if can_view_operator_dashboard or can_view_supervisor_dashboard or can_view_management_dashboard or is_admin %}
+					<a href="{% url 'ui:dashboard' %}"
+						class="nav-item {% if current_url == 'dashboard' %}active{% endif %}" data-tooltip="Dashboard">
+						<i class="fas fa-chart-line"></i>
+						<span class="nav-text">Dashboard</span>
+					</a>
+					{% endif %}
+
+					{% if can_view_submissions or is_admin %}
+					<a href="{% url 'ui:submission_list' %}"
+						class="nav-item {% if current_url == 'submission_list_view' %}active{% endif %}" data-tooltip="IPQC Submissions">
+						<i class="fas fa-clipboard-list"></i>
+						<span class="nav-text">Submissions</span>
+					</a>
+					{% endif %}
 
 						{% if can_manage_ehs_templates or is_admin %}
 						<a href="{% url 'ehs:ehs_admin_submission_list' %}"

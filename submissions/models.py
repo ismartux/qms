@@ -124,9 +124,9 @@ class Submission(models.Model):
 
     plant = models.ForeignKey(Plant, on_delete=models.PROTECT, db_index=True, null=True, blank=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True, blank=True)
-    line = models.ForeignKey(Line, on_delete=models.PROTECT, db_index=True)
+    line = models.ForeignKey(Line, on_delete=models.PROTECT, db_index=True, null=True, blank=True)
     station = models.ForeignKey(Station, on_delete=models.PROTECT, null=True, blank=True)
-    product = models.ForeignKey(Product, on_delete=models.PROTECT, db_index=True)
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, db_index=True, null=True, blank=True)
 
     workflow_state = models.CharField(
         max_length=20,

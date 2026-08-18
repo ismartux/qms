@@ -329,3 +329,10 @@ class DynamicFormStandardRuleAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         # Created via Builder / Version logic only
         return False
+
+
+@admin.register(DynamicTemplateRole)
+class DynamicTemplateRoleAdmin(admin.ModelAdmin):
+    list_display = ("template", "role", "requires_work_context")
+    list_filter = ("requires_work_context", "role")
+    search_fields = ("template__code", "template__name", "role__name")

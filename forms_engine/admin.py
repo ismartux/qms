@@ -275,3 +275,18 @@ class ChecklistItemOptionAdmin(admin.ModelAdmin):
         "item",
         "order",
     )
+
+
+@admin.register(ChecklistApprovalStep)
+class ChecklistApprovalStepAdmin(admin.ModelAdmin):
+    list_display = ("template", "category", "order", "is_required")
+    list_filter = ("category", "is_required")
+    search_fields = ("template__code", "template__name")
+    ordering = ("template", "order")
+
+
+@admin.register(TemplateRole)
+class TemplateRoleAdmin(admin.ModelAdmin):
+    list_display = ("template", "role")
+    list_filter = ("role",)
+    search_fields = ("template__code", "template__name", "role__name")

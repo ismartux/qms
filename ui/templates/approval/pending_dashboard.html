@@ -26,12 +26,7 @@
 
     {% for c in cards %}
     <div
-      class="rounded-xl border p-5 flex flex-col bg-white shadow-sm transition
-             {% if not c.can_approve %}
-               opacity-40 pointer-events-none
-             {% else %}
-               hover:shadow-md
-             {% endif %}"
+      class="rounded-xl border p-5 flex flex-col bg-white shadow-sm transition hover:shadow-md"
       data-submission-id="{{ c.submission.submission_id }}">
 
       <!-- TITLE -->
@@ -82,19 +77,10 @@
           Review Details
         </button>
 
-        {% if c.can_approve %}
-        <!-- APPROVE -->
-        <button
-          type="button"
-          class="w-full py-2 text-sm font-semibold rounded-lg
-                 bg-green-50 text-green-700 border border-green-200
-                 hover:bg-green-600 hover:text-white transition"
-          onclick="confirmDirectApprove(
-            '{% url 'ui:approve_submission' c.submission.submission_id %}',
-            '{{ c.current }}'
-          )">
-          ✔ Approve ({{ c.current }})
-        </button>
+        {% if not c.can_approve %}
+        <div class="text-xs text-gray-400 text-center italic">
+          Open review to approve
+        </div>
         {% endif %}
       </div>
 
@@ -344,6 +330,80 @@ document.addEventListener("click", function (e) {
   if (overlay && !overlay.classList.contains("hidden") && e.target === overlay) {
     closeSubmissionModal();
   }
+});
+
+/* ============================================================
+   APPROVAL SUBMIT (event delegation - works with AJAX-loaded content)
+============================================================ */
+document.addEventListener("click", function(e) {
+  const btn = e.target.closest("[data-approve-action]");
+  if (!btn) return;
+
+  const action = btn.dataset.approveAction;
+
+  if (action === "TOGGLE_REJECT") {
+    const box = document.getElementById("rejectBox");
+    if (box) box.classList.toggle("hidden");
+    return;
+  }
+
+  // APPROVED or REJECTED
+  const content = document.getElementById("submissionContent");
+  const approvalDiv = content ? content.querySelector("[data-approval-url]") : null;
+  const approverName = document.getElementById("approverName");
+  const rejectionReason = document.getElementById("rejectionReason");
+
+  if (!approverName || !approverName.value.trim()) {
+    alert("Approver name is required");
+    return;
+  }
+
+  if (action === "REJECTED" && (!rejectionReason || !rejectionReason.value.trim())) {
+    alert("Rejection reason is required");
+    return;
+  }
+
+  if (!approvalDiv) {
+    alert("Approval form not found");
+    return;
+  }
+
+  const url = approvalDiv.dataset.approvalUrl;
+
+  const formData = new URLSearchParams();
+  formData.append("status", action);
+  formData.append("approver_name", approverName.value.trim());
+  if (action === "REJECTED") {
+    formData.append("rejection_reason", rejectionReason.value.trim());
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Processing...";
+
+  fetch(url, {
+    method: "POST",
+    headers: {
+      "X-CSRFToken": getCookie("csrftoken"),
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: formData.toString(),
+  })
+  .then(r => r.json().then(data => ({ ok: r.ok, data })))
+  .then(({ ok, data }) => {
+    if (!ok) {
+      alert(data.error || data.message || "Approval failed");
+      btn.disabled = false;
+      btn.textContent = action === "APPROVED" ? "Approve" : "Confirm Reject";
+      return;
+    }
+    alert("Approval submitted successfully!");
+    location.reload();
+  })
+  .catch(() => {
+    alert("Approval failed due to a system error.");
+    btn.disabled = false;
+    btn.textContent = action === "APPROVED" ? "Approve" : "Confirm Reject";
+  });
 });
 
 /* ============================================================

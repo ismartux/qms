@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ action }} Line{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">⚙️ {{ action }} Line</h1>
+                    <p class="text-muted">{% if action == 'Create' %}Add a new production line{% else %}Edit line details{% endif %}</p>
+                </div>
+                <a href="{% url 'org:line_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to List
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Line Information</h6>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {% csrf_token %}
+
+                        {% if messages %}
+                        {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="close" data-dismiss="alert">
+                                <span>&times;</span>
+                            </button>
+                        </div>
+                        {% endfor %}
+                        {% endif %}
+
+                        <div class="form-group">
+                            <label for="shop">Shop <span class="text-danger">*</span></label>
+                            <select class="form-control" id="shop" name="shop" required>
+                                <option value="">Select Shop</option>
+                                {% for shop in shops %}
+                                <option value="{{ shop.id }}" 
+                                        {% if record and record.shop_id == shop.id %}selected{% endif %}>
+                                    {{ shop.code }} - {{ shop.name }} ({{ shop.plant.name }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small class="form-text text-muted">Select the shop this line belongs to</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="code">Line Code <span class="text-danger">*</span></label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="code" 
+                                   name="code" 
+                                   value="{% if record %}{{ record.code }}{% endif %}" 
+                                   required
+                                   placeholder="e.g., LINE-001">
+                            <small class="form-text text-muted">Unique code for this line within the shop</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="name">Line Name <span class="text-danger">*</span></label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="name" 
+                                   name="name" 
+                                   value="{% if record %}{{ record.name }}{% endif %}" 
+                                   required
+                                   placeholder="e.g., Assembly Line A">
+                            <small class="form-text text-muted">Full name of the production line</small>
+                        </div>
+
+                        <div class="form-group">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> {{ action }} Line
+                            </button>
+                            <a href="{% url 'org:line_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

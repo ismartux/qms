@@ -15,7 +15,9 @@ from .models import (
     WorkflowStep,
     WorkflowActionLog,
     CAPA,
+    EHSNotification,
 )
+
 
 
 # =========================================================
@@ -239,3 +241,54 @@ class CAPAAdmin(admin.ModelAdmin):
         "submission__id",
         "responsible_person__username",
     )
+
+
+@admin.register(EHSItemOption)
+class EHSItemOptionAdmin(admin.ModelAdmin):
+    list_display = ("item", "label", "value", "order")
+    search_fields = ("label", "value", "item__label")
+    ordering = ("item", "order")
+
+
+@admin.register(EHSRule)
+class EHSRuleAdmin(admin.ModelAdmin):
+    list_display = ("item", "rule_type", "condition_value")
+    list_filter = ("rule_type",)
+    search_fields = ("item__label", "condition_value")
+
+
+@admin.register(EHSResponse)
+class EHSResponseAdmin(admin.ModelAdmin):
+    list_display = ("submission", "item", "value", "created_at")
+    list_filter = ("created_at",)
+    search_fields = ("submission__id", "value", "remark")
+    readonly_fields = ("created_at",)
+
+
+@admin.register(RiskAssessment)
+class RiskAssessmentAdmin(admin.ModelAdmin):
+    list_display = ("submission", "likelihood", "severity")
+    search_fields = ("submission__id",)
+
+
+@admin.register(WorkflowStep)
+class WorkflowStepAdmin(admin.ModelAdmin):
+    list_display = ("workflow", "order", "role_required")
+    list_filter = ("role_required",)
+    ordering = ("workflow", "order")
+
+
+@admin.register(WorkflowActionLog)
+class WorkflowActionLogAdmin(admin.ModelAdmin):
+    list_display = ("submission", "action", "performed_by", "created_at")
+    list_filter = ("action", "created_at")
+    search_fields = ("submission__id", "performed_by__username", "comment")
+    readonly_fields = ("created_at",)
+
+
+@admin.register(EHSNotification)
+class EHSNotificationAdmin(admin.ModelAdmin):
+    list_display = ("recipient", "title", "submission", "is_read", "created_at")
+    list_filter = ("is_read", "created_at")
+    search_fields = ("recipient__username", "title", "message")
+    readonly_fields = ("created_at",)

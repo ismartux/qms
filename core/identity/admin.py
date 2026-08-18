@@ -4,7 +4,21 @@ from core.identity.models import (
     Permission,
     RolePermission,
     ApprovalCategory,
+    EmployeeProfile,
 )
+
+
+# =====================================================
+# EMPLOYEE PROFILE ADMIN
+# =====================================================
+@admin.register(EmployeeProfile)
+class EmployeeProfileAdmin(admin.ModelAdmin):
+    list_display = ("employee_id", "user", "role", "created_at")
+    list_filter = ("role", "created_at")
+    search_fields = ("employee_id", "user__username", "user__email", "user__first_name", "user__last_name")
+    autocomplete_fields = ("user", "role")
+    readonly_fields = ("created_at",)
+
 
 # =====================================================
 # ROLE ↔ PERMISSION INLINE

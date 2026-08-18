@@ -48,27 +48,38 @@ def manage_items(request, section_id):
                 section=target_section,
                 order=order_value
             ).exists():
-                raise ValidationError("Item order already exists in this section")
+                messages.error(request, "Item order already exists in this section")
+                return redirect(
+                    "transs_admin_flow:manage_items",
+                    section_id=section_id
+                )
 
-            item = ChecklistItem.objects.create(
-                section=target_section,
-                item_id=request.POST["item_id"].strip(),
-                label=request.POST["label"].strip(),
-                item_type=request.POST["item_type"],
-                required=request.POST.get("required") == "on",
-                order=order_value,
-                severity_weight=int(request.POST.get("severity_weight", 1)),
-            )
+            try:
+                item = ChecklistItem.objects.create(
+                    section=target_section,
+                    item_id=request.POST["item_id"].strip(),
+                    label=request.POST["label"].strip(),
+                    item_type=request.POST["item_type"],
+                    required=request.POST.get("required") == "on",
+                    order=order_value,
+                    severity_weight=int(request.POST.get("severity_weight", 1)),
+                )
 
-            # ---------------- RULE (OPTIONAL) ----------------
-            rule_type = request.POST.get("rule_type")
-            condition_value = request.POST.get("condition_value", "").strip().upper()
+                # ---------------- RULE (OPTIONAL) ----------------
+                rule_type = request.POST.get("rule_type")
+                condition_value = request.POST.get("condition_value", "").strip().upper()
 
-            if rule_type and condition_value:
-                ChecklistRule.objects.create(
-                    item=item,
-                    rule_type=rule_type,
-                    condition_value=condition_value,
+                if rule_type and condition_value:
+                    ChecklistRule.objects.create(
+                        item=item,
+                        rule_type=rule_type,
+                        condition_value=condition_value,
+                    )
+            except ValidationError as e:
+                messages.error(request, str(e))
+                return redirect(
+                    "transs_admin_flow:manage_items",
+                    section_id=section_id
                 )
 
             # ---------------- DROPDOWN OPTIONS ----------------

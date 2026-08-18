@@ -229,33 +229,38 @@
 	                    <i class="fas fa-chevron-down text-xs"></i>
 	                  </div>
 	                </div>
-	              {% elif item.item_type == "PHOTO" %}
-	                <!-- Improved Photo Upload Card -->
-	                <div class="relative">
-	                  <input type="file" name="item_file_{{ item.id }}" id="file_{{ item.id }}" class="hidden" accept="image/*" onchange="previewImage(this, 'preview_{{ item.id }}')">
-	                  <label for="file_{{ item.id }}" class="block w-full border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:bg-gray-50 hover:border-sky-400 transition-all cursor-pointer group bg-gray-50/50">
-	                    <div id="preview_{{ item.id }}" class="hidden mb-3">
-	                      <img src="" class="h-32 mx-auto rounded-lg shadow-md object-cover w-full">
-	                      <p class="text-xs text-gray-500 mt-2 font-medium">Tap to change photo</p>
-	                    </div>
-	                    <div id="placeholder_{{ item.id }}" {% if att and att.BASE %}class="hidden"{% endif %}>
-	                      <div class="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
-	                        <i class="fas fa-camera text-sky-500 text-xl"></i>
-	                      </div>
-	                      <p class="text-sm font-medium text-gray-700">Upload Photo</p>
-	                      <p class="text-xs text-gray-400 mt-1">Support JPG, PNG</p>
-	                    </div>
-	                  </label>
-	                  {% if att and att.BASE %}
-	                  <script>document.addEventListener('DOMContentLoaded', () => {
-	                    const prev = document.getElementById('preview_{{ item.id }}');
-	                    const ph = document.getElementById('placeholder_{{ item.id }}');
-	                    prev.querySelector('img').src = "{{ att.BASE|attachment_url }}";
-	                    prev.classList.remove('hidden');
-	                    ph.classList.add('hidden');
-	                  })</script>
-	                  {% endif %}
-	                </div>
+              {% elif item.item_type == "PHOTO" %}
+                <!-- Multi-Photo Upload Card -->
+                <div class="relative">
+                  <input type="file" name="item_file_{{ item.id }}" id="file_{{ item.id }}" class="hidden" accept="image/*" multiple onchange="previewImages(this, 'preview_{{ item.id }}')">
+                  <label for="file_{{ item.id }}" class="block w-full border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:bg-gray-50 hover:border-sky-400 transition-all cursor-pointer group bg-gray-50/50">
+                    <div id="preview_{{ item.id }}" class="hidden mb-3">
+                      <div class="grid grid-cols-2 gap-2"></div>
+                      <p class="text-xs text-gray-500 mt-2 font-medium">Tap to add more photos</p>
+                    </div>
+                    <div id="placeholder_{{ item.id }}" {% if att and att.BASE %}class="hidden"{% endif %}>
+                      <div class="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                        <i class="fas fa-camera text-sky-500 text-xl"></i>
+                      </div>
+                      <p class="text-sm font-medium text-gray-700">Upload Photos</p>
+                      <p class="text-xs text-gray-400 mt-1">Support JPG, PNG (Multiple allowed)</p>
+                    </div>
+                  </label>
+                  {% if att and att.BASE %}
+                  <script>document.addEventListener('DOMContentLoaded', () => {
+                    const prev = document.getElementById('preview_{{ item.id }}');
+                    const ph = document.getElementById('placeholder_{{ item.id }}');
+                    const grid = prev.querySelector('div');
+                    grid.innerHTML = '';
+                    const img = document.createElement('img');
+                    img.src = "{{ att.BASE|attachment_url }}";
+                    img.className = "h-32 w-full rounded-lg shadow-md object-cover";
+                    grid.appendChild(img);
+                    prev.classList.remove('hidden');
+                    ph.classList.add('hidden');
+                  })</script>
+                  {% endif %}
+                </div>
 	              {% endif %}
 	            </div>
 	            <!-- RULES (Conditional) -->
@@ -394,20 +399,57 @@
 	  });
 	  updateProgress();
 	});
-	// Helper for Image Preview
-	window.previewImage = function(input, previewId) {
-	  const preview = document.getElementById(previewId);
-	  const placeholder = preview.nextElementSibling;
-	  if (input.files && input.files[0]) {
-	    const reader = new FileReader();
-	    reader.onload = function(e) {
-	      const img = preview.querySelector('img');
-	      img.src = e.target.result;
-	      preview.classList.remove('hidden');
-	      placeholder.classList.add('hidden');
-	    }
-	    reader.readAsDataURL(input.files[0]);
-	  }
-	}
+// Helper for Multi-Image Preview
+window.previewImages = function(input, previewId) {
+  const preview = document.getElementById(previewId);
+  const placeholder = preview.nextElementSibling;
+  const grid = preview.querySelector('div');
+  
+  if (input.files && input.files.length > 0) {
+    grid.innerHTML = '';
+    
+    Array.from(input.files).forEach((file, idx) => {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'relative';
+        
+        const img = document.createElement('img');
+        img.src = e.target.result;
+        img.className = 'h-32 w-full rounded-lg shadow-md object-cover';
+        
+        const badge = document.createElement('span');
+        badge.className = 'absolute top-1 left-1 bg-sky-600 text-white text-[10px] font-bold rounded-full px-2 py-0.5';
+        badge.textContent = (idx + 1);
+        
+        wrapper.appendChild(img);
+        wrapper.appendChild(badge);
+        grid.appendChild(wrapper);
+      };
+      reader.readAsDataURL(file);
+    });
+    
+    preview.classList.remove('hidden');
+    placeholder.classList.add('hidden');
+  }
+}
+
+// Keep backward compatibility for single image preview (rule photos)
+window.previewImage = function(input, previewId) {
+  const preview = document.getElementById(previewId);
+  const placeholder = preview.nextElementSibling;
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = preview.querySelector('img');
+      if (img) {
+        img.src = e.target.result;
+      }
+      preview.classList.remove('hidden');
+      placeholder.classList.add('hidden');
+    }
+    reader.readAsDataURL(input.files[0]);
+  }
+}
 	</script>
 	{% endblock %}

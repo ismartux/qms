@@ -62,6 +62,24 @@ urlpatterns = [
         name="ipqc_dashboard",
     ),
 
+    # =====================================================
+    # 🎯 ROLE-BASED DASHBOARD
+    # =====================================================
+    path(
+        "dashboard/",
+        views.dashboard_view,
+        name="dashboard",
+    ),
+
+    # =====================================================
+    # 🔔 NOTIFICATIONS
+    # =====================================================
+    path(
+        "notifications/",
+        views.notification_list_view,
+        name="notification_list",
+    ),
+
 
     # ✅ POPUP VIEW
     path(

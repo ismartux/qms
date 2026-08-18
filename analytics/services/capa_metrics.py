@@ -13,17 +13,17 @@ class CAPAMetrics:
             qs = qs.filter(submission__plant=plant)
 
         return qs.aggregate(
-            total=Count("id"),
+            total=Count("pk"),
             open_count=Count(
-                "id",
+                "pk",
                 filter=Q(status__in=["OPEN", "ASSIGNED", "ACTION_DONE"])
             ),
             closed=Count(
-                "id",
+                "pk",
                 filter=Q(status="CLOSED")
             ),
             overdue=Count(
-                "id",
+                "pk",
                 filter=Q(
                     due_date__lt=timezone.now().date(),
                     status__in=["OPEN", "ASSIGNED"]
@@ -39,4 +39,4 @@ class CAPAMetrics:
         if plant:
             qs = qs.filter(submission__plant=plant)
 
-        return qs.values("status").annotate(count=Count("id"))
+        return qs.values("status").annotate(count=Count("pk"))

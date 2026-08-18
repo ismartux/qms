@@ -6,7 +6,7 @@ from forms_engine.models import (
     ChecklistVersion,
 )
 
-from core.tenant.context import get_current_plant
+from core.context import get_current_plant
 
 
 # =====================================================
@@ -19,7 +19,7 @@ def get_active_template(code: str) -> ChecklistVersion:
     Fully plant-isolated.
     """
 
-    plant = get_current_plant()
+    plant = get_current_plant(None)  # Runtime context may not have request
 
     if plant is None:
         raise PermissionDenied("Plant context not set")

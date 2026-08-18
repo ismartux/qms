@@ -147,9 +147,24 @@ function registerServiceWorker() {
 // INSTALL PROMPT
 // ======================
 function setupInstallPrompt() {
+  const installBtn = document.getElementById('pwaInstallBtn');
+
   window.addEventListener('beforeinstallprompt', e => {
     e.preventDefault();
     appState.deferredPrompt = e;
+
+    // Show the install button
+    if (installBtn) {
+      installBtn.classList.remove('hidden');
+    }
+  });
+
+  // Hide install button after successful install
+  window.addEventListener('appinstalled', () => {
+    appState.deferredPrompt = null;
+    if (installBtn) {
+      installBtn.classList.add('hidden');
+    }
   });
 }
 
@@ -158,6 +173,12 @@ function installApp() {
 
   appState.deferredPrompt.prompt();
   appState.deferredPrompt = null;
+
+  // Hide the install button after triggering
+  const installBtn = document.getElementById('pwaInstallBtn');
+  if (installBtn) {
+    installBtn.classList.add('hidden');
+  }
 }
 
 // ======================
@@ -195,10 +216,10 @@ document.addEventListener('DOMContentLoaded', () => {
     placeholder: 'Select Role',
     allowClear: true,
   });
-  // ✅ Close sidebar when clicking overlay
+  // Close sidebar when clicking overlay
   elements.overlay?.addEventListener('click', closeMobileSidebar);
 
-  // ✅ Close sidebar when clicking mobile nav blocker
+  // Close sidebar when clicking mobile nav blocker
   const mobileBlocker = document.getElementById('mobileNavBlocker');
   mobileBlocker?.addEventListener('click', closeMobileSidebar);
 });

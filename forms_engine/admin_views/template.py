@@ -5,8 +5,9 @@ from django.http import HttpResponseForbidden
 from forms_engine.decorators import admin_required
 
 from org.models import Plant, Product, Shop, Department
-from forms_engine.models import ChecklistTemplate
-from core.tenant.context import get_current_plant
+from forms_engine.models import ChecklistTemplate, APPROVAL_FLOW_CHOICES
+from core.context import get_current_plant
+from core.identity.permissions import has_permission
 
 
 # =====================================================
@@ -16,7 +17,7 @@ from core.tenant.context import get_current_plant
 @admin_required
 def create_template(request):
 
-    current_plant = get_current_plant()
+    current_plant = get_current_plant(request)
 
     if request.user.is_superuser:
         plants_qs = Plant.objects.all()
@@ -24,18 +25,28 @@ def create_template(request):
         shops_qs = Shop.objects.all()
         departments_qs = Department.objects.select_related("plant").order_by("name")
     else:
-        if not current_plant:
-            return HttpResponseForbidden("Plant context required")
+        # Users with can_access_admin_panel can proceed even without plant context
+        has_admin_permission = has_permission(request.user, 'can_access_admin_panel')
+        
+        if not current_plant and not has_admin_permission:
+            return HttpResponseForbidden(
+                "Plant context required. Please ensure you are assigned to a plant."
+            )
 
-        plants_qs = Plant.objects.filter(id=current_plant.id)
-        products_qs = Product.objects.filter(plant=current_plant)
-        shops_qs = Shop.objects.filter(plant=current_plant)
+        if current_plant:
+            plants_qs = Plant.objects.filter(id=current_plant.id)
+        else:
+            # Admin with permission but no plant context - show all
+            plants_qs = Plant.objects.all()
+            
+        products_qs = Product.objects.filter(plant=current_plant) if current_plant else Product.objects.all()
+        shops_qs = Shop.objects.filter(plant=current_plant) if current_plant else Shop.objects.all()
         departments_qs = (
             Department.objects
             .filter(plant=current_plant)
             .select_related("plant")
             .order_by("name")
-        )
+        ) if current_plant else Department.objects.select_related("plant").order_by("name")
 
     if request.method == "POST":
 
@@ -45,7 +56,8 @@ def create_template(request):
         if not department_id or not approval_flow:
             return HttpResponseForbidden("Department and approval flow required")
 
-        if request.user.is_superuser:
+        if request.user.is_superuser or not current_plant:
+            # Superusers or admins without plant context can select any department
             department = get_object_or_404(Department, id=department_id)
         else:
             department = get_object_or_404(
@@ -67,10 +79,15 @@ def create_template(request):
                 bitable_table_id=request.POST.get("bitable_table_id", "").strip(),
             )
 
-            if request.user.is_superuser:
-                template.plants.set(
-                    Plant.objects.filter(id__in=request.POST.getlist("plants"))
-                )
+            sync_template_approval_steps(template)
+
+            if request.user.is_superuser or not current_plant:
+                # Superusers or admins without plant context use selected plants
+                plant_ids = request.POST.getlist("plants")
+                if plant_ids:
+                    template.plants.set(Plant.objects.filter(id__in=plant_ids))
+                else:
+                    template.plants.clear()
             else:
                 template.plants.set([current_plant])
 
@@ -95,7 +112,7 @@ def create_template(request):
             "products": products_qs,
             "shops": shops_qs,
             "departments": departments_qs,
-            "approval_flow_choices": ChecklistTemplate.APPROVAL_FLOW_CHOICES,
+            "approval_flow_choices": APPROVAL_FLOW_CHOICES,
             "mode": "create",
             "has_published_version": False,
         },
@@ -109,7 +126,7 @@ def create_template(request):
 @admin_required
 def template_detail(request, template_id):
 
-    current_plant = get_current_plant()
+    current_plant = get_current_plant(request)
 
     qs = (
         ChecklistTemplate.objects
@@ -144,7 +161,7 @@ def template_detail(request, template_id):
 @admin_required
 def edit_template(request, template_id):
 
-    current_plant = get_current_plant()
+    current_plant = get_current_plant(request)
 
     qs = ChecklistTemplate.objects.all()
     if not request.user.is_superuser:
@@ -171,6 +188,7 @@ def edit_template(request, template_id):
             template.approval_flow = request.POST.get("approval_flow", "").strip()
             template.is_active = request.POST.get("is_active") == "on"
             template.save()
+            sync_template_approval_steps(template)
 
             # Plants FIRST
             if request.user.is_superuser:
@@ -228,7 +246,7 @@ def edit_template(request, template_id):
             "products": products_qs,
             "shops": shops_qs,
             "departments": departments_qs,
-            "approval_flow_choices": ChecklistTemplate.APPROVAL_FLOW_CHOICES,
+            "approval_flow_choices": APPROVAL_FLOW_CHOICES,
             "mode": "edit",
             "has_published_version": has_published_version,
         },
@@ -242,7 +260,7 @@ def edit_template(request, template_id):
 @admin_required
 def archive_template(request, template_id):
 
-    current_plant = get_current_plant()
+    current_plant = get_current_plant(request)
 
     qs = ChecklistTemplate.objects.all()
 

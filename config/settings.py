@@ -16,6 +16,11 @@ if env_file.exists():
 # SECURITY
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "unsafe-dev-key")
 DEBUG = os.getenv("DJANGO_DEBUG", os.getenv("DEBUG", "false")).lower() == "true"
+
+if not DEBUG and SECRET_KEY == "unsafe-dev-key":
+    import warnings
+    warnings.warn("DJANGO_SECRET_KEY environment variable is not set in production!")
+
 allowed_hosts_env = os.getenv("DJANGO_ALLOWED_HOSTS", "qms.ismartux.com,127.0.0.1,localhost")
 ALLOWED_HOSTS = [h.strip() for h in allowed_hosts_env.split(",") if h.strip()]
 
@@ -65,6 +70,7 @@ INSTALLED_APPS = [
 
     # UI
     "notifications",
+    "ui",
 
 ]
 
@@ -115,11 +121,9 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
-                 # 🔥 THIS LINE MUST EXIST
-                "ui.context_processors.ui_context",
-                "ui.context_processors.admin_access",  # if you created this
+                "ui.context_processors.notification_count",  # Add notification count to all templates
+                "ui.context_processors.admin_panel_context",  # Admin panel context (is_admin_panel, has_admin_access)
                 "core.context_processors.sidebar.permission_context",
-                "core.context_processors.context_processors.role_flags",
                 'capa.context_processors.global_nav_notifications',
                 "ehs_engine.context_processors.notification_context",
             ],
@@ -136,7 +140,7 @@ ASGI_APPLICATION = "config.asgi.application"
 DB_ENGINE = os.getenv("DB_ENGINE", "django.db.backends.postgresql")
 DB_NAME = os.getenv("DB_NAME", "qms")
 DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "Ismartu.Postgres.Admin@X.0729")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "5432")
 
@@ -148,15 +152,20 @@ DATABASES = {
         "PASSWORD": DB_PASSWORD,
         "HOST": DB_HOST,
         "PORT": DB_PORT,
+        "CONN_MAX_AGE": 600,
+        "CONN_HEALTH_CHECKS": True,
     }
 }
+
 
 DATABASE_ROUTERS = ["core.db_router.PlantDatabaseRouter"]
 
 # AUTH
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 10}},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
 LOGIN_URL = "/login/"
@@ -189,6 +198,8 @@ USE_TZ = True
 # SESSION
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 SESSION_COOKIE_AGE = 8 * 60 * 60  # 8 hours
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
 
 # DEFAULTS
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -197,45 +208,42 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LARK_APP_ID = os.getenv("LARK_APP_ID", "cli_a83144a175fad00c")
 LARK_APP_SECRET = os.getenv("LARK_APP_SECRET", "")
 
-BITABLE_USER_APP_TOKEN = "YEmXbTeKaa0NOws1mWucq4C9nKh"
-BITABLE_USER_TABLE_ID = "tbly9wKgPs4LsgR0"
+BITABLE_USER_APP_TOKEN = os.getenv("BITABLE_USER_APP_TOKEN", "YEmXbTeKaa0NOws1mWucq4C9nKh")
+BITABLE_USER_TABLE_ID = os.getenv("BITABLE_USER_TABLE_ID", "tbly9wKgPs4LsgR0")
 
-BITABLE_APPROVAL_APP_TOKEN = "XeKbbjTnqalAh8sno9kcEy6AnVh"
-BITABLE_APPROVAL_TABLE_ID = "tbl5PaBHjrjB3ubR"
+BITABLE_APPROVAL_APP_TOKEN = os.getenv("BITABLE_APPROVAL_APP_TOKEN", "XeKbbjTnqalAh8sno9kcEy6AnVh")
+BITABLE_APPROVAL_TABLE_ID = os.getenv("BITABLE_APPROVAL_TABLE_ID", "tbl5PaBHjrjB3ubR")
 
-CAPA_BITABLE_APP_TOKEN = "XeKbbjTnqalAh8sno9kcEy6AnVh"
-CAPA_BITABLE_TABLE_ID = "tbl2x0dPtg6ZAOem"
+CAPA_BITABLE_APP_TOKEN = os.getenv("CAPA_BITABLE_APP_TOKEN", "XeKbbjTnqalAh8sno9kcEy6AnVh")
+CAPA_BITABLE_TABLE_ID = os.getenv("CAPA_BITABLE_TABLE_ID", "tbl2x0dPtg6ZAOem")
 
-SITE_BASE_URL = "https://mrsingh29.pythonanywhere.com"  # dev
+SITE_BASE_URL = os.getenv("SITE_BASE_URL", "https://qms.ismartux.com")
 
 
-BITABLE_SYNC_MODE = "CLOUDFLARE"
-# options:
-# "LEGACY"  -> old chunk system
-# "CLOUDFLARE" -> instant relay mode
+BITABLE_SYNC_MODE = os.getenv("BITABLE_SYNC_MODE", "CLOUDFLARE")
 
 # 🔹 CREATE worker (forms, simple write)
-CLOUDFLARE_RELAY_URL = "https://lark-relay.mrsingh2996.workers.dev"
-CLOUDFLARE_RELAY_SECRET = "transsflow_secure_2026_very_secret_this_is_pythonanywhere_bitable_external_api_workaround"
+CLOUDFLARE_RELAY_URL = os.getenv("CLOUDFLARE_RELAY_URL", "https://lark-relay.mrsingh2996.workers.dev")
+CLOUDFLARE_RELAY_SECRET = os.getenv("CLOUDFLARE_RELAY_SECRET", "")
 
 # 🔹 UPSERT worker (search + update logic)
-CLOUDFLARE_UPSERT_RELAY_URL = "https://lark-update-relay.mrsingh2996.workers.dev"
-CLOUDFLARE_UPSERT_RELAY_SECRET = "this_is_transsflow_bitable_update_relay_secrete_code"
+CLOUDFLARE_UPSERT_RELAY_URL = os.getenv("CLOUDFLARE_UPSERT_RELAY_URL", "https://lark-update-relay.mrsingh2996.workers.dev")
+CLOUDFLARE_UPSERT_RELAY_SECRET = os.getenv("CLOUDFLARE_UPSERT_RELAY_SECRET", "")
 
-CLOUDFLARE_READ_WORKER_URL = "https://bitable-read-worker.mrsingh2996.workers.dev"
-CLOUDFLARE_READ_RELAY_SECRET = "this_is_transsflow_bitable_read_relay_secrete_code"
-DJANGO_SNAPSHOT_URL = "https://mrsingh29.pythonanywhere.com/bitable/internal/bitable/snapshot/"
+CLOUDFLARE_READ_WORKER_URL = os.getenv("CLOUDFLARE_READ_WORKER_URL", "https://bitable-read-worker.mrsingh2996.workers.dev")
+CLOUDFLARE_READ_RELAY_SECRET = os.getenv("CLOUDFLARE_READ_RELAY_SECRET", "")
+DJANGO_SNAPSHOT_URL = os.getenv("DJANGO_SNAPSHOT_URL", "https://qms.ismartux.com/bitable/internal/bitable/snapshot/")
 
 
 LARK_WEBHOOKS = {
-    "EHS": "https://open.larksuite.com/open-apis/bot/v2/hook/9189e378-1b8b-4292-b60f-d945e93c5e30",
-    "IPQC": "https://open.larksuite.com/open-apis/bot/v2/hook/d7bcd5af-7068-4bc8-8a64-318126a05692",
+    "EHS": os.getenv("LARK_EHS_WEBHOOK", ""),
+    "IPQC": os.getenv("LARK_IPQC_WEBHOOK", ""),
 }
 
 # 🔥 Universal fallback group
-LARK_DEFAULT_WEBHOOK = "https://open.larksuite.com/open-apis/bot/v2/hook/d7bcd5af-7068-4bc8-8a64-318126a05692"
+LARK_DEFAULT_WEBHOOK = os.getenv("LARK_DEFAULT_WEBHOOK", "")
 
-TRANSS_FLOW_BUG_WEBHOOK = "https://open.larksuite.com/open-apis/bot/v2/hook/cf795d9a-fa5d-4cb0-96a7-764833564f5c"
+TRANSS_FLOW_BUG_WEBHOOK = os.getenv("TRANSS_FLOW_BUG_WEBHOOK", "")
 
 # LOGGING CONFIGURATION
 LOG_DIR = BASE_DIR / "log"

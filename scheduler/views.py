@@ -14,7 +14,13 @@ from .forms import FormScheduleForm
 # ======================================================
 
 def is_admin(user):
-    return user.is_superuser or user.is_staff
+    if not user.is_authenticated:
+        return False
+    if user.is_superuser or user.is_staff:
+        return True
+    # Check for the can_access_admin_panel permission
+    from core.identity.permissions import has_permission
+    return has_permission(user, 'can_access_admin_panel')
 
 
 # ======================================================

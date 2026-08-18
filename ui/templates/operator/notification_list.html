@@ -1,0 +1,135 @@
+{% extends "shell/app.html" %}
+{% load static %}
+
+{% block title %}Notifications - QIsmartuX{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <div class="bg-white rounded-lg shadow-md p-6">
+    
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold text-gray-900">
+        <i class="fas fa-bell text-sky-600 mr-2"></i>
+        Notifications
+      </h1>
+      <span class="bg-red-600 text-white text-sm px-3 py-1 rounded-full">
+        {{ total_count }} Total
+      </span>
+    </div>
+
+    <!-- Upcoming Reminders Section -->
+    {% if upcoming_reminders %}
+    <div class="mb-8">
+      <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+        <i class="fas fa-clock text-blue-600 mr-2"></i>
+        Upcoming Reminders
+        <span class="ml-2 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+          {{ upcoming_reminders|length }}
+        </span>
+      </h2>
+      
+      <div class="space-y-3">
+        {% for alert in upcoming_reminders %}
+        <div class="border border-blue-200 bg-blue-50 rounded-lg p-4 hover:shadow-md transition-shadow">
+          <div class="flex items-start justify-between">
+            <div class="flex-1">
+              <div class="flex items-center gap-2 mb-2">
+                <i class="fas fa-bell text-blue-600"></i>
+                <h3 class="font-semibold text-gray-900">{{ alert.template.name }}</h3>
+              </div>
+              
+              <div class="text-sm text-gray-700 space-y-1">
+                <p>
+                  <i class="fas fa-clock mr-1"></i>
+                  <strong>Scheduled:</strong> {{ alert.expected_at|date:"Y-m-d H:i" }}
+                </p>
+                <p class="text-blue-700">
+                  <i class="fas fa-info-circle mr-1"></i>
+                  Reminder sent 15 minutes before scheduled time
+                </p>
+              </div>
+            </div>
+            
+            <div class="ml-4">
+              <span class="bg-blue-600 text-white text-xs px-3 py-1 rounded-full">
+                Upcoming
+              </span>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Missed Forms Section -->
+    {% if missed_forms %}
+    <div>
+      <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+        <i class="fas fa-exclamation-triangle text-red-600 mr-2"></i>
+        Missed Forms
+        <span class="ml-2 bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">
+          {{ missed_forms|length }}
+        </span>
+      </h2>
+      
+      <div class="space-y-3">
+        {% for alert in missed_forms %}
+        <div class="border border-red-200 bg-red-50 rounded-lg p-4 hover:shadow-md transition-shadow">
+          <div class="flex items-start justify-between">
+            <div class="flex-1">
+              <div class="flex items-center gap-2 mb-2">
+                <i class="fas fa-exclamation-circle text-red-600"></i>
+                <h3 class="font-semibold text-gray-900">{{ alert.template.name }}</h3>
+              </div>
+              
+              <div class="text-sm text-gray-700 space-y-1">
+                <p>
+                  <i class="fas fa-clock mr-1"></i>
+                  <strong>Expected:</strong> {{ alert.expected_at|date:"Y-m-d H:i" }}
+                </p>
+                <p>
+                  <i class="fas fa-calendar mr-1"></i>
+                  <strong>Missed on:</strong> {{ alert.created_at|date:"Y-m-d H:i" }}
+                </p>
+                <p class="text-red-700 font-medium">
+                  <i class="fas fa-exclamation-triangle mr-1"></i>
+                  This form was not submitted on time. Please complete it immediately.
+                </p>
+              </div>
+            </div>
+            
+            <div class="ml-4">
+              <span class="bg-red-600 text-white text-xs px-3 py-1 rounded-full animate-pulse">
+                Missed
+              </span>
+            </div>
+          </div>
+          
+          <!-- Action Button -->
+          <div class="mt-3 pt-3 border-t border-red-200">
+            <a href="{% url 'ui:forms_list' %}" 
+               class="inline-flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm">
+              <i class="fas fa-edit"></i>
+              Fill Form Now
+            </a>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Empty State -->
+    {% if not missed_forms and not upcoming_reminders %}
+    <div class="text-center py-12">
+      <i class="fas fa-check-circle text-green-600 text-5xl mb-4"></i>
+      <h3 class="text-xl font-semibold text-gray-900 mb-2">All Caught Up!</h3>
+      <p class="text-gray-600">You have no missed forms or upcoming reminders.</p>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}

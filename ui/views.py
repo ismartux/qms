@@ -144,6 +144,14 @@ def forms_list_view(request):
     shift_progress_map = {}
     interval_status_map = {}
 
+    # Pre-aggregate submission counts per template to avoid N+1 queries
+    submission_counts = dict(
+        base_qs
+        .values("template_version__template_id")
+        .annotate(cnt=models.Count("submission_id"))
+        .values_list("template_version__template_id", "cnt")
+    )
+
     for adapter in get_all_adapters():
         engine = adapter.engine_key
 
@@ -215,13 +223,7 @@ def forms_list_view(request):
                 schedule = getattr(template_obj, "schedule", None)
                 card["schedule"] = schedule
 
-                completed_count = Submission.objects.filter(
-                    work_context=work_context,
-                    template_version__template=template_obj,
-                    workflow_state=WorkflowState.SUBMITTED,
-                    submitted_at__gte=start,
-                    submitted_at__lt=end,
-                ).count()
+                completed_count = submission_counts.get(template_obj.id, 0)
 
                 # ---- shift limit ----
                 if schedule and schedule.schedule_type == "shift_limit":
@@ -1002,6 +1004,60 @@ def work_context_list(request):
 
 
 # =====================================================
+# ROLE-BASED DASHBOARD (PERMISSION-BASED ACCESS)
+# =====================================================
+
+@login_required
+def dashboard_view(request):
+    """
+    Modern role-based dashboard with permission-based access control
+    
+    Access is controlled by permissions:
+    - can_view_operator_dashboard
+    - can_view_supervisor_dashboard  
+    - can_view_management_dashboard
+    
+    Superusers have access to all dashboards.
+    Users are shown the highest-level dashboard they have permission to view.
+    """
+    from ui.dashboard_services import DashboardDataService
+    
+    work_context = get_active_context_for_user(request.user)
+    
+    # Initialize dashboard service
+    dashboard_service = DashboardDataService(request.user, work_context)
+    
+    # Get role-appropriate data
+    dashboard_data = dashboard_service.get_dashboard_data()
+    
+    # Check permissions (superuser gets all)
+    if request.user.is_superuser:
+        can_view_operator = True
+        can_view_supervisor = True
+        can_view_management = True
+    else:
+        can_view_operator = has_permission(request.user, 'can_view_operator_dashboard')
+        can_view_supervisor = has_permission(request.user, 'can_view_supervisor_dashboard')
+        can_view_management = has_permission(request.user, 'can_view_management_dashboard')
+    
+    # Add permission flags to context
+    dashboard_data['can_view_operator'] = can_view_operator
+    dashboard_data['can_view_supervisor'] = can_view_supervisor
+    dashboard_data['can_view_management'] = can_view_management
+    
+    # Determine which template to use based on highest permission
+    if can_view_management:
+        template_name = "dashboard/management_dashboard.html"
+    elif can_view_supervisor:
+        template_name = "dashboard/supervisor_dashboard.html"
+    else:
+        # Default to operator (or if no permission, still show operator)
+        template_name = "dashboard/operator_dashboard.html"
+    
+    return render(request, template_name, dashboard_data)
+
+
+# =====================================================
 # CREATE WORK CONTEXT
 # =====================================================
 
@@ -1235,6 +1291,50 @@ def operator_home(request):
             "inactive_count": inactive_contexts.count(),
             "window_start": start,
             "window_end": end,
+        },
+    )
+
+
+# =====================================================
+# NOTIFICATIONS
+# =====================================================
+
+@login_required
+def notification_list_view(request):
+    """
+    Display user's missed form alerts and reminders
+    """
+    from scheduler.models import MissedFormAlert
+    
+    # Get all alerts for the current user
+    alerts = MissedFormAlert.objects.filter(
+        user=request.user
+    ).select_related(
+        'template',
+        'instance__schedule'
+    ).order_by('-created_at')
+    
+    # Split into missed forms and upcoming reminders
+    missed_forms = []
+    upcoming_reminders = []
+    
+    now = timezone.now()
+    
+    for alert in alerts:
+        # If notification_sent is True, it's a reminder (upcoming)
+        # If notification_sent is False, it's a missed form alert
+        if alert.notification_sent and alert.expected_at > now:
+            upcoming_reminders.append(alert)
+        else:
+            missed_forms.append(alert)
+    
+    return render(
+        request,
+        "operator/notification_list.html",
+        {
+            "missed_forms": missed_forms,
+            "upcoming_reminders": upcoming_reminders,
+            "total_count": len(missed_forms) + len(upcoming_reminders),
         },
     )
 
@@ -1579,28 +1679,22 @@ def submission_list_view(request):
     submissions = []
 
     # ----------------------------------
-    # HELPERS
+    # HELPERS (IN-MEMORY OPTIMIZED)
     # ----------------------------------
     def resolve_submitter_role(u):
-        scope = u.scopes.select_related("role").first()
-        if scope and scope.role:
-            return scope.role.name
-        if hasattr(u, "employee_profile") and u.employee_profile.role:
+        scopes = list(u.scopes.all())
+        if scopes and scopes[0].role:
+            return scopes[0].role.name
+        if hasattr(u, "employee_profile") and u.employee_profile and u.employee_profile.role:
             return u.employee_profile.role.name
         return "-"
 
     def resolve_approval_status(obj):
-        """
-        Last approval by approval-category order (NOT random list order)
-        """
-        approvals = (
-            obj.approvals
-            .select_related("category")
-            .order_by("category__order", "created_at")
-        )
-        if not approvals.exists():
+        approvals = list(obj.approvals.all())
+        if not approvals:
             return "NO_APPROVAL"
-        return approvals.last().status
+        approvals.sort(key=lambda a: (a.category.order if a.category and hasattr(a.category, 'order') else 0, a.created_at or timezone.now()))
+        return approvals[-1].status
 
     # ----------------------------------
     # CHECKLIST → UNIFIED SHAPE
@@ -1728,13 +1822,11 @@ def ipqc_dashboard_view(request):
     submissions = []
 
     def resolve_pqe_status(obj):
-        pqe = (
-            obj.approvals
-            .filter(category__code="PQE")
-            .order_by("created_at")
-            .last()
-        )
-        return pqe.status if pqe else "PENDING"
+        pqes = [a for a in obj.approvals.all() if a.category and a.category.code == "PQE"]
+        if not pqes:
+            return "PENDING"
+        pqes.sort(key=lambda a: a.created_at or timezone.now())
+        return pqes[-1].status
 
     for s in checklist_qs:
         submissions.append({
@@ -1864,8 +1956,8 @@ def submission_detail_popup(request, submission_id):
             "approval": approval,
         },
     )
-    
-    
+
+
 @login_required
 def dynamic_submission_detail_popup(request, submission_id):
     """
@@ -1873,7 +1965,7 @@ def dynamic_submission_detail_popup(request, submission_id):
     """
 
     submission = get_object_or_404(
-        DynamicFormSubmission.objects.select_related(
+        DynamicFormSubmission.objects.select_for_update(of=("self",)).select_related(
             "template_version__template",
             "work_context__plant",
             "submitted_by",
@@ -1883,6 +1975,65 @@ def dynamic_submission_detail_popup(request, submission_id):
         ),
         submission_id=submission_id,
     )
+
+    template = submission.template_version.template
+    flow = get_required_approval_flow(template)
+    approved = get_approved_categories(submission)
+    current_category_code = get_current_approval_category(template, submission)
+
+    can_approve = False
+    approval_category = None
+    if current_category_code and submission.workflow_state == WorkflowState.SUBMITTED:
+        try:
+            approval_category = ApprovalCategory.objects.get(
+                code=current_category_code,
+                is_active=True,
+                is_approver=True,
+            )
+            can_approve = is_user_authorized_for_category(request.user, template, current_category_code)
+        except ApprovalCategory.DoesNotExist:
+            pass
+
+    full_name = request.user.get_full_name() or request.user.username
+    default_approver_name = f"{request.user.username} {full_name}".strip()
+
+    if request.method == "POST":
+        if not can_approve or not current_category_code or not approval_category:
+            return JsonResponse({"success": False, "error": "Not authorized or no pending approval for this step"}, status=403)
+
+        status = request.POST.get("status")
+        rejection_reason = request.POST.get("rejection_reason", "").strip()
+        approver_name = request.POST.get("approver_name", "").strip() or default_approver_name
+
+        if status not in ("APPROVED", "REJECTED"):
+            return JsonResponse({"success": False, "error": "Invalid status"}, status=400)
+
+        if status == "REJECTED" and not rejection_reason:
+            return JsonResponse({"success": False, "error": "Rejection reason required"}, status=400)
+
+        approval = DynamicSubmissionApproval.objects.create(
+            submission=submission,
+            category=approval_category,
+            status=status,
+            approver_name=approver_name,
+            rejection_reason=rejection_reason,
+        )
+
+        if status == "REJECTED":
+            submission.workflow_state = WorkflowState.FAILED
+        else:
+            approved.add(approval_category.code)
+            if set(flow).issubset(approved):
+                submission.workflow_state = WorkflowState.CLOSED
+
+        submission.save(update_fields=["workflow_state"])
+        update_dynamic_approval_status_async(submission, approval)
+
+        return JsonResponse({
+            "success": True,
+            "submission_id": str(submission.submission_id),
+            "status": status,
+        })
 
     # Fields (ordered)
     fields = (
@@ -1908,6 +2059,9 @@ def dynamic_submission_detail_popup(request, submission_id):
             "answers": answers,
             "responses": responses,
             "approvals": approvals,
+            "can_approve": can_approve,
+            "current_category_code": current_category_code,
+            "default_approver_name": default_approver_name,
         },
     )
 
@@ -1915,11 +2069,8 @@ def dynamic_submission_detail_popup(request, submission_id):
 @transaction.atomic
 def pqe_review_and_approve(request, submission_id):
 
-    if not has_permission(request.user, "can_approve_ipqc"):
-        return HttpResponseForbidden("Not allowed")
-
     submission = get_object_or_404(
-        Submission.objects.select_for_update().select_related(
+        Submission.objects.select_for_update(of=("self",)).select_related(
             "work_context",
             "plant",
             "line",
@@ -1932,23 +2083,46 @@ def pqe_review_and_approve(request, submission_id):
         workflow_state=WorkflowState.SUBMITTED,
     )
 
+    template = submission.template_version.template
+
     # --------------------------------------------------
-    # PQE CATEGORY (SINGLE SOURCE OF TRUTH)
+    # RESOLVE CURRENT APPROVAL CATEGORY FROM TEMPLATE FLOW
     # --------------------------------------------------
+    flow = get_required_approval_flow(template)
+    approved = get_approved_categories(submission)
+    current_category_code = get_current_approval_category(template, submission)
+
+    if current_category_code is None:
+        return HttpResponse("Already fully approved", status=400)
+
     try:
-        pqe_category = ApprovalCategory.objects.get(
-            code="PQE",
+        approval_category = ApprovalCategory.objects.get(
+            code=current_category_code,
             is_active=True,
             is_approver=True,
         )
     except ApprovalCategory.DoesNotExist:
-        return HttpResponseBadRequest("PQE approval category not configured")
+        return HttpResponseBadRequest(
+            f"{current_category_code} approval category not configured"
+        )
+
+    # --------------------------------------------------
+    # ROLE VERIFICATION (INCLUDE TEMPLATE ROLE ASSIGNMENTS)
+    # --------------------------------------------------
+    if not is_user_authorized_for_category(request.user, template, current_category_code):
+        return HttpResponseForbidden("Not allowed to approve this category")
 
     # --------------------------------------------------
     # ALREADY APPROVED?
     # --------------------------------------------------
-    if submission.approvals.filter(category=pqe_category).exists():
+    if submission.approvals.filter(category=approval_category).exists():
         return HttpResponse("Already approved", status=400)
+
+    # --------------------------------------------------
+    # AUTO-FILL APPROVER NAME: user id + name
+    # --------------------------------------------------
+    full_name = request.user.get_full_name() or request.user.username
+    default_approver_name = f"{request.user.username} {full_name}".strip()
 
     # --------------------------------------------------
     # HANDLE POST
@@ -1957,6 +2131,7 @@ def pqe_review_and_approve(request, submission_id):
 
         status = request.POST.get("status")
         rejection_reason = request.POST.get("rejection_reason", "").strip()
+        approver_name = request.POST.get("approver_name", "").strip() or default_approver_name
 
         if status not in ("APPROVED", "REJECTED"):
             return HttpResponseBadRequest("Invalid status")
@@ -1969,20 +2144,22 @@ def pqe_review_and_approve(request, submission_id):
 
         approval = SubmissionApproval.objects.create(
             submission=submission,
-            category=pqe_category,
+            category=approval_category,
             status=status,
-            approver_name=request.user.get_full_name() or request.user.username,
+            approver_name=approver_name,
             rejection_reason=rejection_reason,
         )
 
         # --------------------------------------------------
-        # WORKFLOW TRANSITION (UNCHANGED LOGIC)
+        # WORKFLOW TRANSITION
         # --------------------------------------------------
         if status == "REJECTED":
             submission.workflow_state = WorkflowState.FAILED
         else:
-            # If PQE is last step, this will close it
-            submission.workflow_state = WorkflowState.CLOSED
+            # If all required categories approved, close
+            approved.add(approval_category.code)
+            if set(flow).issubset(approved):
+                submission.workflow_state = WorkflowState.CLOSED
 
         submission.save(update_fields=["workflow_state"])
 
@@ -2022,21 +2199,108 @@ def pqe_review_and_approve(request, submission_id):
             "sections": sections,
             "answers": answers,
             "responses": responses,
+            "approval_category": approval_category,
+            "default_approver_name": default_approver_name,
+            "current_category_code": current_category_code,
+            "can_approve": True,
         },
     )
 
-    
+
 def get_required_approval_flow(template):
-    return list(
-        template.approval_steps
-        .filter(is_required=True)
-        .select_related("category")
-        .order_by("order")
-        .values_list("category__code", flat=True)
+    if not template:
+        return []
+
+    if hasattr(template, "approval_steps"):
+        steps = list(
+            template.approval_steps
+            .filter(is_required=True)
+            .select_related("category")
+            .order_by("order")
+            .values_list("category__code", flat=True)
+        )
+        if steps:
+            return steps
+
+    flow_str = getattr(template, "approval_flow", "") or ""
+    flow_str = str(flow_str).strip()
+    if flow_str and flow_str.upper() != "NONE":
+        parts = [p.strip().upper() for p in flow_str.split("_") if p.strip()]
+        valid_parts = [p for p in parts if p != "NONE"]
+        if valid_parts:
+            return valid_parts
+
+    return []
+
+
+def get_user_auth_permissions(user):
+    if not user or not user.is_authenticated or user.is_superuser:
+        return set(), set()
+    user_categories = set(
+        ApprovalCategory.objects.filter(
+            is_active=True,
+            is_approver=True,
+            roles__user_scopes__user=user,
+        ).values_list("code", flat=True)
     )
+    user_categories.update(
+        ApprovalCategory.objects.filter(
+            is_active=True,
+            is_approver=True,
+            roles__employee_profiles__user=user,
+        ).values_list("code", flat=True)
+    )
+    user_role_codes = set(user.scopes.values_list("role__code", flat=True))
+    user_role_codes.update(user.scopes.values_list("role__name", flat=True))
+    if hasattr(user, "employee_profile") and user.employee_profile and user.employee_profile.role:
+        user_role_codes.add(user.employee_profile.role.code)
+        user_role_codes.add(user.employee_profile.role.name)
+
+    return {c.upper() for c in user_categories if c}, {c.upper() for c in user_role_codes if c}
+
+
+def is_user_authorized_for_category(user, template, category_code, cached_user_perms=None):
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+
+    category_code_upper = category_code.upper() if category_code else ""
+
+    if cached_user_perms is not None:
+        user_categories_upper, user_role_codes_upper = cached_user_perms
+    else:
+        user_categories_upper, user_role_codes_upper = get_user_auth_permissions(user)
+
+    if category_code_upper in user_categories_upper:
+        return True
+
+    if category_code_upper in user_role_codes_upper:
+        return True
+
+    # 3) TemplateRole assignments (only for ChecklistTemplate)
+    from forms_engine.models import ChecklistTemplate
+    if template and isinstance(template, ChecklistTemplate):
+        from forms_engine.models import TemplateRole
+        is_template_role_user = TemplateRole.objects.filter(
+            template=template,
+            role__user_scopes__user=user,
+        ).exists() or TemplateRole.objects.filter(
+            template=template,
+            role__employee_profiles__user=user,
+        ).exists()
+        if is_template_role_user:
+            return True
+
+    return False
 
 
 def get_approved_categories(submission):
+    if hasattr(submission, "_prefetched_objects_cache") and "approvals" in submission._prefetched_objects_cache:
+        return {
+            a.category.code for a in submission.approvals.all()
+            if a.status == "APPROVED" and a.category
+        }
     return set(
         submission.approvals
         .filter(status="APPROVED")
@@ -2065,19 +2329,8 @@ def approval_pending_dashboard(request):
     """
 
     user = request.user
-
-    # ---------------------------------------
-    # USER APPROVAL CATEGORIES
-    # ---------------------------------------
-    user_categories = set(
-        ApprovalCategory.objects.filter(
-            is_active=True,
-            is_approver=True,
-            roles__user_scopes__user=user,
-        ).values_list("code", flat=True)
-    )
-
     cards = []
+    cached_user_perms = get_user_auth_permissions(user)
 
     # =======================================
     # CHECKLIST SUBMISSIONS
@@ -2092,7 +2345,7 @@ def approval_pending_dashboard(request):
             "product",
         )
         .prefetch_related(
-            "approvals",
+            "approvals__category",
             "template_version__template__approval_steps__category",
         )
     )
@@ -2107,9 +2360,10 @@ def approval_pending_dashboard(request):
         approved = get_approved_categories(submission)
         current = get_current_approval_category(template, submission)
 
-        # 🔥 KEY FIX — fully approved → do not show
         if current is None:
             continue
+
+        can_approve = is_user_authorized_for_category(user, template, current, cached_user_perms=cached_user_perms)
 
         cards.append({
             "engine": "CHECKLIST",
@@ -2124,7 +2378,7 @@ def approval_pending_dashboard(request):
             "approved": approved,
             "current": current,
 
-            "can_approve": current in user_categories,
+            "can_approve": can_approve,
         })
 
     # =======================================
@@ -2138,7 +2392,7 @@ def approval_pending_dashboard(request):
             "submitted_by",
         )
         .prefetch_related(
-            "approvals",
+            "approvals__category",
             "template_version__template__approval_steps__category",
         )
     )
@@ -2146,30 +2400,19 @@ def approval_pending_dashboard(request):
     for submission in dynamic_qs:
         template = submission.template_version.template
 
-        flow = list(
-            template.approval_steps
-            .filter(is_required=True)
-            .order_by("order")
-            .values_list("category__code", flat=True)
-        )
+        flow = get_required_approval_flow(template)
 
         if not flow:
             continue
 
-        approved = set(
-            submission.approvals
-            .filter(status="APPROVED")
-            .values_list("category__code", flat=True)
-        )
+        approved = get_approved_categories(submission)
 
-        current = next(
-            (c for c in flow if c not in approved),
-            None
-        )
+        current = get_current_approval_category(template, submission)
 
-        # 🔥 KEY FIX — fully approved → do not show
         if current is None:
             continue
+
+        can_approve = is_user_authorized_for_category(user, template, current, cached_user_perms=cached_user_perms)
 
         cards.append({
             "engine": "DYNAMIC",
@@ -2182,7 +2425,7 @@ def approval_pending_dashboard(request):
             "approved": approved,
             "current": current,
 
-            "can_approve": current in user_categories,
+            "can_approve": can_approve,
         })
 
     # ---------------------------------------
@@ -2247,7 +2490,7 @@ def approve_submission(request, submission_id):
         # ---------- CHECKLIST ----------
         submission = (
             Submission.objects
-            .select_for_update()
+            .select_for_update(of=("self",))
             .select_related(
                 "plant",
                 "template_version__template",
@@ -2264,7 +2507,7 @@ def approve_submission(request, submission_id):
         # ---------- DYNAMIC ----------
         submission = (
             DynamicFormSubmission.objects
-            .select_for_update()
+            .select_for_update(of=("self",))
             .select_related(
                 "template_version__template",
                 "work_context__plant",
@@ -2305,48 +2548,27 @@ def approve_submission(request, submission_id):
         )
 
     # --------------------------------------------------
+    # TEMPLATE (Used by role authorization + approval flow)
+    # --------------------------------------------------
+    template = submission.template_version.template
+
+    # --------------------------------------------------
     # 🔐 ROLE AUTHORIZATION
     # --------------------------------------------------
-    if not request.user.is_superuser:
-        from core.identity.models import UserScope
-
-        allowed = UserScope.objects.filter(
-            user=request.user,
-            plant__in=plant_ids,
-            role__approval_categories=category,
-            role__approval_categories__is_active=True,
-            role__approval_categories__is_approver=True,
-        ).exists()
-
-        if not allowed:
-            return JsonResponse(
-                {
-                    "success": False,
-                    "error_type": "ROLE_BLOCKED",
-                    "message": "You are not authorized to approve this category",
-                },
-                status=403,
-            )
+    if not is_user_authorized_for_category(request.user, template, category.code):
+        return JsonResponse(
+            {
+                "success": False,
+                "error_type": "ROLE_BLOCKED",
+                "message": f"You are not authorized to approve {category.code}",
+            },
+            status=403,
+        )
 
     # --------------------------------------------------
     # APPROVAL FLOW (ENGINE AWARE)
     # --------------------------------------------------
-    template = submission.template_version.template
-
-    if engine == "CHECKLIST":
-        flow = list(
-            template.approval_steps
-            .filter(is_required=True)
-            .order_by("order")
-            .values_list("category__code", flat=True)
-        )
-    else:
-        flow = list(
-            template.approval_steps   # TemplateApprovalStep
-            .filter(is_required=True)
-            .order_by("order")
-            .values_list("category__code", flat=True)
-        )
+    flow = get_required_approval_flow(template)
 
     if not flow:
         return JsonResponse(
@@ -2393,21 +2615,23 @@ def approve_submission(request, submission_id):
     # --------------------------------------------------
     # CREATE APPROVAL RECORD
     # --------------------------------------------------
+    # AUTO-FILL APPROVER NAME: user id + name
+    full_name = request.user.get_full_name() or request.user.username
+    default_approver_name = f"{request.user.username} {full_name}".strip()
+
     if engine == "CHECKLIST":
         approval = SubmissionApproval.objects.create(
             submission=submission,
             category=category,
             status="APPROVED",
-            approver_name=request.user.get_full_name()
-            or request.user.username,
+            approver_name=default_approver_name,
         )
     else:
         approval = DynamicSubmissionApproval.objects.create(
             submission=submission,
             category=category,
             status="APPROVED",
-            approver_name=request.user.get_full_name()
-            or request.user.username,
+            approver_name=default_approver_name,
         )
 
     approved.add(category.code)
@@ -2474,18 +2698,19 @@ def public_submission_popup(request, token):
     )
 
 
-@csrf_exempt
+@login_required
 @transaction.atomic
 def public_role_approval(request, token, category_code):
     """
     PUBLIC APPROVAL – CHECKLIST (CATEGORY-BASED)
+
+    🔑 SECURITY FIX: Now requires login + role verification.
+    Only users with the appropriate approval category role
+    can submit approval (e.g., only PQE users can approve PQE step).
     """
 
-    # --------------------------------------------------
-    # LOAD SUBMISSION (TOKEN IS STRING)
-    # --------------------------------------------------
     submission = get_object_or_404(
-        Submission.objects.select_for_update().select_related(
+        Submission.objects.select_for_update(of=("self",)).select_related(
             "plant",
             "line",
             "product",
@@ -2495,6 +2720,21 @@ def public_role_approval(request, token, category_code):
     )
 
     template = submission.template_version.template
+
+    # --------------------------------------------------
+    # 🔐 ROLE VERIFICATION (LOGIN REQUIRED)
+    # --------------------------------------------------
+    user = request.user
+    full_name = user.get_full_name() or user.username
+    default_approver_name = f"{user.username} {full_name}".strip()
+
+    if not is_user_authorized_for_category(user, template, category_code):
+        return render(request, "public/approval_page.html", {
+            "error": f"You do not have permission to approve {category_code}. "
+                     f"Please login with a {category_code} account.",
+            "popup_url": reverse("ui:public_submission_popup", args=[submission.public_approval_token]),
+            "default_approver_name": default_approver_name,
+        })
 
     # --------------------------------------------------
     # VALIDATE APPROVAL CATEGORY
@@ -2511,14 +2751,7 @@ def public_role_approval(request, token, category_code):
     # --------------------------------------------------
     # REQUIRED APPROVAL STEPS (ORDERED)
     # --------------------------------------------------
-    steps = (
-        template.approval_steps
-        .select_related("category")
-        .filter(is_required=True)
-        .order_by("order")
-    )
-
-    required_categories = [step.category.code for step in steps]
+    required_categories = get_required_approval_flow(template)
 
     if category.code not in required_categories:
         return HttpResponseForbidden("Approval not required for this category")
@@ -2537,6 +2770,7 @@ def public_role_approval(request, token, category_code):
                 "ui:public_submission_popup",
                 args=[submission.public_approval_token],
             ),
+            "default_approver_name": default_approver_name,
         })
 
     # --------------------------------------------------
@@ -2564,6 +2798,7 @@ def public_role_approval(request, token, category_code):
                     "ui:public_submission_popup",
                     args=[submission.public_approval_token],
                 ),
+                "default_approver_name": default_approver_name,
             })
 
     # --------------------------------------------------
@@ -2573,16 +2808,7 @@ def public_role_approval(request, token, category_code):
 
         status = request.POST.get("status")
         rejection_reason = request.POST.get("rejection_reason", "").strip()
-        approver_name = request.POST.get("approver_name", "").strip()
-
-        if not approver_name:
-            return render(request, "public/approval_page.html", {
-                "error": "Name required",
-                "popup_url": reverse(
-                    "ui:public_submission_popup",
-                    args=[submission.public_approval_token],
-                ),
-            })
+        approver_name = request.POST.get("approver_name", "").strip() or default_approver_name
 
         if status not in ["APPROVED", "REJECTED"]:
             return render(request, "public/approval_page.html", {
@@ -2591,6 +2817,7 @@ def public_role_approval(request, token, category_code):
                     "ui:public_submission_popup",
                     args=[submission.public_approval_token],
                 ),
+                "default_approver_name": default_approver_name,
             })
 
         if status == "REJECTED" and not rejection_reason:
@@ -2600,6 +2827,7 @@ def public_role_approval(request, token, category_code):
                     "ui:public_submission_popup",
                     args=[submission.public_approval_token],
                 ),
+                "default_approver_name": default_approver_name,
             })
 
         # --------------------------------------------------
@@ -2652,22 +2880,24 @@ def public_role_approval(request, token, category_code):
             "ui:public_submission_popup",
             args=[submission.public_approval_token],
         ),
+        "default_approver_name": default_approver_name,
     })
 
 
-@csrf_exempt
+@login_required
 @transaction.atomic
 def public_dynamic_role_approval(request, token, category_code):
     """
     PUBLIC APPROVAL – DYNAMIC FORMS (CATEGORY-BASED)
 
+    🔑 SECURITY FIX: Now requires login + role verification.
+    Only users with the appropriate approval category role
+    can submit approval (e.g., only PQE users can approve PQE step).
+
     URL param:
     - category_code = ApprovalCategory.code (PD, PE, QA, SAFETY, etc.)
     """
 
-    # --------------------------------------------------
-    # LOAD SUBMISSION (TOKEN IS STRING)
-    # --------------------------------------------------
     submission = get_object_or_404(
         DynamicFormSubmission.objects.select_for_update(),
         public_approval_token=token,
@@ -2676,28 +2906,38 @@ def public_dynamic_role_approval(request, token, category_code):
     template = submission.template_version.template
 
     # --------------------------------------------------
+    # 🔐 ROLE VERIFICATION (LOGIN REQUIRED)
+    # --------------------------------------------------
+    user = request.user
+    full_name = user.get_full_name() or user.username
+    default_approver_name = f"{user.username} {full_name}".strip()
+
+    if not is_user_authorized_for_category(user, template, category_code):
+        return render(request, "public/approval_page.html", {
+            "error": f"You do not have permission to approve {category_code}. "
+                     f"Please login with a {category_code} account.",
+            "popup_url": reverse("ui:public_dynamic_submission_popup", args=[submission.public_approval_token]),
+            "default_approver_name": default_approver_name,
+        })
+
+    # --------------------------------------------------
     # LOAD CATEGORY
     # --------------------------------------------------
-    category = get_object_or_404(
-        ApprovalCategory,
-        code=category_code,
-        is_active=True,
-        is_approver=True,
-    )
+    try:
+        category = ApprovalCategory.objects.get(
+            code=category_code,
+            is_active=True,
+            is_approver=True,
+        )
+    except ApprovalCategory.DoesNotExist:
+        return HttpResponseBadRequest("Invalid approval category")
 
     # --------------------------------------------------
     # REQUIRED APPROVAL STEPS
     # --------------------------------------------------
-    steps = (
-        template.approval_steps
-        .select_related("category")
-        .filter(is_required=True)
-        .order_by("order")
-    )
+    required_categories = get_required_approval_flow(template)
 
-    required_categories = [s.category for s in steps]
-
-    if category not in required_categories:
+    if category.code not in required_categories:
         return HttpResponseForbidden("Approval not required for this category")
 
     # --------------------------------------------------
@@ -2714,6 +2954,7 @@ def public_dynamic_role_approval(request, token, category_code):
                 "ui:public_dynamic_submission_popup",
                 args=[submission.public_approval_token],
             ),
+            "default_approver_name": default_approver_name,
         })
 
     # --------------------------------------------------
@@ -2724,11 +2965,11 @@ def public_dynamic_role_approval(request, token, category_code):
     # --------------------------------------------------
     # ORDER ENFORCEMENT
     # --------------------------------------------------
-    step_index = required_categories.index(category)
+    step_index = required_categories.index(category.code)
 
-    for prior_category in required_categories[:step_index]:
+    for prior_code in required_categories[:step_index]:
         if not submission.approvals.filter(
-            category=prior_category,
+            category__code=prior_code,
             status="APPROVED",
         ).exists():
             return render(request, "public/approval_page.html", {
@@ -2736,11 +2977,12 @@ def public_dynamic_role_approval(request, token, category_code):
                 "role": category.code,
                 "approval": existing,
                 "approvals": submission.approvals.select_related("category"),
-                "error": f"{prior_category.code} approval required first.",
+                "error": f"{prior_code} approval required first.",
                 "popup_url": reverse(
                     "ui:public_dynamic_submission_popup",
                     args=[submission.public_approval_token],
                 ),
+                "default_approver_name": default_approver_name,
             })
 
     # --------------------------------------------------
@@ -2750,16 +2992,7 @@ def public_dynamic_role_approval(request, token, category_code):
 
         status = request.POST.get("status")
         rejection_reason = request.POST.get("rejection_reason", "").strip()
-        approver_name = request.POST.get("approver_name", "").strip()
-
-        if not approver_name:
-            return render(request, "public/approval_page.html", {
-                "error": "Name required",
-                "popup_url": reverse(
-                    "ui:public_dynamic_submission_popup",
-                    args=[submission.public_approval_token],
-                ),
-            })
+        approver_name = request.POST.get("approver_name", "").strip() or default_approver_name
 
         if status not in ["APPROVED", "REJECTED"]:
             return render(request, "public/approval_page.html", {
@@ -2768,6 +3001,7 @@ def public_dynamic_role_approval(request, token, category_code):
                     "ui:public_dynamic_submission_popup",
                     args=[submission.public_approval_token],
                 ),
+                "default_approver_name": default_approver_name,
             })
 
         if status == "REJECTED" and not rejection_reason:
@@ -2777,6 +3011,7 @@ def public_dynamic_role_approval(request, token, category_code):
                     "ui:public_dynamic_submission_popup",
                     args=[submission.public_approval_token],
                 ),
+                "default_approver_name": default_approver_name,
             })
 
         # --------------------------------------------------
@@ -2800,7 +3035,7 @@ def public_dynamic_role_approval(request, token, category_code):
             approved_categories = set(
                 submission.approvals.filter(
                     status="APPROVED"
-                ).values_list("category", flat=True)
+                ).values_list("category__code", flat=True)
             )
             if set(required_categories).issubset(approved_categories):
                 submission.workflow_state = WorkflowState.CLOSED
@@ -2829,6 +3064,7 @@ def public_dynamic_role_approval(request, token, category_code):
             "ui:public_dynamic_submission_popup",
             args=[submission.public_approval_token],
         ),
+        "default_approver_name": default_approver_name,
     })
     
 def public_dynamic_submission_popup(request, token):

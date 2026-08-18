@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ action }} Plant{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">🏭 {{ action }} Plant</h1>
+                    <p class="text-muted">{% if action == 'Create' %}Add a new manufacturing plant{% else %}Edit plant details{% endif %}</p>
+                </div>
+                <a href="{% url 'org:plant_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to List
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Plant Information</h6>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {% csrf_token %}
+
+                        {% if messages %}
+                        {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="close" data-dismiss="alert">
+                                <span>&times;</span>
+                            </button>
+                        </div>
+                        {% endfor %}
+                        {% endif %}
+
+                        <div class="form-group">
+                            <label for="company">Company <span class="text-danger">*</span></label>
+                            <select class="form-control" id="company" name="company" required>
+                                <option value="">Select Company</option>
+                                {% for comp in companies %}
+                                <option value="{{ comp.id }}" 
+                                        {% if record and record.company_id == comp.id %}selected{% endif %}>
+                                    {{ comp.code }} - {{ comp.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small class="form-text text-muted">Select the company this plant belongs to</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="code">Plant Code <span class="text-danger">*</span></label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="code" 
+                                   name="code" 
+                                   value="{% if record %}{{ record.code }}{% endif %}" 
+                                   required
+                                   placeholder="e.g., PLT-001">
+                            <small class="form-text text-muted">Unique code for this plant within the company</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="name">Plant Name <span class="text-danger">*</span></label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="name" 
+                                   name="name" 
+                                   value="{% if record %}{{ record.name }}{% endif %}" 
+                                   required
+                                   placeholder="e.g., Main Manufacturing Plant">
+                            <small class="form-text text-muted">Full name of the plant</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="timezone">Timezone <span class="text-danger">*</span></label>
+                            <select class="form-control" id="timezone" name="timezone" required>
+                                <option value="">Select Timezone</option>
+                                {% load tz %}
+                                {% get_current_timezone as TIME_ZONE %}
+                                {% for tz in timezones %}
+                                <option value="{{ tz }}" 
+                                        {% if record and record.timezone == tz %}selected{% endif %}>
+                                    {{ tz }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small class="form-text text-muted">Select the timezone for this plant</small>
+                        </div>
+
+                        <div class="form-group">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> {{ action }} Plant
+                            </button>
+                            <a href="{% url 'org:plant_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Get timezone list
+const timezones = [
+    'UTC',
+    'Asia/Kolkata',
+    'Asia/Dubai',
+    'Asia/Singapore',
+    'Asia/Hong_Kong',
+    'Asia/Shanghai',
+    'Asia/Tokyo',
+    'Europe/London',
+    'Europe/Paris',
+    'Europe/Berlin',
+    'America/New_York',
+    'America/Los_Angeles',
+    'America/Chicago',
+    'Australia/Sydney',
+    'Pacific/Auckland'
+];
+
+// Populate timezone dropdown if not already populated
+document.addEventListener('DOMContentLoaded', function() {
+    const timezoneSelect = document.getElementById('timezone');
+    if (timezoneSelect && timezoneSelect.options.length <= 1) {
+        timezones.forEach(tz => {
+            const option = document.createElement('option');
+            option.value = tz;
+            option.textContent = tz;
+            timezoneSelect.appendChild(option);
+        });
+    }
+});
+</script>
+{% endblock %}

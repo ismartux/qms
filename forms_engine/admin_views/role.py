@@ -6,14 +6,14 @@ from django.core.exceptions import PermissionDenied
 from forms_engine.decorators import admin_required
 from forms_engine.models import ChecklistTemplate, TemplateRole
 from core.identity.models import Role
-from core.tenant.context import get_current_plant
+from core.context import get_current_plant
 
 
 @login_required
 @admin_required
 def assign_roles(request, template_id):
 
-    current_plant = get_current_plant()
+    current_plant = get_current_plant(request)
 
     # -------------------------------------------------
     # TEMPLATE ACCESS CONTROL

@@ -10,11 +10,11 @@ def update_approval_status_async(submission, approval):
 
     Category-based approval engine.
     Mirrors Dynamic approval updater exactly.
-    """
 
-    import threading
-    import requests
-    from django.conf import settings
+    🔑 FIX: Also clears the approval link for the approved category
+    so that already-approved categories show "Approved" instead of
+    a pending approval link.
+    """
 
     def _send():
         try:
@@ -85,6 +85,14 @@ def update_approval_status_async(submission, approval):
                     fields["Final_Status"] = "APPROVED"
 
             # -------------------------------------------------
+            # 🔑 FIX: Clear the approval link for the approved category
+            # so already-approved categories show "Approved" instead
+            # of a pending approval link in Bitable/email.
+            # -------------------------------------------------
+            if approval.status == "APPROVED":
+                fields[f"{category}_Approval_Link"] = "Approved"
+
+            # -------------------------------------------------
             # Payload
             # -------------------------------------------------
             payload = {
@@ -109,7 +117,8 @@ def update_approval_status_async(submission, approval):
             print("❌ Checklist approval status update failed:", str(e))
 
     threading.Thread(target=_send, daemon=True).start()
-    
+
+
 def update_dynamic_approval_status_async(submission, approval):
     """
     Dynamic Form approval status updater (ASYNC)
@@ -183,6 +192,14 @@ def update_dynamic_approval_status_async(submission, approval):
                 )
 
                 # 🟢 All required approvals satisfied
+            # -------------------------------------------------
+            # 🔑 FIX: Clear the approval link for the approved category
+            # so already-approved categories show "Approved" instead
+            # of a pending approval link in Bitable/email.
+            # -------------------------------------------------
+            if approval.status == "APPROVED":
+                fields[f"{category.code}_Approval_Link"] = "Approved"
+
                 if required_categories and set(required_categories).issubset(
                     approved_categories
                 ):
@@ -211,100 +228,5 @@ def update_dynamic_approval_status_async(submission, approval):
 
         except Exception as e:
             print("❌ Dynamic approval status update failed:", str(e))
-
-
-import threading
-import requests
-from django.conf import settings
-from django.db import transaction
-
-
-def update_approval_status_async(submission, approval):
-
-    def _send():
-        try:
-            from submissions.services import get_required_approval_roles
-            from submissions.models import SubmissionApproval
-
-            # -------------------------------------------------
-            # Reload submission from DB (CRITICAL FIX)
-            # -------------------------------------------------
-            submission.refresh_from_db()
-
-            # -------------------------------------------------
-            # Timestamp
-            # -------------------------------------------------
-            approved_at_ms = None
-            if approval.created_at:
-                approved_at_ms = int(
-                    approval.created_at.timestamp() * 1000
-                )
-
-            role = approval.role  # "PD", "PE", or "PQE"
-
-            # -------------------------------------------------
-            # Base Role Fields
-            # -------------------------------------------------
-            fields = {
-                "Submission_ID": str(submission.submission_id),
-
-                f"{role}_Status": approval.status,
-                f"{role}_Rejection_Reason": approval.rejection_reason or "",
-                f"{role}_Approved_By": approval.approver_name or "",
-                f"{role}_Approved_At": approved_at_ms,
-            }
-
-            # -------------------------------------------------
-            # 🚀 FINAL STATUS LOGIC (Deterministic + Safe)
-            # -------------------------------------------------
-
-            # 🔴 ANY rejection → FINAL = REJECTED
-            if SubmissionApproval.objects.filter(
-                submission=submission,
-                status="REJECTED"
-            ).exists():
-                fields["Final_Status"] = "REJECTED"
-
-            # 🟢 PQE approval → FINAL = APPROVED
-            elif approval.role == "PQE" and approval.status == "APPROVED":
-                fields["Final_Status"] = "APPROVED"
-
-            else:
-                # Fallback dynamic logic
-                required_roles = get_required_approval_roles(submission)
-
-                approved_roles = set(
-                    SubmissionApproval.objects.filter(
-                        submission=submission,
-                        status="APPROVED"
-                    ).values_list("role", flat=True)
-                )
-
-                if required_roles and set(required_roles).issubset(approved_roles):
-                    fields["Final_Status"] = "APPROVED"
-
-            # -------------------------------------------------
-            # Payload
-            # -------------------------------------------------
-            payload = {
-                "app_token": settings.BITABLE_APPROVAL_APP_TOKEN.strip(),
-                "table_id": settings.BITABLE_APPROVAL_TABLE_ID.strip(),
-                "records": [fields],
-                "match_field": "Submission_ID",
-            }
-
-            print("🔥 Sending approval update to worker...")
-
-            r = requests.post(
-                settings.CLOUDFLARE_UPSERT_RELAY_URL,
-                json=payload,
-                headers={
-                    "X-RELAY-SECRET": settings.CLOUDFLARE_UPSERT_RELAY_SECRET
-                },
-                timeout=20
-            )
-
-        except Exception as e:
-            print("❌ Approval status update failed:", str(e))
 
     threading.Thread(target=_send, daemon=True).start()

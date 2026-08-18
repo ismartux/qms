@@ -64,7 +64,7 @@
       </a>
 
       <!-- Notifications -->
-      <a href="{% url 'ehs:ehs_notification_list' %}"
+      <a href="{% url 'ui:notification_list' %}"
          class="user-dropdown-item flex justify-between items-center">
 
         <div class="flex items-center gap-2">
@@ -72,9 +72,9 @@
           <span>Notifications</span>
         </div>
 
-        {% if ehs_unread_notifications > 0 %}
-        <span class="bg-red-600 text-white text-xs px-2 py-0.5 rounded-full">
-          {{ ehs_unread_notifications }}
+        {% if missed_form_alerts_count > 0 %}
+        <span class="bg-red-600 text-white text-xs px-2 py-0.5 rounded-full animate-pulse">
+          {{ missed_form_alerts_count }}
         </span>
         {% endif %}
       </a>

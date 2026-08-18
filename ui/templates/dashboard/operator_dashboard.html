@@ -1,0 +1,271 @@
+{% extends "shell/dashboard.html" %}
+{% load custom_filters %}
+
+{% block dashboard_content %}
+<div class="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
+  
+  <!-- Header -->
+  <div class="mb-8">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold text-gray-900">My Dashboard</h1>
+        <p class="mt-2 text-sm text-gray-600">
+          Welcome back, {{ user.get_full_name|default:user.username }}
+          {% if work_context_info %}
+            | {{ work_context_info.shop.name }} - {{ work_context_info.line.code }}
+          {% endif %}
+        </p>
+      </div>
+      <div class="text-right">
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+          <i class="fas fa-sun mr-2"></i> {{ shift_label }} Shift
+        </span>
+        <p class="text-xs text-gray-500 mt-1">{{ current_time|date:"M d, Y H:i" }}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Work Context Info -->
+  {% if work_context_info %}
+  <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl shadow-sm p-4 mb-8 text-white">
+    <div class="flex flex-wrap items-center gap-4 text-sm">
+      <div class="flex items-center gap-2">
+        <i class="fas fa-sitemap"></i>
+        <span class="font-medium">{{ work_context_info.line.code }}</span>
+      </div>
+      <span class="opacity-50">|</span>
+      <div class="flex items-center gap-2">
+        <i class="fas fa-box"></i>
+        <span>{{ work_context_info.product }}</span>
+      </div>
+      <span class="opacity-50">|</span>
+      <div class="flex items-center gap-2">
+        <i class="fas fa-palette"></i>
+        <span>{{ work_context_info.model_color|default:"N/A" }}</span>
+      </div>
+      <span class="opacity-50">|</span>
+      <div class="flex items-center gap-2">
+        <i class="fas fa-store"></i>
+        <span>{{ work_context_info.shop.name }}</span>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- KPI Cards -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-8">
+    
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Today's Submissions</p>
+          <p class="text-2xl font-bold text-gray-900 mt-1">{{ my_stats.total_submissions }}</p>
+        </div>
+        <div class="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
+          <i class="fas fa-clipboard-check text-xl text-blue-600"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Avg Severity</p>
+          <p class="text-2xl font-bold text-gray-900 mt-1">{{ my_stats.avg_severity|floatformat:1 }}</p>
+        </div>
+        <div class="w-10 h-10 bg-yellow-50 rounded-lg flex items-center justify-center">
+          <i class="fas fa-exclamation-triangle text-xl text-yellow-600"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Pass Rate</p>
+          <p class="text-2xl font-bold {% if my_stats.pass_rate >= 90 %}text-green-600{% elif my_stats.pass_rate >= 70 %}text-yellow-600{% else %}text-red-600{% endif %} mt-1">
+            {{ my_stats.pass_rate }}%
+          </p>
+        </div>
+        <div class="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+          <i class="fas fa-check-circle text-xl text-green-600"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Open Issues</p>
+          <p class="text-2xl font-bold {% if my_stats.open_issues > 0 %}text-red-600{% else %}text-gray-900{% endif %} mt-1">
+            {{ my_stats.open_issues }}
+          </p>
+        </div>
+        <div class="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center">
+          <i class="fas fa-times-circle text-xl text-red-600"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Missed Forms</p>
+          <p class="text-2xl font-bold {% if missed_forms > 0 %}text-red-600{% else %}text-gray-900{% endif %} mt-1">
+            {{ missed_forms }}
+          </p>
+        </div>
+        <div class="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center">
+          <i class="fas fa-clock text-xl text-red-600"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    
+    <!-- Scheduled Forms -->
+    <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <h2 class="text-lg font-semibold text-gray-900 mb-4">My Scheduled Forms</h2>
+      
+      {% if scheduled_forms %}
+      <div class="space-y-4">
+        {% for form in scheduled_forms %}
+        <div class="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+          <div class="flex items-start justify-between">
+            <div class="flex-1">
+              <h3 class="font-semibold text-gray-900">{{ form.template.name }}</h3>
+              <p class="text-sm text-gray-600 mt-1">
+                Type: 
+                <span class="font-medium">
+                  {% if form.schedule.schedule_type == 'shift_limit' %}Shift Limit{% endif %}
+                  {% if form.schedule.schedule_type == 'interval' %}Interval ({{ form.schedule.interval_minutes }} min){% endif %}
+                  {% if form.schedule.schedule_type == 'daily' %}Daily{% endif %}
+                </span>
+              </p>
+              
+              {% if form.schedule.schedule_type == 'shift_limit' %}
+              <div class="mt-3">
+                <div class="flex items-center justify-between text-sm mb-1">
+                  <span class="text-gray-600">Progress</span>
+                  <span class="font-semibold text-gray-900">{{ form.completed }}/{{ form.required }}</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                  <div class="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                       style="width: {% widthratio form.completed form.required 100 %}%">
+                  </div>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">
+                  {% if form.remaining > 0 %}
+                    {{ form.remaining }} remaining
+                  {% else %}
+                    ✓ Completed for shift
+                  {% endif %}
+                </p>
+              </div>
+              {% endif %}
+            </div>
+            
+            <a href="{% url 'ui:unified_form_runtime' 'CHECKLIST' form.template.id %}" 
+               class="ml-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium whitespace-nowrap">
+              Start
+            </a>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-gray-500 text-center py-8">No scheduled forms for this shift</p>
+      {% endif %}
+    </div>
+
+    <!-- Recent Activity & NC Items -->
+    <div class="space-y-6">
+      <!-- Recent Submissions -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Recent Submissions</h2>
+        
+        {% if recent_submissions %}
+        <div class="space-y-3">
+          {% for submission in recent_submissions %}
+          <div class="border-l-4 {% if submission.severity_score >= 8 %}border-red-500{% elif submission.severity_score >= 5 %}border-yellow-500{% else %}border-green-500{% endif %} bg-gray-50 p-3 rounded-r-lg">
+            <p class="font-medium text-sm text-gray-900">{{ submission.template_version.template.name }}</p>
+            <p class="text-xs text-gray-600 mt-1">{{ submission.submitted_at|date:"H:i" }}</p>
+            <div class="flex items-center mt-2 gap-2">
+              <span class="text-xs px-2 py-1 rounded-full {% if submission.severity_score >= 8 %}bg-red-100 text-red-700{% elif submission.severity_score >= 5 %}bg-yellow-100 text-yellow-700{% else %}bg-green-100 text-green-700{% endif %}">
+                Severity: {{ submission.severity_score }}
+              </span>
+              {% if submission.workflow_state == 'CLOSED' %}
+              <span class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">Approved</span>
+              {% elif submission.workflow_state == 'FAILED' %}
+              <span class="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700">Rejected</span>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-gray-500 text-center py-8">No submissions yet today</p>
+        {% endif %}
+      </div>
+
+      <!-- Non-Conformance Items -->
+      {% if my_nc_items %}
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Non-Conformance Items</h2>
+        <div class="space-y-2">
+          {% for nc in my_nc_items %}
+          <div class="flex items-center justify-between p-2 bg-red-50 rounded-lg">
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-gray-900 truncate">{{ nc.submission.template_version.template.name }}</p>
+              <p class="text-xs text-gray-600">{{ nc.submission.submitted_at|date:"H:i" }}</p>
+            </div>
+            <span class="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700 ml-2 whitespace-nowrap">
+              NC
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="mt-8 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+    <h2 class="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <a href="{% url 'ui:forms_list' %}" 
+         class="flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+        <i class="fas fa-clipboard-list mr-2"></i>
+        <span class="font-medium">Fill Forms</span>
+      </a>
+      <a href="{% url 'ui:submission_list' %}" 
+         class="flex items-center justify-center px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
+        <i class="fas fa-history mr-2"></i>
+        <span class="font-medium">My History</span>
+      </a>
+      <a href="{% url 'ui:ipqc_dashboard' %}" 
+         class="flex items-center justify-center px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+        <i class="fas fa-chart-line mr-2"></i>
+        <span class="font-medium">My Analytics</span>
+      </a>
+      <a href="{% url 'ui:work_context_list' %}" 
+         class="flex items-center justify-center px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
+        <i class="fas fa-cog mr-2"></i>
+        <span class="font-medium">Settings</span>
+      </a>
+    </div>
+  </div>
+
+</div>
+
+{% block extra_js %}
+<script>
+// Auto-refresh dashboard every 60 seconds
+setTimeout(function() {
+  location.reload();
+}, 60000);
+</script>
+{% endblock %}
+{% endblock %}

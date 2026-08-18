@@ -168,9 +168,16 @@ def save_submission_responses(submission, post_data, files=None):
 
     # --------------------------------
     # Attachments (NEW: store in SubmissionImage)
+    # 🔑 Supports MULTIPLE images per item (BASE type)
     # --------------------------------
 
-    for key, file in files.items():
+    # Group files by key to handle multiple files with same name
+    from collections import defaultdict
+    files_by_key = defaultdict(list)
+    for key in files:
+        files_by_key[key].append(files[key])
+
+    for key, file_list in files_by_key.items():
 
         if key.startswith("item_file_"):
             suffix = key.replace("item_file_", "")
@@ -188,34 +195,36 @@ def save_submission_responses(submission, post_data, files=None):
 
         item_id = int(suffix)
 
-        # Compress image before storing
-        try:
-            compressed = compress_uploaded_image(file)
-            file.seek(0)
-            image_bytes = compressed.read()
-            content_type = getattr(compressed, "content_type", "image/jpeg")
-        except Exception:
-            # Fallback: store original file bytes
-            file.seek(0)
-            image_bytes = file.read()
-            content_type = getattr(file, "content_type", "image/jpeg")
+        # Remove old images for this item (only if we have new files to replace)
+        if file_list:
+            SubmissionImage.objects.filter(
+                submission=submission,
+                checklist_item_id=item_id,
+                attachment_type=attachment_type,
+            ).delete()
 
-        # Remove old images for this item
-        SubmissionImage.objects.filter(
-            submission=submission,
-            checklist_item_id=item_id,
-            attachment_type=attachment_type,
-        ).delete()
+        # Create new SubmissionImage record for each file
+        for file in file_list:
+            # Compress image before storing
+            try:
+                compressed = compress_uploaded_image(file)
+                file.seek(0)
+                image_bytes = compressed.read()
+                content_type = getattr(compressed, "content_type", "image/jpeg")
+            except Exception:
+                # Fallback: store original file bytes
+                file.seek(0)
+                image_bytes = file.read()
+                content_type = getattr(file, "content_type", "image/jpeg")
 
-        # Create new SubmissionImage record
-        SubmissionImage.objects.create(
-            submission=submission,
-            checklist_item_id=item_id,
-            attachment_type=attachment_type,
-            image=image_bytes,
-            content_type=content_type,
-            filename=file.name,
-        )
+            SubmissionImage.objects.create(
+                submission=submission,
+                checklist_item_id=item_id,
+                attachment_type=attachment_type,
+                image=image_bytes,
+                content_type=content_type,
+                filename=file.name,
+            )
 
 
 # =====================================================

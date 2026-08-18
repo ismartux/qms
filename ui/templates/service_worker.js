@@ -126,7 +126,7 @@ self.addEventListener("push", event => {
   console.log("Service Worker: Push received");
 
   const options = {
-    body: event.data ? event.data.text() : "New notification from Transs Flow",
+    body: event.data ? event.data.text() : "New notification from QIsmartuX",
     icon: "/static/icons/icon-192x192.png",
     badge: "/static/icons/badge-72x72.png",
     vibrate: [100, 50, 100],
@@ -138,7 +138,7 @@ self.addEventListener("push", event => {
   };
 
   event.waitUntil(
-    self.registration.showNotification("Transs Flow IPQC", options)
+    self.registration.showNotification("QIsmartuX IPQC", options)
   );
 });
 

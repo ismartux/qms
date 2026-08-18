@@ -10,23 +10,34 @@ from core.identity.models import Role
 # =========================================================
 # CHECKLIST TEMPLATE (FORM DEFINITION)
 # =========================================================
-class ChecklistTemplate(models.Model):
-    APPROVAL_FLOW_CHOICES = [
-        ("NONE", "No Approval Required"),
-        ("PD", "PD Only"),
-        ("PE", "PE Only"),
-        ("PQE", "PQE Only"),
-        ("PD_PQE", "PD + PQE"),
-        ("PE_PQE", "PE + PQE"),
-        ("PD_PE_PQE", "PD + PE + PQE (Full Chain)"),
-    ]
+APPROVAL_FLOW_CHOICES = [
+    ("NONE", "No Approval Required"),
+    ("PD", "PD Only"),
+    ("PE", "PE Only"),
+    ("PQE", "PQE Only"),
+    ("PD_PQE", "PD + PQE"),
+    ("PE_PQE", "PE + PQE"),
+    ("PD_PE_PQE", "PD + PE + PQE (Full Chain)"),
+]
 
+
+class ChecklistTemplate(models.Model):
     code = models.CharField(max_length=50, unique=True)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
 
     is_active = models.BooleanField(default=True, db_index=True)
     is_archived = models.BooleanField(default=False, db_index=True)
+
+    # -------------------------
+    # APPROVAL FLOW
+    # -------------------------
+    approval_flow = models.CharField(
+        max_length=20,
+        choices=APPROVAL_FLOW_CHOICES,
+        default="NONE",
+        help_text="Defines which roles must approve before submission closes.",
+    )
 
     # -------------------------
     # SCOPE / APPLICABILITY
