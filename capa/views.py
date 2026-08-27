@@ -8,6 +8,10 @@ from django.db.models import Case, When, Value, IntegerField, Q
 from core.identity.models import UserScope
 from capa.models import CAPA
 from core.identity.permissions import has_permission
+from submissions.assignment_resolver import (
+    filter_capas_for_pqe_scope,
+    can_pqe_view_or_approve_capa,
+)
 from capa.services import (
     assign_capa,
     mark_action_done,
@@ -48,6 +52,7 @@ def capa_list_view(request):
         "submission__work_context__plant",
         "submission__work_context__product",
         "submission__work_context__line",
+        "submission__work_context__shop",
         "submission__template_version__template",
         "rca_role",
         "capa_role",
@@ -58,6 +63,7 @@ def capa_list_view(request):
         base_queryset = base_queryset.filter(
             submission__work_context__plant_id__in=plant_ids
         )
+        base_queryset = filter_capas_for_pqe_scope(request.user, base_queryset)
 
     today = timezone.now().date()
 
@@ -104,6 +110,7 @@ def capa_popup_view(request, capa_id):
             "submission__work_context__line",
             "submission__work_context__product",
             "submission__work_context__plant",
+            "submission__work_context__shop",
             "submission__submitted_by",
             "rca_role",
             "capa_role",
@@ -113,6 +120,10 @@ def capa_popup_view(request, capa_id):
         ),
         capa_id=capa_id
     )
+
+    if not request.user.is_superuser and is_pqe(request.user):
+        if not can_pqe_view_or_approve_capa(request.user, capa):
+            raise PermissionDenied
 
     submission = capa.submission
 
@@ -165,9 +176,17 @@ class CAPAUpdateForm(forms.ModelForm):
 @login_required
 def capa_detail_view(request, capa_id):
 
-    capa = get_object_or_404(CAPA, capa_id=capa_id)
+    capa = get_object_or_404(
+        CAPA.objects.select_related(
+            "submission",
+            "submission__work_context__line",
+            "submission__work_context__plant",
+            "submission__work_context__shop",
+        ),
+        capa_id=capa_id
+    )
 
-    if not is_pqe(request.user):
+    if not is_pqe(request.user) or not can_pqe_view_or_approve_capa(request.user, capa):
         raise PermissionDenied
 
     class AssignmentForm(forms.ModelForm):
@@ -277,7 +296,19 @@ def approval_pending_capas(request):
     if not is_pqe(request.user):
         raise PermissionDenied
 
-    capas = CAPA.objects.filter(status="ACTION_DONE")
+    capas = (
+        CAPA.objects.filter(status="ACTION_DONE")
+        .select_related(
+            "submission",
+            "submission__work_context__plant",
+            "submission__work_context__line",
+            "submission__work_context__shop",
+            "submission__template_version__template",
+            "rca_role",
+            "capa_role",
+        )
+    )
+    capas = filter_capas_for_pqe_scope(request.user, capas)
 
     return render(request, "capa/approval_pending_capas.html", {
         "capas": capas
@@ -291,9 +322,17 @@ def approval_pending_capas(request):
 @login_required
 def capa_approve(request, capa_id):
 
-    capa = get_object_or_404(CAPA, capa_id=capa_id)
+    capa = get_object_or_404(
+        CAPA.objects.select_related(
+            "submission",
+            "submission__work_context__line",
+            "submission__work_context__plant",
+            "submission__work_context__shop",
+        ),
+        capa_id=capa_id
+    )
 
-    if not is_pqe(request.user):
+    if not is_pqe(request.user) or not can_pqe_view_or_approve_capa(request.user, capa):
         raise PermissionDenied
 
     close_capa(capa, request.user)
@@ -308,9 +347,17 @@ def capa_approve(request, capa_id):
 @login_required
 def capa_reject(request, capa_id):
 
-    capa = get_object_or_404(CAPA, capa_id=capa_id)
+    capa = get_object_or_404(
+        CAPA.objects.select_related(
+            "submission",
+            "submission__work_context__line",
+            "submission__work_context__plant",
+            "submission__work_context__shop",
+        ),
+        capa_id=capa_id
+    )
 
-    if not is_pqe(request.user):
+    if not is_pqe(request.user) or not can_pqe_view_or_approve_capa(request.user, capa):
         raise PermissionDenied
 
     reason = request.POST.get("rejection_reason")

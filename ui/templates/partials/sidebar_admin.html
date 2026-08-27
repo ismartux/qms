@@ -4,7 +4,8 @@
     <span class="nav-text">Admin Home</span>
 </a>
 
-<div class="nav-dropdown {% if current_app == 'admin_panel' %}open{% endif %}">
+<!-- ================= 1. ADMIN PANEL CORE ================= -->
+<div class="nav-dropdown {% if current_app == 'admin_panel' or current_app == 'accounts' or current_app == 'identity' %}open{% endif %}">
 
     <div class="nav-item nav-dropdown-toggle" onclick="toggleNavDropdown(this)" data-tooltip="Admin Panel">
 
@@ -30,14 +31,8 @@
             <span class="nav-text">Access Control</span>
         </a>
 
-        <a href="{% url 'admin_panel:company_list' %}"
-            class="nav-sub-item {% if active_tab %}active{% endif %}" data-tooltip="Organization">
-            <i class="fas fa-sitemap"></i>
-            <span class="nav-text">Organization Setup</span>
-        </a>
-
         <a href="{% url 'admin_panel:admin_capas' %}"
-            class="nav-sub-item {% if current_app == 'admin_panel' and not active_tab %}active{% endif %}" data-tooltip="CAPA">
+            class="nav-sub-item {% if current_app == 'admin_panel' and current_url == 'admin_capas' %}active{% endif %}" data-tooltip="CAPA">
             <i class="fas fa-clipboard-check"></i>
             <span class="nav-text">CAPA</span>
         </a>
@@ -62,10 +57,94 @@
             <span class="nav-text">Form Scheduler</span>
         </a>
 
-         <a href="{% url 'ehs_builder:template_list' %}"
+        <a href="{% url 'ehs_builder:template_list' %}"
             class="nav-sub-item {% if current_app == 'ehs_builder' %}active{% endif %}" data-tooltip="EHS Templates">
             <i class="fas fa-shield-heart"></i>
             <span class="nav-text">EHS Templates</span>
+        </a>
+
+    </div>
+</div>
+
+<!-- ================= 2. ORGANIZATION STRUCTURE ================= -->
+<div class="nav-dropdown {% if active_tab in 'companies plants floors shops lines departments stations products' %}open{% endif %}">
+
+    <div class="nav-item nav-dropdown-toggle" onclick="toggleNavDropdown(this)" data-tooltip="Organization">
+
+        <div class="flex items-center gap-3">
+            <i class="fas fa-sitemap"></i>
+            <span class="nav-text">Organization</span>
+        </div>
+
+        <i class="fas fa-chevron-down nav-text text-xs"></i>
+    </div>
+
+    <div class="nav-dropdown-menu">
+
+        <a href="{% url 'admin_panel:company_list' %}"
+            class="nav-sub-item {% if active_tab == 'companies' %}active{% endif %}" data-tooltip="All Org Setup">
+            <i class="fas fa-building"></i>
+            <span class="nav-text">Companies & Plants</span>
+        </a>
+
+        <a href="{% url 'admin_panel:floor_list' %}"
+            class="nav-sub-item {% if active_tab == 'floors' %}active{% endif %}" data-tooltip="Floors">
+            <i class="fas fa-layer-group"></i>
+            <span class="nav-text">Floors</span>
+        </a>
+
+        <a href="{% url 'admin_panel:shop_list' %}"
+            class="nav-sub-item {% if active_tab == 'shops' %}active{% endif %}" data-tooltip="Shops / Sections">
+            <i class="fas fa-store"></i>
+            <span class="nav-text">Shops / Sections</span>
+        </a>
+
+        <a href="{% url 'admin_panel:line_list' %}"
+            class="nav-sub-item {% if active_tab == 'lines' %}active{% endif %}" data-tooltip="Lines">
+            <i class="fas fa-grip-lines"></i>
+            <span class="nav-text">Production Lines</span>
+        </a>
+
+        <a href="{% url 'admin_panel:department_list' %}"
+            class="nav-sub-item {% if active_tab == 'departments' %}active{% endif %}" data-tooltip="Departments">
+            <i class="fas fa-network-wired"></i>
+            <span class="nav-text">Departments</span>
+        </a>
+
+    </div>
+</div>
+
+<!-- ================= 3. STAFF ASSIGNMENTS & MAPPINGS ================= -->
+<div class="nav-dropdown {% if active_tab in 'floor_tls shop_pqes ipqc_mappings' %}open{% endif %}">
+
+    <div class="nav-item nav-dropdown-toggle" onclick="toggleNavDropdown(this)" data-tooltip="Staff Assignments">
+
+        <div class="flex items-center gap-3">
+            <i class="fas fa-user-gear"></i>
+            <span class="nav-text">Assignments & Mappings</span>
+        </div>
+
+        <i class="fas fa-chevron-down nav-text text-xs"></i>
+    </div>
+
+    <div class="nav-dropdown-menu">
+
+        <a href="{% url 'admin_panel:floor_tl_list' %}"
+            class="nav-sub-item {% if active_tab == 'floor_tls' %}active{% endif %}" data-tooltip="Floor TL Assign">
+            <i class="fas fa-user-shield text-indigo-500"></i>
+            <span class="nav-text">Floor TL Assign</span>
+        </a>
+
+        <a href="{% url 'admin_panel:shop_pqe_list' %}"
+            class="nav-sub-item {% if active_tab == 'shop_pqes' %}active{% endif %}" data-tooltip="Shop PQE Assign">
+            <i class="fas fa-microscope text-teal-500"></i>
+            <span class="nav-text">Shop PQE Assign</span>
+        </a>
+
+        <a href="{% url 'admin_panel:ipqc_mapping_list' %}"
+            class="nav-sub-item {% if active_tab == 'ipqc_mappings' %}active{% endif %}" data-tooltip="IPQC Mapping">
+            <i class="fas fa-id-card-clip text-amber-500"></i>
+            <span class="nav-text">IPQC Mapping</span>
         </a>
 
     </div>

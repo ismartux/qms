@@ -2,7 +2,7 @@
 {% block title %}Submissions{% endblock %}
 {% block content %}
 
-<div class="max-w-7xl mx-auto space-y-8 pb-12">
+<div class="max-w-7xl mx-auto space-y-6 pb-12">
 
   <!-- ================= HEADER ================= -->
   <div class="flex justify-between items-center flex-wrap gap-4">
@@ -11,133 +11,372 @@
         Submissions
       </h1>
       <p class="text-sm text-gray-500 mt-1">
-        {{ request.user.get_full_name|default:request.user.username }}
+        Viewing submissions filtered by date, line, and IPQC inspector mapping.
       </p>
+    </div>
+
+    <!-- VIEW MODE SWITCHER -->
+    <div class="inline-flex rounded-xl bg-gray-100 p-1 border shadow-inner">
+      <a href="?range={{ selected_range }}&ipqc_id={{ selected_ipqc_id }}&line_id={{ selected_line_id }}&floor_id={{ selected_floor_id }}&section_id={{ selected_section_id }}&view_mode=flat"
+         class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5
+         {% if selected_view_mode == 'flat' or not selected_view_mode %}
+           bg-white text-gray-900 shadow-sm
+         {% else %}
+           text-gray-500 hover:text-gray-900
+         {% endif %}">
+        <i class="fas fa-th-large"></i> All Cards
+      </a>
+      <a href="?range={{ selected_range }}&ipqc_id={{ selected_ipqc_id }}&line_id={{ selected_line_id }}&floor_id={{ selected_floor_id }}&section_id={{ selected_section_id }}&view_mode=by_line"
+         class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5
+         {% if selected_view_mode == 'by_line' %}
+           bg-white text-sky-700 shadow-sm
+         {% else %}
+           text-gray-500 hover:text-gray-900
+         {% endif %}">
+        <i class="fas fa-grip-lines"></i> Line-wise View
+      </a>
+      <a href="?range={{ selected_range }}&ipqc_id={{ selected_ipqc_id }}&line_id={{ selected_line_id }}&floor_id={{ selected_floor_id }}&section_id={{ selected_section_id }}&view_mode=by_ipqc"
+         class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5
+         {% if selected_view_mode == 'by_ipqc' %}
+           bg-white text-indigo-700 shadow-sm
+         {% else %}
+           text-gray-500 hover:text-gray-900
+         {% endif %}">
+        <i class="fas fa-user-check"></i> IPQC-wise View
+      </a>
     </div>
   </div>
 
-  <!-- ================= DATE FILTERS ================= -->
-  <div class="flex flex-wrap gap-2">
+  <!-- ================= FILTER PANEL ================= -->
+  <div class="bg-white rounded-2xl border p-5 shadow-sm space-y-4">
+    
+    <!-- Top Row: Date Pills -->
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+      <span class="text-xs font-bold uppercase tracking-wider text-gray-500">Date Range:</span>
+      <div class="flex flex-wrap gap-2">
+        <a href="?range=today&ipqc_id={{ selected_ipqc_id }}&line_id={{ selected_line_id }}&floor_id={{ selected_floor_id }}&section_id={{ selected_section_id }}&view_mode={{ selected_view_mode }}"
+           class="px-3.5 py-1 rounded-full text-xs font-semibold border transition
+           {% if selected_range == 'today' %}
+             bg-sky-600 text-white border-sky-600
+           {% else %}
+             bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100
+           {% endif %}">
+          Today
+        </a>
+        <a href="?range=this_week&ipqc_id={{ selected_ipqc_id }}&line_id={{ selected_line_id }}&floor_id={{ selected_floor_id }}&section_id={{ selected_section_id }}&view_mode={{ selected_view_mode }}"
+           class="px-3.5 py-1 rounded-full text-xs font-semibold border transition
+           {% if selected_range == 'this_week' %}
+             bg-sky-600 text-white border-sky-600
+           {% else %}
+             bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100
+           {% endif %}">
+          This Week
+        </a>
+        <a href="?range=last_week&ipqc_id={{ selected_ipqc_id }}&line_id={{ selected_line_id }}&floor_id={{ selected_floor_id }}&section_id={{ selected_section_id }}&view_mode={{ selected_view_mode }}"
+           class="px-3.5 py-1 rounded-full text-xs font-semibold border transition
+           {% if selected_range == 'last_week' %}
+             bg-sky-600 text-white border-sky-600
+           {% else %}
+             bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100
+           {% endif %}">
+          Last Week
+        </a>
+        <a href="?range=this_month&ipqc_id={{ selected_ipqc_id }}&line_id={{ selected_line_id }}&floor_id={{ selected_floor_id }}&section_id={{ selected_section_id }}&view_mode={{ selected_view_mode }}"
+           class="px-3.5 py-1 rounded-full text-xs font-semibold border transition
+           {% if selected_range == 'this_month' %}
+             bg-sky-600 text-white border-sky-600
+           {% else %}
+             bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100
+           {% endif %}">
+          This Month
+        </a>
+      </div>
+    </div>
 
-    <a href="?range=today"
-       class="px-4 py-1.5 rounded-full text-sm font-semibold border transition
-       {% if selected_range == 'today' %}
-         bg-sky-600 text-white border-sky-600
-       {% else %}
-         bg-white text-gray-600 border-gray-300 hover:bg-gray-100
-       {% endif %}">
-      Today
-    </a>
+    <!-- Bottom Row: Dropdown Filters -->
+    <form method="GET" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      <input type="hidden" name="range" value="{{ selected_range }}">
+      <input type="hidden" name="view_mode" value="{{ selected_view_mode }}">
 
-    <a href="?range=this_week"
-       class="px-4 py-1.5 rounded-full text-sm font-semibold border transition
-       {% if selected_range == 'this_week' %}
-         bg-sky-600 text-white border-sky-600
-       {% else %}
-         bg-white text-gray-600 border-gray-300 hover:bg-gray-100
-       {% endif %}">
-      This Week
-    </a>
+      <!-- IPQC Inspector Dropdown -->
+      <div>
+        <label class="block text-xs font-bold text-gray-600 mb-1">IPQC Inspector</label>
+        <select name="ipqc_id" class="w-full text-xs rounded-lg border-gray-300 bg-gray-50 p-2 border focus:ring-2 focus:ring-sky-500 focus:bg-white">
+          <option value="">All IPQC Inspectors</option>
+          {% for u in filter_ipqc_users %}
+            <option value="{{ u.id }}" {% if selected_ipqc_id == u.id|stringformat:"s" %}selected{% endif %}>
+              {{ u.get_full_name|default:u.username }} ({{ u.username }})
+            </option>
+          {% endfor %}
+        </select>
+      </div>
 
-    <a href="?range=last_week"
-       class="px-4 py-1.5 rounded-full text-sm font-semibold border transition
-       {% if selected_range == 'last_week' %}
-         bg-sky-600 text-white border-sky-600
-       {% else %}
-         bg-white text-gray-600 border-gray-300 hover:bg-gray-100
-       {% endif %}">
-      Last Week
-    </a>
+      <!-- Production Line Dropdown -->
+      <div>
+        <label class="block text-xs font-bold text-gray-600 mb-1">Production Line</label>
+        <select name="line_id" class="w-full text-xs rounded-lg border-gray-300 bg-gray-50 p-2 border focus:ring-2 focus:ring-sky-500 focus:bg-white">
+          <option value="">All Production Lines</option>
+          {% for l in filter_lines %}
+            <option value="{{ l.id }}" {% if selected_line_id == l.id|stringformat:"s" %}selected{% endif %}>
+              {{ l.name }} {% if l.floor %}({{ l.floor.name }}){% endif %}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
 
-    <a href="?range=this_month"
-       class="px-4 py-1.5 rounded-full text-sm font-semibold border transition
-       {% if selected_range == 'this_month' %}
-         bg-sky-600 text-white border-sky-600
-       {% else %}
-         bg-white text-gray-600 border-gray-300 hover:bg-gray-100
-       {% endif %}">
-      This Month
-    </a>
+      <!-- Floor Dropdown -->
+      <div>
+        <label class="block text-xs font-bold text-gray-600 mb-1">Floor</label>
+        <select name="floor_id" class="w-full text-xs rounded-lg border-gray-300 bg-gray-50 p-2 border focus:ring-2 focus:ring-sky-500 focus:bg-white">
+          <option value="">All Floors</option>
+          {% for f in filter_floors %}
+            <option value="{{ f.id }}" {% if selected_floor_id == f.id|stringformat:"s" %}selected{% endif %}>
+              {{ f.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Shop / Section Dropdown -->
+      <div>
+        <label class="block text-xs font-bold text-gray-600 mb-1">Shop / Section</label>
+        <select name="shop_id" class="w-full text-xs rounded-lg border-gray-300 bg-gray-50 p-2 border focus:ring-2 focus:ring-sky-500 focus:bg-white">
+          <option value="">All Shops / Sections</option>
+          {% for sh in filter_shops %}
+            <option value="{{ sh.id }}" {% if selected_shop_id == sh.id|stringformat:"s" %}selected{% endif %}>
+              {{ sh.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-end gap-2">
+        <button type="submit" class="flex-1 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold shadow-sm transition flex items-center justify-center gap-1">
+          <i class="fas fa-filter"></i> Apply
+        </button>
+        <a href="?range={{ selected_range }}&view_mode={{ selected_view_mode }}" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-semibold transition">
+          Reset
+        </a>
+      </div>
+    </form>
 
   </div>
 
-  <!-- ================= UNIFIED SUBMISSIONS ================= -->
+  <!-- ================= VIEW MODE 1: FLAT CARDS VIEW ================= -->
+  {% if selected_view_mode == 'flat' or not selected_view_mode %}
   <div class="bg-white rounded-2xl border overflow-hidden shadow-sm">
 
     <div class="px-6 py-4 border-b bg-gray-50 flex justify-between items-center">
-      <h3 class="font-bold text-lg">All Submissions</h3>
-      <span class="text-xs font-bold bg-gray-200 px-3 py-1 rounded-full">
-        {{ submissions|length }}
+      <h3 class="font-bold text-lg text-gray-900">Submissions Stream</h3>
+      <span class="text-xs font-bold bg-sky-100 text-sky-800 px-3 py-1 rounded-full">
+        {{ submissions|length }} total
       </span>
     </div>
 
     <div class="p-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-
       {% for s in submissions %}
       <div class="rounded-xl border p-5 flex flex-col bg-white hover:shadow-md transition">
 
-        <!-- ================= TITLE ================= -->
-        <h4 class="font-bold text-lg mb-3">
+        <!-- TITLE -->
+        <h4 class="font-bold text-base text-gray-900 mb-2">
           {{ s.template_name }}
         </h4>
 
-        <!-- ================= META ================= -->
-        <div class="space-y-1 text-xs text-gray-500 mb-4">
-          <div>📅 {{ s.submitted_at|date:"d M Y, H:i" }}</div>
-          <div>👤 {{ s.submitter_name }}</div>
-          <div>🧩 Role: {{ s.submitter_role }}</div>
-
+        <!-- META DETAILS -->
+        <div class="space-y-1.5 text-xs text-gray-600 mb-4 bg-gray-50 p-3 rounded-lg border">
+          <div class="flex justify-between">
+            <span class="text-gray-400">Date:</span>
+            <span class="font-medium">📅 {{ s.submitted_at|date:"d M Y, H:i" }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-400">IPQC Inspector:</span>
+            <span class="font-bold text-gray-900">👤 {{ s.submitter_name }}</span>
+          </div>
           {% if s.line_name %}
-            <div>🏭 {{ s.line_name }} — {{ s.product_name }}</div>
+          <div class="flex justify-between">
+            <span class="text-gray-400">Line & Product:</span>
+            <span class="font-semibold text-sky-700">🏭 {{ s.line_name }} — {{ s.product_name|default:"-" }}</span>
+          </div>
           {% endif %}
+          <div class="flex justify-between pt-1 border-t border-gray-200">
+            <span class="text-gray-400">Floor / Shop:</span>
+            <span class="text-gray-700">🏢 {{ s.floor_name }} | 🏪 {{ s.shop_name }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-400">Mapped TL:</span>
+            <span class="font-medium text-indigo-700">🛡️ {{ s.tl_names }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-400">Mapped PQE:</span>
+            <span class="font-medium text-teal-700">🔬 {{ s.pqe_names }}</span>
+          </div>
         </div>
 
-        <!-- ================= APPROVAL STATUS ================= -->
+        <!-- APPROVAL STATUS -->
         <div class="mb-4">
           {% if s.approval_status == "APPROVED" %}
-            <span class="text-[11px] font-bold px-2 py-1 rounded
-                         bg-green-100 text-green-700">
-              Approved
+            <span class="text-[11px] font-bold px-2.5 py-1 rounded bg-green-100 text-green-700">
+              ✓ Approved
             </span>
           {% elif s.approval_status == "REJECTED" %}
-            <span class="text-[11px] font-bold px-2 py-1 rounded
-                         bg-red-100 text-red-700">
-              Rejected
+            <span class="text-[11px] font-bold px-2.5 py-1 rounded bg-red-100 text-red-700">
+              ✕ Rejected
             </span>
           {% elif s.approval_status == "NO_APPROVAL" %}
-            <span class="text-[11px] font-bold px-2 py-1 rounded
-                         bg-gray-100 text-gray-600">
-              No Approval
+            <span class="text-[11px] font-bold px-2.5 py-1 rounded bg-gray-100 text-gray-700">
+              No Approval Required
             </span>
           {% else %}
-            <span class="text-[11px] font-bold px-2 py-1 rounded
-                         bg-yellow-100 text-yellow-700">
-              Pending
+            <span class="text-[11px] font-bold px-2.5 py-1 rounded bg-amber-100 text-amber-700">
+              ⏳ Pending Approval
             </span>
           {% endif %}
         </div>
 
-        <!-- ================= ACTION ================= -->
-        <div class="mt-auto pt-4 border-t">
-          <button
-            type="button"
-            class="w-full py-2 text-sm font-semibold rounded-lg
-                   bg-sky-50 text-sky-700 border border-sky-200
-                   hover:bg-sky-600 hover:text-white transition"
-            data-url="{% url 'ui:submission_detail' s.id %}"
-            onclick="openSubmissionModalFromBtn(this)">
-            View Details
+        <!-- ACTION BUTTON -->
+        <div class="mt-auto pt-3 border-t">
+          <button type="button"
+                  data-url="{% url 'ui:submission_detail' s.id %}"
+                  onclick="openSubmissionModalFromBtn(this)"
+                  class="w-full text-center py-2 px-3 bg-gray-900 hover:bg-black text-white text-xs font-semibold rounded-lg transition">
+            View Details & Flow
           </button>
         </div>
 
       </div>
       {% empty %}
         <div class="col-span-full text-center text-gray-500 py-12">
-          No submissions found.
+          No submissions found matching the criteria.
         </div>
       {% endfor %}
     </div>
   </div>
+  {% endif %}
+
+  <!-- ================= VIEW MODE 2: LINE-WISE GROUPED VIEW ================= -->
+  {% if selected_view_mode == 'by_line' %}
+  <div class="space-y-6">
+    {% for group in grouped_data %}
+    <div class="bg-white rounded-2xl border overflow-hidden shadow-sm">
+      
+      <!-- Group Header -->
+      <div class="px-6 py-4 border-b bg-sky-50/60 flex justify-between items-center flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+          <span class="h-8 w-8 rounded-lg bg-sky-600 text-white flex items-center justify-center font-bold text-sm">
+            <i class="fas fa-grip-lines"></i>
+          </span>
+          <div>
+            <h3 class="font-bold text-base text-gray-900">{{ group.group_title }}</h3>
+            <p class="text-xs text-gray-500">Production Line Group</p>
+          </div>
+        </div>
+        
+        <!-- Summary Stats Pills -->
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-white border text-gray-700">Total: {{ group.total }}</span>
+          <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-green-100 text-green-700">Approved: {{ group.approved }}</span>
+          <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">Pending: {{ group.pending }}</span>
+          {% if group.rejected > 0 %}
+          <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-red-100 text-red-700">Rejected: {{ group.rejected }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Nested Cards -->
+      <div class="p-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        {% for s in group.items %}
+        <div class="rounded-xl border p-4 flex flex-col bg-gray-50/50 hover:bg-white hover:shadow transition">
+          <h4 class="font-bold text-sm text-gray-900 mb-2">{{ s.template_name }}</h4>
+          <div class="text-xs text-gray-500 space-y-1 mb-3">
+            <div>📅 {{ s.submitted_at|date:"d M Y, H:i" }}</div>
+            <div>👤 <strong>IPQC:</strong> {{ s.submitter_name }}</div>
+            <div>🏢 <strong>Floor:</strong> {{ s.floor_name }} | <strong>TL:</strong> {{ s.tl_names }}</div>
+            <div>🏪 <strong>Shop:</strong> {{ s.shop_name }} | <strong>PQE:</strong> {{ s.pqe_names }}</div>
+          </div>
+          <div class="flex items-center justify-between mt-auto pt-3 border-t">
+            <span class="text-xs font-bold {% if s.approval_status == 'APPROVED' %}text-green-600{% elif s.approval_status == 'REJECTED' %}text-red-600{% else %}text-amber-600{% endif %}">
+              {{ s.approval_status }}
+            </span>
+            <button type="button" class="px-3 py-1 text-xs font-semibold rounded bg-sky-600 text-white hover:bg-sky-700" data-url="{% url 'ui:submission_detail' s.id %}" onclick="openSubmissionModalFromBtn(this)">
+              Details
+            </button>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+    </div>
+    {% empty %}
+      <div class="bg-white rounded-2xl border p-12 text-center text-gray-500">
+        No line-wise submissions found.
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- ================= VIEW MODE 3: IPQC-WISE GROUPED VIEW ================= -->
+  {% if selected_view_mode == 'by_ipqc' %}
+  <div class="space-y-6">
+    {% for group in grouped_data %}
+    <div class="bg-white rounded-2xl border overflow-hidden shadow-sm">
+      
+      <!-- Group Header -->
+      <div class="px-6 py-4 border-b bg-indigo-50/60 flex justify-between items-center flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+          <span class="h-8 w-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">
+            <i class="fas fa-user-check"></i>
+          </span>
+          <div>
+            <h3 class="font-bold text-base text-gray-900">{{ group.group_title }}</h3>
+            <p class="text-xs text-gray-500">
+              Role: {{ group.submitter_role }} | Floor: {{ group.floor_name }} (TL: {{ group.tl_names }}) | Shop: {{ group.shop_name }} (PQE: {{ group.pqe_names }})
+            </p>
+          </div>
+        </div>
+        
+        <!-- Summary Stats Pills -->
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-white border text-gray-700">Submissions: {{ group.total }}</span>
+          <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-green-100 text-green-700">Approved: {{ group.approved }}</span>
+          <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">Pending: {{ group.pending }}</span>
+          {% if group.rejected > 0 %}
+          <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-red-100 text-red-700">Rejected: {{ group.rejected }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Nested Cards -->
+      <div class="p-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        {% for s in group.items %}
+        <div class="rounded-xl border p-4 flex flex-col bg-gray-50/50 hover:bg-white hover:shadow transition">
+          <h4 class="font-bold text-sm text-gray-900 mb-2">{{ s.template_name }}</h4>
+          <div class="text-xs text-gray-500 space-y-1 mb-3">
+            <div>📅 {{ s.submitted_at|date:"d M Y, H:i" }}</div>
+            {% if s.line_name %}<div>🏭 <strong>Line:</strong> {{ s.line_name }} — {{ s.product_name|default:"-" }}</div>{% endif %}
+            <div>🛡️ <strong>TL:</strong> {{ s.tl_names }} | <strong>PQE:</strong> {{ s.pqe_names }}</div>
+          </div>
+          <div class="flex items-center justify-between mt-auto pt-3 border-t">
+            <span class="text-xs font-bold {% if s.approval_status == 'APPROVED' %}text-green-600{% elif s.approval_status == 'REJECTED' %}text-red-600{% else %}text-amber-600{% endif %}">
+              {{ s.approval_status }}
+            </span>
+            <button type="button" class="px-3 py-1 text-xs font-semibold rounded bg-indigo-600 text-white hover:bg-indigo-700" data-url="{% url 'ui:submission_detail' s.id %}" onclick="openSubmissionModalFromBtn(this)">
+              Details
+            </button>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+    </div>
+    {% empty %}
+      <div class="bg-white rounded-2xl border p-12 text-center text-gray-500">
+        No IPQC-wise submissions found.
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
 </div>
 
 <!-- ================= SUBMISSION MODAL ================= -->

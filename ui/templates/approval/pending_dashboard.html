@@ -37,9 +37,23 @@
       </div>
 
       <!-- META -->
-      <div class="space-y-1 text-xs text-gray-500 mb-4">
+      <div class="space-y-1 text-xs text-gray-500 mb-4 bg-gray-50/60 p-2.5 rounded-lg border">
         <div>📅 {{ c.submitted_at|date:"d M Y, H:i" }}</div>
-        <div>👤 {{ c.submitted_by.get_full_name|default:c.submitted_by.username }}</div>
+        <div>👤 <strong>IPQC:</strong> {{ c.submitted_by.get_full_name|default:c.submitted_by.username }}</div>
+        {% if c.line %}
+        <div>🏭 <strong>Line:</strong> {{ c.line.name }}{% if c.product %} — {{ c.product.name }}{% endif %}</div>
+        {% elif c.submission.work_context.line %}
+        <div>🏭 <strong>Line:</strong> {{ c.submission.work_context.line.name }}</div>
+        {% endif %}
+        {% if c.submission.shop %}
+        <div>🏪 <strong>Shop / Section:</strong> {{ c.submission.shop.name }}</div>
+        {% elif c.line and c.line.shop %}
+        <div>🏪 <strong>Shop / Section:</strong> {{ c.line.shop.name }}</div>
+        {% elif c.submission.work_context.shop %}
+        <div>🏪 <strong>Shop / Section:</strong> {{ c.submission.work_context.shop.name }}</div>
+        {% elif c.submission.work_context.line.shop %}
+        <div>🏪 <strong>Shop / Section:</strong> {{ c.submission.work_context.line.shop.name }}</div>
+        {% endif %}
       </div>
 
       <!-- APPROVAL FLOW -->

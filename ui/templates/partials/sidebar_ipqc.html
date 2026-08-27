@@ -47,6 +47,15 @@
       <span class="nav-text">Forms</span>
     </a>
 
+    {% if has_admin_access or is_admin or request.user.is_superuser %}
+    <a href="{% url 'admin_panel:ipqc_mapping_list' %}"
+       class="nav-sub-item {% if current_url == 'ipqc_mapping_list' %}active{% endif %}"
+       data-tooltip="IPQC Mapping">
+      <i class="fas fa-id-card-clip text-amber-500"></i>
+      <span class="nav-text">IPQC Mapping</span>
+    </a>
+    {% endif %}
+
   </div>
 </div>
 {% endif %}

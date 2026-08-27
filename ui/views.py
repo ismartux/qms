@@ -26,9 +26,17 @@ from submissions.services import get_required_approval_roles
 from integrations.bitable.approval_status_updater import (
     update_dynamic_approval_status_async,
 )
+from django.contrib.auth import get_user_model
 from scheduler.models import ScheduledInstance
 from core.identity.models import ApprovalCategory
-from org.models import Line, Product, Shop
+from org.models import Line, Product, Shop, Floor, IPQCMapping
+from submissions.assignment_resolver import (
+    resolve_submission_assignments,
+    filter_submissions_for_pqe_scope,
+    can_pqe_view_or_approve_submission,
+    is_user_pqe,
+    get_pqe_scope_filters,
+)
 from django.contrib import messages
 from submissions.models import SubmissionApproval
 from core.identity.permissions import has_permission
@@ -1497,12 +1505,15 @@ def submission_detail_view(request, submission_id):
             raise PermissionDenied
 
     # ----------------------------------
-    # 🔐 ACCESS CONTROL (UNCHANGED)
+    # 🔐 ACCESS CONTROL & PQE SCOPE
     # ----------------------------------
     if not user.is_superuser:
+        if not can_pqe_view_or_approve_submission(user, submission):
+            raise PermissionDenied
         if submission.submitted_by != user and not (
             has_permission(user, "can_view_submissions")
             or has_permission(user, "workcontext.view_all")
+            or has_permission(user, "can_approve_ipqc")
         ):
             raise PermissionDenied
 
@@ -1591,13 +1602,21 @@ def submission_list_view(request):
     """
     Unified submission list
     - Checklist + Dynamic
-    - Date range filters (same as IPQC dashboard)
+    - Date range filters
+    - IPQC submitter filtering
+    - Line-wise, Floor-wise, Section-wise filtering
+    - View modes: Flat list, Grouped by Line, Grouped by IPQC
     - Access control preserved
-    - Department-based visibility (NEW)
+    - Department-based visibility
     """
 
     user = request.user
     selected_range = request.GET.get("range", "today")
+    selected_ipqc_id = request.GET.get("ipqc_id", "").strip()
+    selected_line_id = request.GET.get("line_id", "").strip()
+    selected_floor_id = request.GET.get("floor_id", "").strip()
+    selected_shop_id = request.GET.get("shop_id", request.GET.get("section_id", "")).strip()
+    selected_view_mode = request.GET.get("view_mode", "flat").strip()
 
     now = timezone.localtime()
     start_date, end_date = _resolve_date_range(now, selected_range)
@@ -1615,7 +1634,14 @@ def submission_list_view(request):
             "template_version__template",
             "submitted_by",
             "line",
+            "line__floor",
+            "line__shop",
             "product",
+            "floor",
+            "shop",
+            "work_context",
+            "work_context__floor",
+            "work_context__shop",
         )
         .prefetch_related(
             "approvals__category",
@@ -1634,6 +1660,10 @@ def submission_list_view(request):
         .select_related(
             "template_version__template",
             "submitted_by",
+            "work_context",
+            "work_context__line",
+            "work_context__floor",
+            "work_context__shop",
         )
         .prefetch_related(
             "approvals__category",
@@ -1642,6 +1672,42 @@ def submission_list_view(request):
         )
         .order_by("-submitted_at")
     )
+
+    # ----------------------------------
+    # IPQC SUBMITTER FILTER
+    # ----------------------------------
+    if selected_ipqc_id:
+        checklist_qs = checklist_qs.filter(submitted_by_id=selected_ipqc_id)
+        dynamic_qs = dynamic_qs.filter(submitted_by_id=selected_ipqc_id)
+
+    # ----------------------------------
+    # LINE FILTER
+    # ----------------------------------
+    if selected_line_id:
+        checklist_qs = checklist_qs.filter(line_id=selected_line_id)
+        dynamic_qs = dynamic_qs.filter(work_context__line_id=selected_line_id)
+
+    # ----------------------------------
+    # FLOOR FILTER
+    # ----------------------------------
+    if selected_floor_id:
+        checklist_qs = checklist_qs.filter(
+            Q(floor_id=selected_floor_id) |
+            Q(line__floor_id=selected_floor_id) |
+            Q(work_context__floor_id=selected_floor_id)
+        )
+        dynamic_qs = dynamic_qs.filter(work_context__floor_id=selected_floor_id)
+
+    # ----------------------------------
+    # SHOP / SECTION FILTER
+    # ----------------------------------
+    if selected_shop_id:
+        checklist_qs = checklist_qs.filter(
+            Q(shop_id=selected_shop_id) |
+            Q(line__shop_id=selected_shop_id) |
+            Q(work_context__shop_id=selected_shop_id)
+        )
+        dynamic_qs = dynamic_qs.filter(work_context__shop_id=selected_shop_id)
 
     # ----------------------------------
     # DEPARTMENT FILTER (NEW – SAFE)
@@ -1661,20 +1727,26 @@ def submission_list_view(request):
                 template_version__template__department_id__in=user_departments
             )
         else:
-            # No department scope → see nothing
             checklist_qs = checklist_qs.none()
             dynamic_qs = dynamic_qs.none()
 
     # ----------------------------------
-    # ACCESS CONTROL (UNCHANGED – AS REQUESTED)
+    # ACCESS CONTROL
     # ----------------------------------
     if not user.is_superuser:
         if not (
             has_permission(user, "can_view_submissions")
             or has_permission(user, "workcontext.view_all")
+            or has_permission(user, "can_approve_ipqc")
         ):
             checklist_qs = checklist_qs.filter(submitted_by=user)
             dynamic_qs = dynamic_qs.filter(submitted_by=user)
+
+    # ----------------------------------
+    # 🔐 PQE SCOPE FILTER (LINE/FLOOR/PLANT/IPQC)
+    # ----------------------------------
+    checklist_qs = filter_submissions_for_pqe_scope(user, checklist_qs, is_dynamic=False)
+    dynamic_qs = filter_submissions_for_pqe_scope(user, dynamic_qs, is_dynamic=True)
 
     submissions = []
 
@@ -1700,17 +1772,25 @@ def submission_list_view(request):
     # CHECKLIST → UNIFIED SHAPE
     # ----------------------------------
     for s in checklist_qs:
+        assignment_info = resolve_submission_assignments(s)
         submissions.append({
             "id": s.submission_id,
             "template_name": s.template_version.template.name,
             "submitted_at": s.submitted_at,
+            "submitter_id": s.submitted_by.id,
             "submitter_name": (
                 s.submitted_by.get_full_name()
                 or s.submitted_by.username
             ),
             "submitter_role": resolve_submitter_role(s.submitted_by),
+            "line_id": s.line.id if s.line else None,
             "line_name": s.line.name if s.line else None,
             "product_name": s.product.name if s.product else None,
+            "floor_name": assignment_info["floor_name"],
+            "shop_name": assignment_info["shop_name"],
+            "section_name": assignment_info["shop_name"],
+            "tl_names": assignment_info["tl_names"],
+            "pqe_names": assignment_info["pqe_names"],
             "approval_status": resolve_approval_status(s),
         })
 
@@ -1718,17 +1798,27 @@ def submission_list_view(request):
     # DYNAMIC → UNIFIED SHAPE
     # ----------------------------------
     for s in dynamic_qs:
+        assignment_info = resolve_submission_assignments(s)
+        dyn_line = s.work_context.line if s.work_context else None
+        dyn_prod = s.work_context.product if s.work_context else None
         submissions.append({
             "id": s.submission_id,
             "template_name": s.template_version.template.name,
             "submitted_at": s.submitted_at,
+            "submitter_id": s.submitted_by.id,
             "submitter_name": (
                 s.submitted_by.get_full_name()
                 or s.submitted_by.username
             ),
             "submitter_role": resolve_submitter_role(s.submitted_by),
-            "line_name": None,
-            "product_name": None,
+            "line_id": dyn_line.id if dyn_line else None,
+            "line_name": dyn_line.name if dyn_line else None,
+            "product_name": dyn_prod.name if dyn_prod else None,
+            "floor_name": assignment_info["floor_name"],
+            "shop_name": assignment_info["shop_name"],
+            "section_name": assignment_info["shop_name"],
+            "tl_names": assignment_info["tl_names"],
+            "pqe_names": assignment_info["pqe_names"],
             "approval_status": resolve_approval_status(s),
         })
 
@@ -1740,12 +1830,116 @@ def submission_list_view(request):
         reverse=True,
     )
 
+    # ----------------------------------
+    # GROUPINGS (BY LINE / BY IPQC)
+    # ----------------------------------
+    grouped_data = []
+
+    if selected_view_mode == "by_line":
+        groups = {}
+        for s in submissions:
+            key = s["line_name"] or "General / No Line"
+            if key not in groups:
+                groups[key] = {
+                    "group_title": key,
+                    "items": [],
+                    "total": 0,
+                    "approved": 0,
+                    "rejected": 0,
+                    "pending": 0,
+                }
+            groups[key]["items"].append(s)
+            groups[key]["total"] += 1
+            if s["approval_status"] == "APPROVED":
+                groups[key]["approved"] += 1
+            elif s["approval_status"] == "REJECTED":
+                groups[key]["rejected"] += 1
+            elif s["approval_status"] == "NO_APPROVAL":
+                pass
+            else:
+                groups[key]["pending"] += 1
+        grouped_data = list(groups.values())
+
+    elif selected_view_mode == "by_ipqc":
+        groups = {}
+        for s in submissions:
+            key = s["submitter_name"]
+            if key not in groups:
+                groups[key] = {
+                    "group_title": key,
+                    "submitter_role": s["submitter_role"],
+                    "floor_name": s["floor_name"],
+                    "shop_name": s["shop_name"],
+                    "section_name": s["shop_name"],
+                    "tl_names": s["tl_names"],
+                    "pqe_names": s["pqe_names"],
+                    "items": [],
+                    "total": 0,
+                    "approved": 0,
+                    "rejected": 0,
+                    "pending": 0,
+                }
+            groups[key]["items"].append(s)
+            groups[key]["total"] += 1
+            if s["approval_status"] == "APPROVED":
+                groups[key]["approved"] += 1
+            elif s["approval_status"] == "REJECTED":
+                groups[key]["rejected"] += 1
+            elif s["approval_status"] == "NO_APPROVAL":
+                pass
+            else:
+                groups[key]["pending"] += 1
+        grouped_data = list(groups.values())
+
+    # ----------------------------------
+    # FILTER DROPDOWN DATA (PQE SCOPED)
+    # ----------------------------------
+    filter_lines = Line.objects.filter(is_active=True).select_related("shop", "floor").order_by("name")
+    filter_floors = Floor.objects.filter(is_active=True).order_by("name")
+    filter_shops = Shop.objects.filter(is_active=True).order_by("name")
+    
+    UserModel = get_user_model()
+    filter_ipqc_users = UserModel.objects.filter(
+        is_active=True
+    ).filter(
+        Q(scopes__role__code__in=["IPQC", "IPQC_PACK", "OPERATOR", "PQE", "TL"]) |
+        Q(employee_profile__role__code__in=["IPQC", "IPQC_PACK", "OPERATOR", "PQE", "TL"]) |
+        Q(submissions__isnull=False)
+    ).distinct().order_by("first_name", "username")
+
+    if is_user_pqe(user):
+        pqe_scope = get_pqe_scope_filters(user)
+        if pqe_scope["plant_ids"]:
+            filter_lines = filter_lines.filter(shop__plant_id__in=pqe_scope["plant_ids"])
+            filter_floors = filter_floors.filter(plant_id__in=pqe_scope["plant_ids"])
+            filter_shops = filter_shops.filter(plant_id__in=pqe_scope["plant_ids"])
+        if pqe_scope["line_ids"]:
+            filter_lines = filter_lines.filter(id__in=pqe_scope["line_ids"])
+        if pqe_scope["floor_ids"]:
+            filter_floors = filter_floors.filter(id__in=pqe_scope["floor_ids"])
+        if pqe_scope["shop_ids"]:
+            filter_shops = filter_shops.filter(id__in=pqe_scope["shop_ids"])
+        if pqe_scope["ipqc_user_ids"]:
+            filter_ipqc_users = filter_ipqc_users.filter(id__in=pqe_scope["ipqc_user_ids"])
+
     return render(
         request,
         "operator/submission_list.html",
         {
             "submissions": submissions,
+            "grouped_data": grouped_data,
             "selected_range": selected_range,
+            "selected_ipqc_id": selected_ipqc_id,
+            "selected_line_id": selected_line_id,
+            "selected_floor_id": selected_floor_id,
+            "selected_shop_id": selected_shop_id,
+            "selected_section_id": selected_shop_id,
+            "selected_view_mode": selected_view_mode,
+            "filter_lines": filter_lines,
+            "filter_floors": filter_floors,
+            "filter_shops": filter_shops,
+            "filter_sections": filter_shops,
+            "filter_ipqc_users": filter_ipqc_users,
             "start_date": start_date,
             "end_date": end_date,
         },
@@ -2113,6 +2307,12 @@ def pqe_review_and_approve(request, submission_id):
         return HttpResponseForbidden("Not allowed to approve this category")
 
     # --------------------------------------------------
+    # 🔐 PQE SCOPE VERIFICATION (ASSIGNED LINE/FLOOR/PLANT/IPQC)
+    # --------------------------------------------------
+    if not can_pqe_view_or_approve_submission(request.user, submission):
+        return HttpResponseForbidden("You are only authorized to review submissions for your assigned line, floor, plant, or IPQC.")
+
+    # --------------------------------------------------
     # ALREADY APPROVED?
     # --------------------------------------------------
     if submission.approvals.filter(category=approval_category).exists():
@@ -2342,6 +2542,11 @@ def approval_pending_dashboard(request):
             "template_version__template",
             "submitted_by",
             "line",
+            "line__floor",
+            "line__shop",
+            "floor",
+            "shop",
+            "work_context",
             "product",
         )
         .prefetch_related(
@@ -2349,6 +2554,7 @@ def approval_pending_dashboard(request):
             "template_version__template__approval_steps__category",
         )
     )
+    checklist_qs = filter_submissions_for_pqe_scope(user, checklist_qs, is_dynamic=False)
 
     for submission in checklist_qs:
         template = submission.template_version.template
@@ -2363,7 +2569,14 @@ def approval_pending_dashboard(request):
         if current is None:
             continue
 
-        can_approve = is_user_authorized_for_category(user, template, current, cached_user_perms=cached_user_perms)
+        can_approve = (
+            is_user_authorized_for_category(user, template, current, cached_user_perms=cached_user_perms)
+            and can_pqe_view_or_approve_submission(user, submission)
+        )
+
+        # 🔒 Only show submissions assigned to / actionable by this approver
+        if not user.is_superuser and not can_approve:
+            continue
 
         cards.append({
             "engine": "CHECKLIST",
@@ -2390,12 +2603,17 @@ def approval_pending_dashboard(request):
         .select_related(
             "template_version__template",
             "submitted_by",
+            "work_context",
+            "work_context__line",
+            "work_context__floor",
+            "work_context__shop",
         )
         .prefetch_related(
             "approvals__category",
             "template_version__template__approval_steps__category",
         )
     )
+    dynamic_qs = filter_submissions_for_pqe_scope(user, dynamic_qs, is_dynamic=True)
 
     for submission in dynamic_qs:
         template = submission.template_version.template
@@ -2412,7 +2630,14 @@ def approval_pending_dashboard(request):
         if current is None:
             continue
 
-        can_approve = is_user_authorized_for_category(user, template, current, cached_user_perms=cached_user_perms)
+        can_approve = (
+            is_user_authorized_for_category(user, template, current, cached_user_perms=cached_user_perms)
+            and can_pqe_view_or_approve_submission(user, submission)
+        )
+
+        # 🔒 Only show submissions assigned to / actionable by this approver
+        if not user.is_superuser and not can_approve:
+            continue
 
         cards.append({
             "engine": "DYNAMIC",
@@ -2553,7 +2778,7 @@ def approve_submission(request, submission_id):
     template = submission.template_version.template
 
     # --------------------------------------------------
-    # 🔐 ROLE AUTHORIZATION
+    # 🔐 ROLE AUTHORIZATION & PQE SCOPE
     # --------------------------------------------------
     if not is_user_authorized_for_category(request.user, template, category.code):
         return JsonResponse(
@@ -2561,6 +2786,16 @@ def approve_submission(request, submission_id):
                 "success": False,
                 "error_type": "ROLE_BLOCKED",
                 "message": f"You are not authorized to approve {category.code}",
+            },
+            status=403,
+        )
+
+    if not can_pqe_view_or_approve_submission(request.user, submission):
+        return JsonResponse(
+            {
+                "success": False,
+                "error_type": "SCOPE_BLOCKED",
+                "message": "You are only authorized to approve submissions for your assigned line, floor, plant, or IPQC.",
             },
             status=403,
         )

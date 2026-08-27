@@ -2,11 +2,15 @@ from django import forms
 from org.models import (
     Company,
     Plant,
+    Floor,
     Department,
     Shop,
     Line,
     Station,
     Product,
+    FloorTLAssignment,
+    ShopPQEAssignment,
+    IPQCMapping,
 )
 
 INPUT_STYLE = "w-full rounded-lg border-gray-300 bg-white border p-2.5 text-sm focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
@@ -74,14 +78,66 @@ class ShopForm(forms.ModelForm):
         }
 
 
+class FloorForm(forms.ModelForm):
+    class Meta:
+        model = Floor
+        fields = ["plant", "code", "name", "description", "is_active"]
+        widgets = {
+            "plant": forms.Select(attrs={"class": INPUT_STYLE}),
+            "code": forms.TextInput(attrs={"class": INPUT_STYLE, "placeholder": "e.g. FL1"}),
+            "name": forms.TextInput(attrs={"class": INPUT_STYLE, "placeholder": "e.g. 1st Floor"}),
+            "description": forms.Textarea(attrs={"class": INPUT_STYLE, "rows": 3, "placeholder": "Floor description..."}),
+            "is_active": forms.CheckboxInput(attrs={"class": CHECKBOX_STYLE}),
+        }
+
+
 class LineForm(forms.ModelForm):
     class Meta:
         model = Line
-        fields = ["shop", "code", "name", "is_active"]
+        fields = ["shop", "floor", "code", "name", "is_active"]
         widgets = {
             "shop": forms.Select(attrs={"class": INPUT_STYLE}),
+            "floor": forms.Select(attrs={"class": INPUT_STYLE}),
             "code": forms.TextInput(attrs={"class": INPUT_STYLE, "placeholder": "e.g. L1"}),
             "name": forms.TextInput(attrs={"class": INPUT_STYLE, "placeholder": "e.g. Main SMT Line 1"}),
+            "is_active": forms.CheckboxInput(attrs={"class": CHECKBOX_STYLE}),
+        }
+
+
+class FloorTLAssignmentForm(forms.ModelForm):
+    class Meta:
+        model = FloorTLAssignment
+        fields = ["floor", "user", "shift", "is_active"]
+        widgets = {
+            "floor": forms.Select(attrs={"class": INPUT_STYLE}),
+            "user": forms.Select(attrs={"class": INPUT_STYLE}),
+            "shift": forms.Select(attrs={"class": INPUT_STYLE}),
+            "is_active": forms.CheckboxInput(attrs={"class": CHECKBOX_STYLE}),
+        }
+
+
+class ShopPQEAssignmentForm(forms.ModelForm):
+    class Meta:
+        model = ShopPQEAssignment
+        fields = ["shop", "user", "is_active"]
+        widgets = {
+            "shop": forms.Select(attrs={"class": INPUT_STYLE}),
+            "user": forms.Select(attrs={"class": INPUT_STYLE}),
+            "is_active": forms.CheckboxInput(attrs={"class": CHECKBOX_STYLE}),
+        }
+
+
+class IPQCMappingForm(forms.ModelForm):
+    class Meta:
+        model = IPQCMapping
+        fields = ["user", "plant", "floor", "shop", "lines", "shift", "is_active"]
+        widgets = {
+            "user": forms.Select(attrs={"class": INPUT_STYLE}),
+            "plant": forms.Select(attrs={"class": INPUT_STYLE}),
+            "floor": forms.Select(attrs={"class": INPUT_STYLE}),
+            "shop": forms.Select(attrs={"class": INPUT_STYLE}),
+            "lines": forms.SelectMultiple(attrs={"class": INPUT_STYLE, "size": 6}),
+            "shift": forms.Select(attrs={"class": INPUT_STYLE}),
             "is_active": forms.CheckboxInput(attrs={"class": CHECKBOX_STYLE}),
         }
 

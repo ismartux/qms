@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from PIL import Image
 from django.db.models import Index
-from org.models import Plant, Shop, Line, Station, Product
+from org.models import Plant, Shop, Line, Station, Product, Floor
 from forms_engine.models import ChecklistVersion, ChecklistItem
 from core.workflow.states import WorkflowState
 from core.utils.image_utils import compress_uploaded_image
@@ -51,6 +51,7 @@ class WorkContext(models.Model):
 
     plant = models.ForeignKey(Plant, on_delete=models.PROTECT, db_index=True, null=True, blank=True,)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True, blank=True)
+    floor = models.ForeignKey(Floor, on_delete=models.PROTECT, null=True, blank=True, db_index=True)
     line = models.ForeignKey(Line, on_delete=models.PROTECT, db_index=True)
     product = models.ForeignKey(Product, on_delete=models.PROTECT, db_index=True)
 
@@ -124,6 +125,7 @@ class Submission(models.Model):
 
     plant = models.ForeignKey(Plant, on_delete=models.PROTECT, db_index=True, null=True, blank=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True, blank=True)
+    floor = models.ForeignKey(Floor, on_delete=models.PROTECT, null=True, blank=True, db_index=True)
     line = models.ForeignKey(Line, on_delete=models.PROTECT, db_index=True, null=True, blank=True)
     station = models.ForeignKey(Station, on_delete=models.PROTECT, null=True, blank=True)
     product = models.ForeignKey(Product, on_delete=models.PROTECT, db_index=True, null=True, blank=True)

@@ -2,11 +2,15 @@ from django.contrib import admin
 from org.models import (
     Company,
     Plant,
+    Floor,
     Shop,
     Line,
     Station,
     Product,
     Department,
+    FloorTLAssignment,
+    ShopPQEAssignment,
+    IPQCMapping,
 )
 
 
@@ -24,6 +28,13 @@ class PlantAdmin(admin.ModelAdmin):
     search_fields = ("code", "name")
 
 
+@admin.register(Floor)
+class FloorAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "plant", "is_active")
+    list_filter = ("plant", "is_active")
+    search_fields = ("code", "name")
+
+
 @admin.register(Shop)
 class ShopAdmin(admin.ModelAdmin):
     list_display = ("code", "name", "plant", "is_active")
@@ -33,8 +44,8 @@ class ShopAdmin(admin.ModelAdmin):
 
 @admin.register(Line)
 class LineAdmin(admin.ModelAdmin):
-    list_display = ("code", "name", "shop", "is_active")
-    list_filter = ("shop", "is_active")
+    list_display = ("code", "name", "shop", "floor", "is_active")
+    list_filter = ("shop", "floor", "is_active")
     search_fields = ("code", "name")
 
 
@@ -57,3 +68,25 @@ class DepartmentAdmin(admin.ModelAdmin):
     list_display = ("name", "code", "plant", "is_active")
     list_filter = ("plant", "is_active")
     search_fields = ("name", "code")
+
+
+@admin.register(FloorTLAssignment)
+class FloorTLAssignmentAdmin(admin.ModelAdmin):
+    list_display = ("user", "floor", "shift", "is_active", "assigned_by", "created_at")
+    list_filter = ("floor__plant", "floor", "shift", "is_active")
+    search_fields = ("user__username", "user__first_name", "user__last_name", "floor__name")
+
+
+@admin.register(ShopPQEAssignment)
+class ShopPQEAssignmentAdmin(admin.ModelAdmin):
+    list_display = ("user", "shop", "is_active", "assigned_by", "created_at")
+    list_filter = ("shop__plant", "shop", "is_active")
+    search_fields = ("user__username", "user__first_name", "user__last_name", "shop__name")
+
+
+@admin.register(IPQCMapping)
+class IPQCMappingAdmin(admin.ModelAdmin):
+    list_display = ("user", "plant", "floor", "shop", "shift", "is_active", "created_at")
+    list_filter = ("plant", "floor", "shop", "shift", "is_active")
+    search_fields = ("user__username", "user__first_name", "user__last_name")
+    filter_horizontal = ("lines",)

@@ -8,6 +8,7 @@ class Roles:
     IPQC = "IPQC"
     IPQC_PACK = "IPQC_PACK"
     PQE = "PQE"
+    TL = "TL"
     ADMIN = "ADMIN"
     SUPERUSER = "SUPERUSER"
     EHS_AUDITOR = "EHS_AUDITOR"
@@ -18,6 +19,7 @@ class Roles:
         IPQC,
         IPQC_PACK,
         PQE,
+        TL,
         ADMIN,
         SUPERUSER,
         EHS_AUDITOR,

@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.db.models import Count
 from ui.admin_panel.views.base import admin_required
 
-from org.models import Plant
+from org.models import Plant, Floor, Shop, Line, FloorTLAssignment, ShopPQEAssignment, IPQCMapping
 from submissions.models import Submission
 from capa.models import CAPA
 from core.audit.models import AuditLog
@@ -22,13 +22,18 @@ def admin_dashboard(request):
         submission_qs = Submission.objects.all()
         capa_qs = CAPA.objects.all()
     else:
-        # Plant-aware manager already filters,
-        # but we explicitly scope for clarity
         submission_qs = Submission.objects.all()
         capa_qs = CAPA.objects.all()
 
     total_users = User.objects.count()
     total_plants = Plant.objects.count()
+    total_floors = Floor.objects.count()
+    total_shops = Shop.objects.count()
+    total_lines = Line.objects.count()
+    total_floor_tls = FloorTLAssignment.objects.filter(is_active=True).count()
+    total_shop_pqes = ShopPQEAssignment.objects.filter(is_active=True).count()
+    total_ipqc_mappings = IPQCMapping.objects.filter(is_active=True).count()
+
     total_submissions = submission_qs.count()
     total_capas = capa_qs.count()
 
@@ -64,6 +69,12 @@ def admin_dashboard(request):
     return render(request, "admin/dashboard.html", {
         "total_users": total_users,
         "total_plants": total_plants,
+        "total_floors": total_floors,
+        "total_shops": total_shops,
+        "total_lines": total_lines,
+        "total_floor_tls": total_floor_tls,
+        "total_shop_pqes": total_shop_pqes,
+        "total_ipqc_mappings": total_ipqc_mappings,
         "total_submissions": total_submissions,
         "total_capas": total_capas,
         "plant_labels": [x["plant__name"] for x in submissions_by_plant],

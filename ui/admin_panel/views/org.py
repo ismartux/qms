@@ -2,15 +2,31 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 
 from ui.admin_panel.views.base import admin_required
-from org.models import Company, Plant, Department, Shop, Line, Station, Product
+from org.models import (
+    Company,
+    Plant,
+    Floor,
+    Department,
+    Shop,
+    Line,
+    Station,
+    Product,
+    FloorTLAssignment,
+    ShopPQEAssignment,
+    IPQCMapping,
+)
 from ui.admin_panel.forms import (
     CompanyForm,
     PlantForm,
+    FloorForm,
     DepartmentForm,
     ShopForm,
     LineForm,
     StationForm,
     ProductForm,
+    FloorTLAssignmentForm,
+    ShopPQEAssignmentForm,
+    IPQCMappingForm,
 )
 
 
@@ -404,3 +420,235 @@ def product_edit(request, pk):
         "entity_type": "product",
         "back_url_name": "admin_panel:product_list",
     })
+
+
+# =========================================================
+# FLOOR (CRU)
+# =========================================================
+@admin_required
+def floor_list(request):
+    search_query = request.GET.get("q", "").strip()
+    floors = Floor.objects.select_related("plant").all()
+
+    if search_query:
+        floors = floors.filter(name__icontains=search_query) | floors.filter(code__icontains=search_query)
+
+    return render(request, "admin/org/org_list.html", {
+        "items": floors,
+        "entity_type": "floor",
+        "title": "Floors",
+        "search_query": search_query,
+        "active_tab": "floors",
+    })
+
+
+@admin_required
+def floor_create(request):
+    form = FloorForm(request.POST or None)
+
+    if request.method == "POST" and form.is_valid():
+        floor = form.save()
+        messages.success(request, f"Floor '{floor.name}' created successfully.")
+        return redirect("admin_panel:floor_list")
+
+    return render(request, "admin/org/org_form.html", {
+        "form": form,
+        "title": "Create Floor",
+        "entity_type": "floor",
+        "back_url_name": "admin_panel:floor_list",
+    })
+
+
+@admin_required
+def floor_edit(request, pk):
+    floor = get_object_or_404(Floor, pk=pk)
+    form = FloorForm(request.POST or None, instance=floor)
+
+    if request.method == "POST" and form.is_valid():
+        floor = form.save()
+        messages.success(request, f"Floor '{floor.name}' updated successfully.")
+        return redirect("admin_panel:floor_list")
+
+    return render(request, "admin/org/org_form.html", {
+        "form": form,
+        "instance": floor,
+        "title": f"Edit Floor: {floor.name}",
+        "entity_type": "floor",
+        "back_url_name": "admin_panel:floor_list",
+    })
+# =========================================================
+# FLOOR-WISE TL ASSIGNMENT (CRU)
+# =========================================================
+@admin_required
+def floor_tl_list(request):
+    search_query = request.GET.get("q", "").strip()
+    assignments = FloorTLAssignment.objects.select_related("floor", "floor__plant", "user", "assigned_by").all()
+
+    if search_query:
+        assignments = assignments.filter(user__username__icontains=search_query) | assignments.filter(floor__name__icontains=search_query)
+
+    return render(request, "admin/org/org_list.html", {
+        "items": assignments,
+        "entity_type": "floor_tl",
+        "title": "Floor-wise TL Assignments",
+        "search_query": search_query,
+        "active_tab": "floor_tls",
+    })
+
+
+@admin_required
+def floor_tl_create(request):
+    form = FloorTLAssignmentForm(request.POST or None)
+
+    if request.method == "POST" and form.is_valid():
+        assignment = form.save(commit=False)
+        assignment.assigned_by = request.user
+        assignment.save()
+        messages.success(request, f"TL '{assignment.user.username}' assigned to floor '{assignment.floor.name}'.")
+        return redirect("admin_panel:floor_tl_list")
+
+    return render(request, "admin/org/org_form.html", {
+        "form": form,
+        "title": "Assign TL to Floor",
+        "entity_type": "floor_tl",
+        "back_url_name": "admin_panel:floor_tl_list",
+    })
+
+
+@admin_required
+def floor_tl_edit(request, pk):
+    assignment = get_object_or_404(FloorTLAssignment, pk=pk)
+    form = FloorTLAssignmentForm(request.POST or None, instance=assignment)
+
+    if request.method == "POST" and form.is_valid():
+        assignment = form.save()
+        messages.success(request, f"Floor TL assignment for '{assignment.user.username}' updated.")
+        return redirect("admin_panel:floor_tl_list")
+
+    return render(request, "admin/org/org_form.html", {
+        "form": form,
+        "instance": assignment,
+        "title": f"Edit TL Assignment: {assignment.user.username} @ {assignment.floor.name}",
+        "entity_type": "floor_tl",
+        "back_url_name": "admin_panel:floor_tl_list",
+    })
+
+
+# =========================================================
+# SHOP-WISE PQE ASSIGNMENT (CRU)
+# =========================================================
+@admin_required
+def shop_pqe_list(request):
+    search_query = request.GET.get("q", "").strip()
+    assignments = ShopPQEAssignment.objects.select_related("shop", "shop__plant", "user", "assigned_by").all()
+
+    if search_query:
+        assignments = assignments.filter(user__username__icontains=search_query) | assignments.filter(shop__name__icontains=search_query)
+
+    return render(request, "admin/org/org_list.html", {
+        "items": assignments,
+        "entity_type": "shop_pqe",
+        "title": "Shop-wise PQE Assignments",
+        "search_query": search_query,
+        "active_tab": "shop_pqes",
+    })
+
+
+@admin_required
+def shop_pqe_create(request):
+    form = ShopPQEAssignmentForm(request.POST or None)
+
+    if request.method == "POST" and form.is_valid():
+        assignment = form.save(commit=False)
+        assignment.assigned_by = request.user
+        assignment.save()
+        messages.success(request, f"PQE '{assignment.user.username}' assigned to shop '{assignment.shop.name}'.")
+        return redirect("admin_panel:shop_pqe_list")
+
+    return render(request, "admin/org/org_form.html", {
+        "form": form,
+        "title": "Assign PQE to Shop",
+        "entity_type": "shop_pqe",
+        "back_url_name": "admin_panel:shop_pqe_list",
+    })
+
+
+@admin_required
+def shop_pqe_edit(request, pk):
+    assignment = get_object_or_404(ShopPQEAssignment, pk=pk)
+    form = ShopPQEAssignmentForm(request.POST or None, instance=assignment)
+
+    if request.method == "POST" and form.is_valid():
+        assignment = form.save()
+        messages.success(request, f"Shop PQE assignment for '{assignment.user.username}' updated.")
+        return redirect("admin_panel:shop_pqe_list")
+
+    return render(request, "admin/org/org_form.html", {
+        "form": form,
+        "instance": assignment,
+        "title": f"Edit PQE Assignment: {assignment.user.username} @ {assignment.shop.name}",
+        "entity_type": "shop_pqe",
+        "back_url_name": "admin_panel:shop_pqe_list",
+    })
+
+
+# =========================================================
+# IPQC MAPPING (CRU)
+# =========================================================
+@admin_required
+def ipqc_mapping_list(request):
+    search_query = request.GET.get("q", "").strip()
+    mappings = IPQCMapping.objects.select_related(
+        "user", "plant", "floor", "shop", "assigned_by"
+    ).prefetch_related("lines").all()
+
+    if search_query:
+        mappings = mappings.filter(user__username__icontains=search_query) | mappings.filter(floor__name__icontains=search_query) | mappings.filter(shop__name__icontains=search_query)
+
+    return render(request, "admin/org/org_list.html", {
+        "items": mappings,
+        "entity_type": "ipqc_mapping",
+        "title": "IPQC Mappings (TL & PQE Linked)",
+        "search_query": search_query,
+        "active_tab": "ipqc_mappings",
+    })
+
+
+@admin_required
+def ipqc_mapping_create(request):
+    form = IPQCMappingForm(request.POST or None)
+
+    if request.method == "POST" and form.is_valid():
+        mapping = form.save(commit=False)
+        mapping.assigned_by = request.user
+        mapping.save()
+        form.save_m2m()
+        messages.success(request, f"IPQC mapping for '{mapping.user.username}' created.")
+        return redirect("admin_panel:ipqc_mapping_list")
+
+    return render(request, "admin/org/org_form.html", {
+        "form": form,
+        "title": "Create IPQC Mapping",
+        "entity_type": "ipqc_mapping",
+        "back_url_name": "admin_panel:ipqc_mapping_list",
+    })
+
+
+@admin_required
+def ipqc_mapping_edit(request, pk):
+    mapping = get_object_or_404(IPQCMapping, pk=pk)
+    form = IPQCMappingForm(request.POST or None, instance=mapping)
+
+    if request.method == "POST" and form.is_valid():
+        mapping = form.save()
+        messages.success(request, f"IPQC mapping for '{mapping.user.username}' updated.")
+        return redirect("admin_panel:ipqc_mapping_list")
+
+    return render(request, "admin/org/org_form.html", {
+        "form": form,
+        "instance": mapping,
+        "title": f"Edit IPQC Mapping: {mapping.user.username}",
+        "entity_type": "ipqc_mapping",
+        "back_url_name": "admin_panel:ipqc_mapping_list",
+    })
+

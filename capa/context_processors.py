@@ -37,9 +37,18 @@ def global_nav_notifications(request):
     can_manage_capa = has_permission(user, "can_manage_capa")
 
     if can_manage_capa:
-        approval_count = base_capa_qs.filter(
+        from submissions.assignment_resolver import filter_capas_for_pqe_scope
+        scoped_capas = filter_capas_for_pqe_scope(user, base_capa_qs)
+        approval_count = scoped_capas.filter(
             status="ACTION_DONE"
         ).count()
+        open_capa_count = scoped_capas.filter(
+            status="OPEN",
+            rca_role__isnull=True,
+            capa_role__isnull=True
+        ).count()
+    else:
+        open_capa_count = 0
 
     # =========================================================
     # 🟡 RCA Pending
@@ -62,17 +71,6 @@ def global_nav_notifications(request):
         Q(capa_plan__isnull=False) & ~Q(capa_plan__exact="")
     ).count()
 
-    # =========================================================
-    # 🔵 Open CAPA (Management Only)
-    # =========================================================
-
-    open_capa_count = 0
-    if can_manage_capa:
-        open_capa_count = base_capa_qs.filter(
-            status="OPEN",
-            rca_role__isnull=True,
-            capa_role__isnull=True
-        ).count()
 
     # =========================================================
     # 🔥 IPQC FORM APPROVAL PENDING (PQE / ADMIN ONLY)
@@ -81,14 +79,17 @@ def global_nav_notifications(request):
     ipqc_pending_approval_count = 0
 
     if has_permission(user, "can_approve_ipqc"):
+        from submissions.assignment_resolver import filter_submissions_for_pqe_scope
 
         ipqc_qs = Submission.objects.filter(
             workflow_state=WorkflowState.SUBMITTED,
-            plant_id__in=plant_ids,
         ).exclude(
             approvals__isnull=False
         )
+        if plant_ids:
+            ipqc_qs = ipqc_qs.filter(plant_id__in=plant_ids)
 
+        ipqc_qs = filter_submissions_for_pqe_scope(user, ipqc_qs, is_dynamic=False)
         ipqc_pending_approval_count = ipqc_qs.count()
 
     # =========================================================
