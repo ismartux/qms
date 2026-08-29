@@ -1,0 +1,428 @@
+{% extends "shell/app.html" %}
+{% load static %}
+
+{% block extra_css %}
+<style>
+/* =============================================
+   QR SCANNER — inputs always visible + result below
+============================================= */
+
+.main-content .max-w-\[1300px\] {
+  padding: 0 !important;
+  max-width: 100% !important;
+}
+
+.scanner-page {
+  height: calc(100vh - 64px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  overflow: hidden;
+}
+
+.scanner-card {
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 6px 32px rgba(0,0,0,0.11);
+  padding: 1.5rem 2rem 1.25rem;
+  width: 100%;
+  max-width: 500px;
+  position: relative;
+}
+
+.scanner-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  border-radius: 18px 18px 0 0;
+  background: linear-gradient(90deg, #6366f1, #0ea5e9, #10b981);
+}
+
+.scanner-icon  { font-size: 1.8rem; text-align: center; display: block; margin-bottom: 0.1rem; }
+.scanner-title {
+  text-align: center;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 0 0 0.1rem;
+  letter-spacing: -0.02em;
+}
+.scanner-subtitle {
+  text-align: center;
+  color: #64748b;
+  font-size: 0.77rem;
+  margin: 0 0 0.85rem;
+}
+
+/* Step indicator */
+.step-indicator {
+  display: flex; align-items: center; justify-content: center;
+  gap: 0.4rem; margin-bottom: 0.85rem;
+}
+.step-dot  { width: 9px; height: 9px; border-radius: 50%; background: #e2e8f0; transition: all 0.3s; }
+.step-line { flex:1; height:2px; background:#e2e8f0; max-width:80px; transition:background 0.4s; }
+.step-dot.active { background:#6366f1; transform:scale(1.4); }
+.step-dot.done   { background:#10b981; }
+.step-line.done  { background:#10b981; }
+
+/* Scan fields */
+.scan-field-group { margin-bottom: 0.7rem; }
+.scan-field-label {
+  display: flex; align-items: center; gap: 0.4rem;
+  font-size: 0.71rem; font-weight: 700; color: #475569;
+  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.28rem;
+}
+.scan-field-label .dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #cbd5e1; transition: background 0.3s; flex-shrink: 0;
+}
+.scan-field-label .dot.active {
+  background: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.2);
+  animation: pulse-dot 1.5s infinite;
+}
+.scan-field-label .dot.done { background: #10b981; }
+
+@keyframes pulse-dot {
+  0%,100% { box-shadow:0 0 0 3px rgba(99,102,241,0.18); }
+  50%      { box-shadow:0 0 0 7px rgba(99,102,241,0.07); }
+}
+
+.scan-input {
+  width: 100%;
+  padding: 0.62rem 0.875rem;
+  font-size: 0.93rem;
+  font-family: 'Courier New', monospace;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #1e293b;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  outline: none;
+  box-sizing: border-box;
+}
+.scan-input:focus     { border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,0.12); background:#fff; }
+.scan-input:read-only { background:#f1f5f9; color:#94a3b8; cursor:not-allowed; }
+.scan-input.filled    { border-color:#10b981; background:#f0fdf4; color:#065f46; }
+
+/* =============================================
+   RESULT BANNER (always below inputs, never hides them)
+============================================= */
+.result-banner {
+  display: none;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1.25rem;
+  border-radius: 12px;
+  margin-top: 0.75rem;
+  animation: banner-slide 0.35s cubic-bezier(0.34,1.56,0.64,1);
+}
+.result-banner.visible { display: flex; }
+
+@keyframes banner-slide {
+  0%   { transform:translateY(8px) scale(0.96); opacity:0; }
+  100% { transform:translateY(0) scale(1);      opacity:1; }
+}
+
+.result-banner.pass { background:linear-gradient(135deg,#dcfce7,#bbf7d0); border:2px solid #86efac; }
+.result-banner.fail { background:linear-gradient(135deg,#fee2e2,#fecaca); border:2px solid #fca5a5; }
+
+.result-emoji {
+  font-size: 2.5rem;
+  line-height: 1;
+  animation: pop 0.4s 0.1s cubic-bezier(0.34,1.56,0.64,1) both;
+  flex-shrink: 0;
+}
+@keyframes pop { 0%{transform:scale(0.3)} 100%{transform:scale(1)} }
+
+.result-text-block { flex: 1; }
+.result-word {
+  font-size: 2.6rem;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.result-banner.pass .result-word { color: #15803d; }
+.result-banner.fail .result-word { color: #dc2626; }
+
+.result-desc {
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0.7;
+  margin-top: 0.1rem;
+}
+.result-banner.pass .result-desc { color: #166534; }
+.result-banner.fail .result-desc { color: #991b1b; }
+
+
+
+/* History strip */
+.scan-history {
+  margin-top: 0.65rem;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 0.55rem;
+  max-height: 80px;
+  overflow-y: auto;
+}
+.history-title { font-size:0.66rem; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:0.35rem; }
+.history-item  { display:flex; align-items:center; gap:0.55rem; padding:0.28rem 0.5rem; border-radius:6px; margin-bottom:0.18rem; background:#f8fafc; font-size:0.75rem; }
+.history-badge { padding:0.08rem 0.38rem; border-radius:4px; font-size:0.65rem; font-weight:700; flex-shrink:0; }
+.badge-pass    { background:#dcfce7; color:#15803d; }
+.badge-fail    { background:#fee2e2; color:#dc2626; }
+.history-codes { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#64748b; font-family:monospace; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="scanner-page">
+  <div class="scanner-card">
+
+    <span class="scanner-icon">📷</span>
+    <h1 class="scanner-title">QR Scanner</h1>
+    <p class="scanner-subtitle">Scan Old Material QR first, then New Material QR</p>
+
+    <!-- Step Indicator -->
+    <div class="step-indicator">
+      <div class="step-dot active" id="step1Dot"></div>
+      <div class="step-line"       id="stepLine"></div>
+      <div class="step-dot"        id="step2Dot"></div>
+    </div>
+
+    <!-- OLD MATERIAL — always visible -->
+    <div class="scan-field-group">
+      <label class="scan-field-label" for="qr1Input">
+        <span class="dot active" id="dot1"></span>
+        Old Material QR
+      </label>
+      <input type="text" id="qr1Input" class="scan-input"
+             placeholder="Scan Old Material QR here…"
+             autocomplete="off" autofocus />
+    </div>
+
+    <!-- NEW MATERIAL — always visible -->
+    <div class="scan-field-group">
+      <label class="scan-field-label" for="qr2Input">
+        <span class="dot" id="dot2"></span>
+        New Material QR
+      </label>
+      <input type="text" id="qr2Input" class="scan-input"
+             placeholder="Scan New Material QR here…"
+             autocomplete="off" readonly />
+    </div>
+
+    <!-- RESULT BANNER — appears below inputs, never hides them -->
+    <div class="result-banner" id="resultBanner">
+      <div class="result-emoji" id="resultEmoji"></div>
+      <div class="result-text-block">
+        <div class="result-word" id="resultWord"></div>
+        <div class="result-desc" id="resultDesc"></div>
+      </div>
+
+    </div>
+
+    <!-- History strip -->
+    <div class="scan-history" id="scanHistory" style="display:none;">
+      <div class="history-title"><i class="fas fa-clock-rotate-left mr-1"></i> Recent Scans</div>
+      <div id="historyList"></div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const SAVE_URL      = "{% url 'qr_scanner:qr_scan_save' %}";
+  const CSRF_TOKEN    = "{{ csrf_token }}";
+  const SHOW_MS       = 2000;   // show result for 2 seconds then reset
+
+  const qr1Input       = document.getElementById("qr1Input");
+  const qr2Input       = document.getElementById("qr2Input");
+  const resultBanner   = document.getElementById("resultBanner");
+  const resultEmoji    = document.getElementById("resultEmoji");
+  const resultWord     = document.getElementById("resultWord");
+  const resultDesc     = document.getElementById("resultDesc");
+
+  const dot1           = document.getElementById("dot1");
+  const dot2           = document.getElementById("dot2");
+  const step1Dot       = document.getElementById("step1Dot");
+  const step2Dot       = document.getElementById("step2Dot");
+  const stepLine       = document.getElementById("stepLine");
+  const historySection = document.getElementById("scanHistory");
+  const historyList    = document.getElementById("historyList");
+
+  let recentScans   = [];
+  let resetTimer    = null;
+  let barAnim       = null;
+
+  /* =========================================
+     VOICE — Google Translate Indian Female (en-IN)
+     Proxied via Django to avoid CORS.
+     Web Audio GainNode amplifies volume 3x.
+     Falls back to Web Speech API if proxy unavailable.
+  ========================================= */
+  const TTS_URL    = "/scanner/tts/";
+  const audioCtx   = new (window.AudioContext || window.webkitAudioContext)();
+  const GAIN_LEVEL = 3.0;
+  const audioCache = {};
+
+  async function fetchAudioBuffer(text) {
+    if (audioCache[text]) return audioCache[text];
+    const resp = await fetch(TTS_URL + "?text=" + encodeURIComponent(text));
+    if (!resp.ok) throw new Error("TTS HTTP " + resp.status);
+    const arrayBuf = await resp.arrayBuffer();
+    const decoded  = await audioCtx.decodeAudioData(arrayBuf);
+    audioCache[text] = decoded;
+    return decoded;
+  }
+
+  async function speak(isPass) {
+    if (audioCtx.state === "suspended") await audioCtx.resume();
+    const word = isPass ? "Pass" : "Fail";
+    try {
+      const buffer   = await fetchAudioBuffer(word);
+      const source   = audioCtx.createBufferSource();
+      const gainNode = audioCtx.createGain();
+      gainNode.gain.value = GAIN_LEVEL;
+      source.buffer = buffer;
+      source.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      source.start(0);
+    } catch (err) {
+      console.warn("TTS proxy failed, fallback:", err);
+      speakFallback(isPass);
+    }
+  }
+
+  function speakFallback(isPass) {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utter  = new SpeechSynthesisUtterance(isPass ? "Pass" : "Fail");
+    utter.lang   = "en-IN";
+    utter.volume = 1;
+    utter.rate   = 0.88;
+    utter.pitch  = isPass ? 1.1 : 0.9;
+    window.speechSynthesis.speak(utter);
+  }
+
+  /* =========================================
+     FIELD 1 -> advance to field 2
+  ========================================= */
+  qr1Input.addEventListener("keydown", e => {
+    if ((e.key === "Enter" || e.key === "Tab") && qr1Input.value.trim()) {
+      e.preventDefault();
+      advanceToField2();
+    }
+  });
+  qr1Input.addEventListener("input", () => {
+    if (/[\r\n]/.test(qr1Input.value)) {
+      qr1Input.value = qr1Input.value.replace(/[\r\n]/g, "").trim();
+      if (qr1Input.value) advanceToField2();
+    }
+  });
+
+  function advanceToField2() {
+    qr1Input.classList.add("filled");
+    qr1Input.readOnly = true;
+    dot1.className     = "dot done";
+    dot2.className     = "dot active";
+    step1Dot.className = "step-dot done";
+    step2Dot.className = "step-dot active";
+    stepLine.classList.add("done");
+    qr2Input.readOnly  = false;
+    qr2Input.focus();
+  }
+
+  /* =========================================
+     FIELD 2 -> submit
+  ========================================= */
+  qr2Input.addEventListener("keydown", e => {
+    if ((e.key === "Enter" || e.key === "Tab") && qr2Input.value.trim() && qr1Input.value.trim()) {
+      e.preventDefault();
+      submitScan();
+    }
+  });
+  qr2Input.addEventListener("input", () => {
+    if (/[\r\n]/.test(qr2Input.value)) {
+      qr2Input.value = qr2Input.value.replace(/[\r\n]/g, "").trim();
+      if (qr2Input.value && qr1Input.value.trim()) submitScan();
+    }
+  });
+
+  async function submitScan() {
+    const qr1 = qr1Input.value.trim();
+    const qr2 = qr2Input.value.trim();
+    if (!qr1 || !qr2) return;
+    const isMatch = (qr1 === qr2);
+    showBanner(isMatch);
+    speak(isMatch);
+    fetch(SAVE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": CSRF_TOKEN },
+      body: JSON.stringify({ qr_code_1: qr1, qr_code_2: qr2 }),
+    }).catch(err => console.error(err));
+    addToHistory(isMatch, qr1, qr2);
+    scheduleReset();
+  }
+
+  function showBanner(isMatch) {
+    resultBanner.className  = "result-banner visible " + (isMatch ? "pass" : "fail");
+    resultEmoji.textContent = isMatch ? "\u2705" : "\u274C";
+    resultWord.textContent  = isMatch ? "PASS" : "FAIL";
+    resultDesc.textContent  = isMatch
+      ? "Old & New Material QR match!"
+      : "QR codes do NOT match - recheck!";
+  }
+
+  function scheduleReset() {
+    clearTimeout(resetTimer);
+    resetTimer = setTimeout(resetScanner, SHOW_MS);
+  }
+
+  function resetScanner() {
+    qr1Input.value    = "";
+    qr2Input.value    = "";
+    qr1Input.readOnly = false;
+    qr2Input.readOnly = true;
+    qr1Input.classList.remove("filled");
+    qr2Input.classList.remove("filled");
+    dot1.className     = "dot active";
+    dot2.className     = "dot";
+    step1Dot.className = "step-dot active";
+    step2Dot.className = "step-dot";
+    stepLine.classList.remove("done");
+    resultBanner.className = "result-banner";
+    qr1Input.focus();
+  }
+
+  function addToHistory(isMatch, qr1, qr2) {
+    recentScans.unshift({ isMatch, qr1, qr2 });
+    if (recentScans.length > 4) recentScans.pop();
+    historySection.style.display = "block";
+    historyList.innerHTML = recentScans.map(s =>
+      '<div class="history-item">' +
+        '<span class="history-badge ' + (s.isMatch ? "badge-pass" : "badge-fail") + '">' +
+          (s.isMatch ? "PASS" : "FAIL") +
+        "</span>" +
+        '<span class="history-codes" title="' + s.qr1 + " | " + s.qr2 + '">' +
+          trunc(s.qr1, 22) + " > " + trunc(s.qr2, 22) +
+        "</span>" +
+      "</div>"
+    ).join("");
+  }
+
+  function trunc(s, n) { return s.length > n ? s.slice(0, n) + "..." : s; }
+
+  window.addEventListener("DOMContentLoaded", () => {
+    qr1Input.focus();
+    // Warm up audio cache after 1.5s (after first user interaction resolves autoplay policy)
+    setTimeout(() => {
+      fetchAudioBuffer("Pass").catch(() => {});
+      fetchAudioBuffer("Fail").catch(() => {});
+    }, 1500);
+  });
+
+</script>
+{% endblock %}

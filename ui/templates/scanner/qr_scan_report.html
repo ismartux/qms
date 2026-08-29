@@ -1,0 +1,587 @@
+{% extends "shell/app.html" %}
+{% load static %}
+
+{% block extra_css %}
+<style>
+  /* =============================================
+     QR SCANNER REPORT STYLES
+  ============================================= */
+
+  .report-header {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-radius: 20px;
+    padding: 2rem 2.5rem;
+    color: white;
+    margin-bottom: 1.75rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .report-header::after {
+    content: '📊';
+    position: absolute;
+    right: 2rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 5rem;
+    opacity: 0.12;
+  }
+
+  .report-header h1 {
+    font-size: 1.75rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.25rem 0;
+  }
+
+  .report-header p {
+    color: #94a3b8;
+    font-size: 0.875rem;
+    margin: 0;
+  }
+
+  /* KPI Cards */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.75rem;
+  }
+
+  .kpi-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    border: 1px solid #f1f5f9;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  }
+
+  .kpi-icon {
+    width: 42px; height: 42px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+  }
+
+  .kpi-value {
+    font-size: 2.25rem;
+    font-weight: 900;
+    color: #1e293b;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+
+  .kpi-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .kpi-blue .kpi-icon  { background: #eff6ff; color: #3b82f6; }
+  .kpi-green .kpi-icon { background: #f0fdf4; color: #22c55e; }
+  .kpi-red .kpi-icon   { background: #fef2f2; color: #ef4444; }
+  .kpi-purple .kpi-icon{ background: #faf5ff; color: #a855f7; }
+
+  .kpi-green .kpi-value { color: #15803d; }
+  .kpi-red .kpi-value   { color: #dc2626; }
+  .kpi-purple .kpi-value{ color: #7c3aed; }
+
+  /* Filter Bar */
+  .filter-bar {
+    background: #fff;
+    border-radius: 16px;
+    padding: 1.25rem 1.5rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    border: 1px solid #f1f5f9;
+    margin-bottom: 1.5rem;
+  }
+
+  .filter-bar form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: flex-end;
+  }
+
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .filter-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .filter-input, .filter-select {
+    padding: 0.6rem 0.875rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 0.875rem;
+    color: #1e293b;
+    background: #f8fafc;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+  }
+
+  .filter-input:focus, .filter-select:focus {
+    border-color: #6366f1;
+    background: #fff;
+  }
+
+  .btn-filter {
+    padding: 0.6rem 1.25rem;
+    background: linear-gradient(135deg, #6366f1, #818cf8);
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 700;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+
+  .btn-filter:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(99,102,241,0.4);
+  }
+
+  .btn-export {
+    padding: 0.6rem 1.25rem;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 700;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+
+  .btn-export:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16,185,129,0.4);
+    color: white;
+  }
+
+  .btn-reset {
+    padding: 0.6rem 1rem;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.15s;
+  }
+
+  .btn-reset:hover {
+    background: #e2e8f0;
+  }
+
+  /* Table */
+  .report-table-wrapper {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    border: 1px solid #f1f5f9;
+    overflow: hidden;
+  }
+
+  .report-table-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .report-table-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1e293b;
+  }
+
+  .report-table-count {
+    font-size: 0.8rem;
+    color: #64748b;
+    background: #f1f5f9;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+  }
+
+  .report-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .report-table th {
+    background: #f8fafc;
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .report-table td {
+    padding: 0.875rem 1rem;
+    font-size: 0.875rem;
+    color: #374151;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+  }
+
+  .report-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .report-table tr:hover td {
+    background: #f8fafc;
+  }
+
+  .badge-pass {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    background: #dcfce7;
+    color: #15803d;
+    letter-spacing: 0.02em;
+  }
+
+  .badge-fail {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    background: #fee2e2;
+    color: #dc2626;
+    letter-spacing: 0.02em;
+  }
+
+  .qr-code-cell {
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    color: #475569;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Pagination */
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1.25rem;
+    border-top: 1px solid #f1f5f9;
+  }
+
+  .page-btn {
+    padding: 0.45rem 0.875rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+    color: #475569;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    transition: background 0.15s;
+  }
+
+  .page-btn:hover  { background: #e2e8f0; }
+  .page-btn.active { background: #6366f1; color: white; border-color: #6366f1; }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #94a3b8;
+  }
+
+  .empty-state-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+  }
+
+  .empty-state-text {
+    font-size: 1rem;
+    font-weight: 600;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="report-header">
+  <h1><i class="fas fa-qrcode mr-2"></i> QR Scanner Report</h1>
+  <p>Dashboard &amp; history of all QR scan verifications</p>
+</div>
+
+<!-- KPI Cards -->
+<div class="kpi-grid">
+  <div class="kpi-card kpi-blue">
+    <div class="kpi-icon"><i class="fas fa-qrcode"></i></div>
+    <div class="kpi-value">{{ total_scans }}</div>
+    <div class="kpi-label">Total Scans</div>
+  </div>
+
+  <div class="kpi-card kpi-green">
+    <div class="kpi-icon"><i class="fas fa-check-circle"></i></div>
+    <div class="kpi-value">{{ total_pass }}</div>
+    <div class="kpi-label">Passed</div>
+  </div>
+
+  <div class="kpi-card kpi-red">
+    <div class="kpi-icon"><i class="fas fa-times-circle"></i></div>
+    <div class="kpi-value">{{ total_fail }}</div>
+    <div class="kpi-label">Failed</div>
+  </div>
+
+  <div class="kpi-card kpi-purple">
+    <div class="kpi-icon"><i class="fas fa-percent"></i></div>
+    <div class="kpi-value">{{ pass_rate }}%</div>
+    <div class="kpi-label">Pass Rate</div>
+  </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+  <form method="GET" action="" id="filterForm">
+    <div class="filter-group">
+      <label class="filter-label" for="id_date_from">Date From</label>
+      <input
+        type="date"
+        name="date_from"
+        id="id_date_from"
+        class="filter-input"
+        value="{{ date_from }}"
+      />
+    </div>
+
+    <div class="filter-group">
+      <label class="filter-label" for="id_date_to">Date To</label>
+      <input
+        type="date"
+        name="date_to"
+        id="id_date_to"
+        class="filter-input"
+        value="{{ date_to }}"
+      />
+    </div>
+
+    <div class="filter-group" style="max-width: 150px;">
+      <label class="filter-label" for="id_result">Result</label>
+      <select name="result" id="id_result" class="filter-select">
+        <option value="" {% if not result_filter %}selected{% endif %}>All</option>
+        <option value="PASS" {% if result_filter == "PASS" %}selected{% endif %}>✅ Pass Only</option>
+        <option value="FAIL" {% if result_filter == "FAIL" %}selected{% endif %}>❌ Fail Only</option>
+      </select>
+    </div>
+
+    <div class="filter-group" style="flex: 2;">
+      <label class="filter-label" for="id_search">Search QR Code</label>
+      <input
+        type="text"
+        name="search"
+        id="id_search"
+        class="filter-input"
+        placeholder="Search by QR code value…"
+        value="{{ search }}"
+      />
+    </div>
+
+    <button type="submit" class="btn-filter">
+      <i class="fas fa-search mr-1"></i> Filter
+    </button>
+
+    <a href="{% url 'qr_scanner:qr_scan_report' %}" class="btn-reset">
+      <i class="fas fa-rotate-left mr-1"></i> Reset
+    </a>
+
+    <a
+      href="{% url 'qr_scanner:qr_scan_export' %}?date_from={{ date_from }}&date_to={{ date_to }}&result={{ result_filter }}"
+      class="btn-export"
+      id="exportBtn"
+    >
+      <i class="fas fa-file-csv"></i> Export CSV
+    </a>
+  </form>
+</div>
+
+<!-- Table -->
+<div class="report-table-wrapper">
+  <div class="report-table-header">
+    <span class="report-table-title">
+      <i class="fas fa-table mr-1 text-indigo-500"></i>
+      Scan Records
+    </span>
+    <span class="report-table-count">{{ page_obj.paginator.count }} record{{ page_obj.paginator.count|pluralize }}</span>
+  </div>
+
+  {% if sessions %}
+  <div style="overflow-x: auto;">
+    <table class="report-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Date &amp; Time</th>
+          <th>Scanned By</th>
+          <th>QR Code 1</th>
+          <th>QR Code 2</th>
+          <th>Result</th>
+          <th>Plant</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for session in sessions %}
+        <tr>
+          <td style="color:#94a3b8; font-size:0.8rem;">{{ session.id }}</td>
+          <td>
+            <div style="font-weight:600; color:#1e293b;">{{ session.scanned_at|date:"M d, Y" }}</div>
+            <div style="font-size:0.8rem; color:#64748b;">{{ session.scanned_at|date:"H:i:s" }}</div>
+          </td>
+          <td>
+            <div style="font-weight:600;">
+              {% if session.scanned_by %}
+                <i class="fas fa-user text-indigo-400 mr-1"></i>
+                {{ session.scanned_by.username }}
+              {% else %}
+                <span style="color:#94a3b8;">—</span>
+              {% endif %}
+            </div>
+          </td>
+          <td class="qr-code-cell" title="{{ session.qr_code_1 }}">
+            {{ session.qr_code_1 }}
+          </td>
+          <td class="qr-code-cell" title="{{ session.qr_code_2 }}">
+            {{ session.qr_code_2 }}
+          </td>
+          <td>
+            {% if session.result == "PASS" %}
+              <span class="badge-pass"><i class="fas fa-check"></i> PASS</span>
+            {% else %}
+              <span class="badge-fail"><i class="fas fa-times"></i> FAIL</span>
+            {% endif %}
+          </td>
+          <td style="color:#64748b; font-size:0.82rem;">
+            {% if session.plant %}
+              {{ session.plant.name }}
+            {% else %}
+              <span style="color:#cbd5e1;">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if page_obj.has_other_pages %}
+  <div class="pagination">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}&date_from={{ date_from }}&date_to={{ date_to }}&result={{ result_filter }}&search={{ search }}"
+       class="page-btn">
+      <i class="fas fa-chevron-left"></i>
+    </a>
+    {% endif %}
+
+    {% for num in page_obj.paginator.page_range %}
+      {% if page_obj.number == num %}
+        <span class="page-btn active">{{ num }}</span>
+      {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+        <a href="?page={{ num }}&date_from={{ date_from }}&date_to={{ date_to }}&result={{ result_filter }}&search={{ search }}"
+           class="page-btn">{{ num }}</a>
+      {% endif %}
+    {% endfor %}
+
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}&date_from={{ date_from }}&date_to={{ date_to }}&result={{ result_filter }}&search={{ search }}"
+       class="page-btn">
+      <i class="fas fa-chevron-right"></i>
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">📭</div>
+    <div class="empty-state-text">No scan records found for the selected filters.</div>
+    <a href="{% url 'qr_scanner:qr_scan' %}" style="color:#6366f1; font-size:0.875rem; margin-top:1rem; display:inline-block;">
+      <i class="fas fa-qrcode mr-1"></i> Go scan something →
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Scan Now floating button -->
+<a href="{% url 'qr_scanner:qr_scan' %}"
+   style="
+     position: fixed;
+     bottom: 2rem;
+     right: 2rem;
+     background: linear-gradient(135deg, #6366f1, #0ea5e9);
+     color: white;
+     padding: 0.875rem 1.5rem;
+     border-radius: 50px;
+     font-weight: 700;
+     font-size: 0.9rem;
+     text-decoration: none;
+     box-shadow: 0 8px 24px rgba(99,102,241,0.4);
+     display: flex;
+     align-items: center;
+     gap: 0.5rem;
+     transition: transform 0.2s;
+     z-index: 100;
+   "
+   onmouseover="this.style.transform='translateY(-3px)'"
+   onmouseout="this.style.transform='translateY(0)'"
+>
+  <i class="fas fa-qrcode"></i> Scan Now
+</a>
+
+{% endblock %}

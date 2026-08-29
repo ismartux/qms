@@ -72,6 +72,9 @@ INSTALLED_APPS = [
     "notifications",
     "ui",
 
+    # QR Scanner
+    "qr_scanner",
+
 ]
 
 # MIDDLEWARE

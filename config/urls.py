@@ -33,6 +33,9 @@ urlpatterns = [
 
     path("scheduler/", include("scheduler.urls", namespace="scheduler_admin")),
     path("identity/", include("core.identity.urls", namespace="identity")),
+
+    # QR Scanner
+    path("scanner/", include("qr_scanner.urls", namespace="qr_scanner")),
 ]
 
 
