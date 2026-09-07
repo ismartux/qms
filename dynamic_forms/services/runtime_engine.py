@@ -1,15 +1,11 @@
 from typing import Dict, List, Any
 from django.core.cache import cache
-import time
 
 from dynamic_forms.models import (
     DynamicFormVersion,
     DynamicFormField,
     DynamicFormStandardRule,
 )
-from integrations.bitable.read_service import fetch_bitable_rows
-import requests
-from django.conf import settings
 
 # =========================================================
 # RUNTIME FIELD (IN-MEMORY ONLY)
@@ -115,36 +111,7 @@ class DynamicFormRuntimeEngine:
     # SOURCE DATA (CACHED)
     # -----------------------------------------------------
     def _fetch_source_rows(self):
-        cache_key = f"dynamic_forms:bitable_rows:{self.template.id}"
-
-
-        rows = cache.get(cache_key)
-        if rows is not None:
-            return rows
-
-
-        try:
-            requests.post(
-                settings.CLOUDFLARE_READ_WORKER_URL,
-                json={
-                    # 🔑 UUID → STRING
-                    "template_id": str(self.template.id),
-                    "app_token": self.template.source_bitable_app_token,
-                    "table_id": self.template.source_bitable_table_id,
-                },
-                timeout=5,
-            )
-        except Exception as e:
-            print("❌ Failed to trigger Cloudflare:", e)
-            return []
-
-        # ⏳ wait for snapshot (max 5 sec)
-        for i in range(10):
-            time.sleep(0.5)
-            rows = cache.get(cache_key)
-            if rows is not None:
-                return rows
-
+        # Bitable data source disabled — all data is DB-only now
         return []
 
     # -----------------------------------------------------

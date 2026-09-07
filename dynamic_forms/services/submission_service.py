@@ -21,12 +21,7 @@ from dynamic_forms.services.validation_service import (
     validate_dynamic_submission,
 )
 
-from integrations.bitable.dynamic_service import (
-    sync_dynamic_submission,
-)
-from integrations.bitable.approval_sender import (
-    send_dynamic_submission_approval_record,
-)
+
 
 from django.core.files.storage import default_storage
 from django.utils.text import get_valid_filename
@@ -286,11 +281,5 @@ def submit_dynamic_form_submission(
     # -----------------------------------------------------
     # POST-COMMIT INTEGRATION
     # -----------------------------------------------------
-    transaction.on_commit(
-        lambda: (
-            sync_dynamic_submission(submission),
-            send_dynamic_submission_approval_record(submission),
-        )
-    )
 
     return submission

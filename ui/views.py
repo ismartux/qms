@@ -23,9 +23,7 @@ from submissions.models import (
     DynamicSubmissionApproval,
 )
 from submissions.services import get_required_approval_roles
-from integrations.bitable.approval_status_updater import (
-    update_dynamic_approval_status_async,
-)
+
 from django.contrib.auth import get_user_model
 from scheduler.models import ScheduledInstance
 from core.identity.models import ApprovalCategory
@@ -45,7 +43,7 @@ from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse, Http
 
 from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction
-from integrations.bitable.approval_status_updater import update_approval_status_async
+
 from dynamic_forms.models import DynamicFormField
 
 
@@ -1018,51 +1016,9 @@ def work_context_list(request):
 @login_required
 def dashboard_view(request):
     """
-    Modern role-based dashboard with permission-based access control
-    
-    Access is controlled by permissions:
-    - can_view_operator_dashboard
-    - can_view_supervisor_dashboard  
-    - can_view_management_dashboard
-    
-    Superusers have access to all dashboards.
-    Users are shown the highest-level dashboard they have permission to view.
+    Role-based quality dashboard router
     """
-    from ui.dashboard_services import DashboardDataService
-    
-    work_context = get_active_context_for_user(request.user)
-    
-    # Initialize dashboard service
-    dashboard_service = DashboardDataService(request.user, work_context)
-    
-    # Get role-appropriate data
-    dashboard_data = dashboard_service.get_dashboard_data()
-    
-    # Check permissions (superuser gets all)
-    if request.user.is_superuser:
-        can_view_operator = True
-        can_view_supervisor = True
-        can_view_management = True
-    else:
-        can_view_operator = has_permission(request.user, 'can_view_operator_dashboard')
-        can_view_supervisor = has_permission(request.user, 'can_view_supervisor_dashboard')
-        can_view_management = has_permission(request.user, 'can_view_management_dashboard')
-    
-    # Add permission flags to context
-    dashboard_data['can_view_operator'] = can_view_operator
-    dashboard_data['can_view_supervisor'] = can_view_supervisor
-    dashboard_data['can_view_management'] = can_view_management
-    
-    # Determine which template to use based on highest permission
-    if can_view_management:
-        template_name = "dashboard/management_dashboard.html"
-    elif can_view_supervisor:
-        template_name = "dashboard/supervisor_dashboard.html"
-    else:
-        # Default to operator (or if no permission, still show operator)
-        template_name = "dashboard/operator_dashboard.html"
-    
-    return render(request, template_name, dashboard_data)
+    return ipqc_dashboard_view(request)
 
 
 # =====================================================
@@ -1950,126 +1906,107 @@ def submission_list_view(request):
 @login_required
 def ipqc_dashboard_view(request):
     """
-    Unified IPQC dashboard
-    - Checklist + Dynamic
-    - Logged-in user's submissions ONLY
-    - Date-range filter aware
+    Comprehensive multi-role manufacturing quality dashboard:
+    - Overview, IPQC, PQE, TL perspectives
+    - Plant, Section, Brand, Line breakdowns
+    - Submissions, Approvals, Rejections, Defect rates
     """
+    from analytics.services.dashboard_analytics import DashboardAnalyticsService
 
-    user = request.user
     selected_range = request.GET.get("range", "today")
-    page_number = request.GET.get("page", 1)
-    per_page = int(request.GET.get("per_page", 12))
+    plant_id = request.GET.get("plant")
+    shop_id = request.GET.get("shop")
+    brand = request.GET.get("brand")
+    line_id = request.GET.get("line")
+    active_tab = request.GET.get("tab", "overview")
 
-    now = timezone.localtime()
-    start_date, end_date = _resolve_date_range(now, selected_range)
+    # Clean filter inputs
+    plant_id = int(plant_id) if plant_id and str(plant_id).isdigit() else None
+    shop_id = int(shop_id) if shop_id and str(shop_id).isdigit() else None
+    line_id = int(line_id) if line_id and str(line_id).isdigit() else None
+    brand = brand.strip() if brand else None
 
-    # -------------------------------------------------
-    # CHECKLIST SUBMISSIONS
-    # -------------------------------------------------
-    checklist_qs = (
-        Submission.objects
-        .filter(
-            submitted_by=user,
-            workflow_state__in=[
-                WorkflowState.SUBMITTED,
-                WorkflowState.CLOSED,
-                WorkflowState.FAILED,
-            ],
-            submitted_at__gte=start_date,
-            submitted_at__lt=end_date,
-        )
-        .select_related(
-            "template_version__template",
-            "submitted_by",
-            "line",
-            "product",
-        )
-        .prefetch_related("approvals__category")
+    data = DashboardAnalyticsService.get_full_dashboard_data(
+        user=request.user,
+        plant_id=plant_id,
+        shop_id=shop_id,
+        brand=brand,
+        line_id=line_id,
+        range_key=selected_range,
     )
 
-    # -------------------------------------------------
-    # DYNAMIC SUBMISSIONS
-    # -------------------------------------------------
-    dynamic_qs = (
-        DynamicFormSubmission.objects
-        .filter(
-            submitted_by=user,
-            workflow_state__in=[
-                WorkflowState.SUBMITTED,
-                WorkflowState.CLOSED,
-                WorkflowState.FAILED,
-            ],
-            submitted_at__gte=start_date,
-            submitted_at__lt=end_date,
-        )
-        .select_related(
-            "template_version__template",
-            "submitted_by",
-        )
-        .prefetch_related("approvals__category")
+    data["active_tab"] = active_tab
+
+    return render(request, "operator/ipqc_dashboard.html", data)
+
+
+@login_required
+def ipqc_dashboard_details_api(request):
+    from analytics.services.dashboard_analytics import DashboardAnalyticsService
+    from django.urls import reverse
+
+    metric = request.GET.get("metric", "total")
+    target_id = request.GET.get("target_id")
+    target_name = request.GET.get("target_name")
+    selected_range = request.GET.get("range", "today")
+    plant_id = request.GET.get("plant")
+    shop_id = request.GET.get("shop")
+    brand = request.GET.get("brand")
+    line_id = request.GET.get("line")
+
+    plant_id = int(plant_id) if plant_id and str(plant_id).isdigit() else None
+    shop_id = int(shop_id) if shop_id and str(shop_id).isdigit() else None
+    line_id = int(line_id) if line_id and str(line_id).isdigit() else None
+    target_id = int(target_id) if target_id and str(target_id).isdigit() else None
+    brand = brand.strip() if brand else None
+    target_name = target_name.strip() if target_name else None
+
+    drill = DashboardAnalyticsService.get_drilldown_details(
+        metric=metric,
+        target_id=target_id,
+        target_name=target_name,
+        plant_id=plant_id,
+        shop_id=shop_id,
+        brand=brand,
+        line_id=line_id,
+        range_key=selected_range,
+        limit=500,
     )
 
-    # -------------------------------------------------
-    # UNIFY DATA
-    # -------------------------------------------------
-    submissions = []
+    formatted_records = []
+    for r in drill["records"]:
+        dt = r["submitted_at"]
+        dt_str = dt.strftime("%d %b %Y, %H:%M") if dt else "—"
+        try:
+            detail_url = reverse("ui:submission_detail", args=[r["submission_id"]])
+        except Exception:
+            detail_url = f"/submissions/{r['submission_id']}/"
 
-    def resolve_pqe_status(obj):
-        pqes = [a for a in obj.approvals.all() if a.category and a.category.code == "PQE"]
-        if not pqes:
-            return "PENDING"
-        pqes.sort(key=lambda a: a.created_at or timezone.now())
-        return pqes[-1].status
-
-    for s in checklist_qs:
-        submissions.append({
-            "id": s.submission_id,
-            "engine": "CHECKLIST",
-            "template_name": s.template_version.template.name,
-            "submitted_at": s.submitted_at,
-            "workflow_state": s.workflow_state,
-            "severity": s.severity_score,
-            "line": s.line.name if s.line else None,
-            "product": s.product.name if s.product else None,
-            "approval_status": resolve_pqe_status(s),
+        formatted_records.append({
+            "submission_id": r["submission_id"],
+            "template_name": r["template_name"],
+            "plant_name": r["plant_name"],
+            "shop_name": r["shop_name"],
+            "line_name": r["line_name"],
+            "product_name": r["product_name"],
+            "brand": r["brand"],
+            "submitted_by_name": r["submitted_by_name"],
+            "submitted_by_username": r["submitted_by_username"],
+            "submitted_at_str": dt_str,
+            "severity_score": r["severity_score"],
+            "pqe_status": r["pqe_status"],
+            "pqe_approver": r["pqe_approver"],
+            "rejection_reason": r["rejection_reason"],
+            "detail_url": detail_url,
         })
 
-    for s in dynamic_qs:
-        submissions.append({
-            "id": s.submission_id,
-            "engine": "DYNAMIC",
-            "template_name": s.template_version.template.name,
-            "submitted_at": s.submitted_at,
-            "workflow_state": s.workflow_state,
-            "severity": None,
-            "line": None,
-            "product": None,
-            "approval_status": resolve_pqe_status(s),
-        })
-
-    # -------------------------------------------------
-    # SORT + PAGINATE
-    # -------------------------------------------------
-    submissions.sort(
-        key=lambda x: x["submitted_at"] or timezone.now(),
-        reverse=True,
-    )
-
-    paginator = Paginator(submissions, per_page)
-    page_obj = paginator.get_page(page_number)
-
-    return render(
-        request,
-        "operator/ipqc_dashboard.html",
-        {
-            "page_obj": page_obj,
-            "selected_range": selected_range,
-            "per_page": per_page,
-            "start_date": start_date,
-            "end_date": end_date,
-        },
-    )
+    return JsonResponse({
+        "success": True,
+        "title": drill["title"],
+        "count": drill["count"],
+        "metric": drill["metric"],
+        "records": formatted_records,
+    })
     
     
 
@@ -2363,13 +2300,6 @@ def pqe_review_and_approve(request, submission_id):
 
         submission.save(update_fields=["workflow_state"])
 
-        # --------------------------------------------------
-        # BITABLE UPDATE
-        # --------------------------------------------------
-        update_approval_status_async(
-            submission=submission,
-            approval=approval,
-        )
 
         return JsonResponse({
             "success": True,
@@ -2878,13 +2808,6 @@ def approve_submission(request, submission_id):
         submission.workflow_state = WorkflowState.CLOSED
         submission.save(update_fields=["workflow_state"])
 
-    # --------------------------------------------------
-    # 🔁 BITABLE UPDATE
-    # --------------------------------------------------
-    if engine == "CHECKLIST":
-        update_approval_status_async(submission, approval)
-    else:
-        update_dynamic_approval_status_async(submission, approval)
 
     return JsonResponse(
         {
@@ -3093,13 +3016,6 @@ def public_role_approval(request, token, category_code):
 
         submission.save(update_fields=["workflow_state"])
 
-        # --------------------------------------------------
-        # BITABLE STATUS UPDATE (ASYNC)
-        # --------------------------------------------------
-        update_approval_status_async(
-            submission=submission,
-            approval=approval,
-        )
 
         existing = approval
 

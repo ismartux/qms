@@ -61,6 +61,11 @@ urlpatterns = [
         views.ipqc_dashboard_view,
         name="ipqc_dashboard",
     ),
+    path(
+        "ipqc/dashboard/details-api/",
+        views.ipqc_dashboard_details_api,
+        name="ipqc_dashboard_details_api",
+    ),
 
     # =====================================================
     # 🎯 ROLE-BASED DASHBOARD

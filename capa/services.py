@@ -5,10 +5,7 @@ from django.utils.timezone import now
 from capa.models import CAPA
 from core.audit.models import AuditLog
 
-from integrations.bitable.capa_sender import (
-    send_capa_create_async,
-    send_capa_update_async,
-)
+
 
 
 # =========================================================
@@ -48,11 +45,6 @@ def create_capa(
         },
     )
 
-    # ---------------- Background Bitable Create Sync ----------------
-    try:
-        send_capa_create_async(capa, creator)
-    except Exception as e:
-        print("CAPA CREATE background sync error:", e)
 
     return capa
 
@@ -95,14 +87,6 @@ def maybe_trigger_capa(submission):
         },
     )
 
-    print("✅ CAPA CREATED:", capa.capa_id)
-
-    # ---------------- Background Bitable Create Sync ----------------
-    try:
-        print("📡 Calling send_capa_create_async")
-        send_capa_create_async(capa, submission.submitted_by)
-    except Exception as e:
-        print("AUTO CAPA CREATE sync error:", e)
 
     return capa
 
@@ -126,11 +110,7 @@ def assign_capa(capa: CAPA, owner, actor):
         }
     )
 
-    # ---------------- Background Update Sync ----------------
-    try:
-        send_capa_update_async(capa, actor)
-    except Exception as e:
-        print("CAPA ASSIGN update sync error:", e)
+
 
 
 # =========================================================
@@ -148,11 +128,6 @@ def mark_action_done(capa: CAPA, actor):
         object_id=str(capa.capa_id),
     )
 
-    # ---------------- Background Update Sync ----------------
-    try:
-        send_capa_update_async(capa, actor)
-    except Exception as e:
-        print("CAPA ACTION_DONE update sync error:", e)
 
 
 # =========================================================
@@ -171,11 +146,6 @@ def close_capa(capa: CAPA, actor):
         object_id=str(capa.capa_id),
     )
 
-    # ---------------- Background Update Sync ----------------
-    try:
-        send_capa_update_async(capa, actor)
-    except Exception as e:
-        print("CAPA CLOSE update sync error:", e)
 
 
 # =========================================================
@@ -219,9 +189,3 @@ def reject_capa(capa: CAPA, actor, reason: str):
         object_id=str(capa.capa_id),
         metadata={"reason": reason}
     )
-
-    # ---------------- Background Update Sync ----------------
-    try:
-        send_capa_update_async(capa, actor)
-    except Exception as e:
-        print("CAPA REJECT update sync error:", e)

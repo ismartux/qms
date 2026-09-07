@@ -4,174 +4,427 @@
 {% block extra_css %}
 <style>
 /* =============================================
-   QR SCANNER — inputs always visible + result below
+   PAGE RESET
 ============================================= */
-
 .main-content .max-w-\[1300px\] {
   padding: 0 !important;
   max-width: 100% !important;
 }
 
 .scanner-page {
-  height: calc(100vh - 64px);
+  min-height: calc(100vh - 64px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: #0f172a;
+  padding: 1rem;
+}
+
+/* =============================================
+   CARD
+============================================= */
+.scanner-card {
+  background: #1e293b;
+  border-radius: 20px;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+  width: 100%;
+  max-width: 520px;
+  overflow: hidden;
+  margin-top: 0.5rem;
+}
+
+.card-header {
+  background: linear-gradient(135deg, #6366f1, #0ea5e9);
+  padding: 1.1rem 1.5rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.card-header-icon { font-size: 1.5rem; }
+.card-header-text h1 { font-size: 1.15rem; font-weight: 800; color: #fff; margin: 0; }
+.card-header-text p  { font-size: 0.72rem; color: rgba(255,255,255,0.75); margin: 0; }
+
+.card-body { padding: 1.1rem 1.25rem 1rem; }
+
+/* =============================================
+   STEP INDICATOR
+============================================= */
+.step-row {
+  display: flex; align-items: center; gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.step-pill {
+  flex: 1; display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  border: 2px solid #334155;
+  background: #0f172a;
+  font-size: 0.7rem; font-weight: 700;
+  color: #64748b;
+  transition: all 0.3s;
+}
+.step-pill.active  { border-color: #6366f1; color: #a5b4fc; background: rgba(99,102,241,0.12); }
+.step-pill.done    { border-color: #10b981; color: #6ee7b7; background: rgba(16,185,129,0.1); }
+.step-num {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: #334155; display: flex; align-items: center; justify-content: center;
+  font-size: 0.65rem; font-weight: 900; color: #94a3b8;
+  flex-shrink: 0; transition: all 0.3s;
+}
+.step-pill.active .step-num { background: #6366f1; color: #fff; }
+.step-pill.done   .step-num { background: #10b981; color: #fff; }
+.step-arrow { color: #334155; font-size: 0.85rem; }
+
+/* =============================================
+   SCAN FIELD
+============================================= */
+.scan-field-group { margin-bottom: 0.85rem; }
+.scan-field-label {
+  display: flex; align-items: center; gap: 0.4rem;
+  font-size: 0.68rem; font-weight: 700;
+  color: #94a3b8; text-transform: uppercase; letter-spacing: 0.07em;
+  margin-bottom: 0.35rem;
+}
+.scan-field-label .led {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #334155; flex-shrink: 0; transition: all 0.3s;
+}
+.scan-field-label .led.active { background: #6366f1; animation: blink-led 1.2s infinite; }
+.scan-field-label .led.done   { background: #10b981; animation: none; }
+
+@keyframes blink-led {
+  0%,100% { opacity:1; box-shadow:0 0 0 3px rgba(99,102,241,0.2); }
+  50%      { opacity:0.5; box-shadow:0 0 0 6px rgba(99,102,241,0.05); }
+}
+
+.scan-input-row {
+  display: flex; gap: 0.5rem; align-items: center;
+}
+.scan-input {
+  flex: 1;
+  padding: 0.65rem 0.9rem;
+  font-size: 0.88rem; font-family: 'Courier New', monospace;
+  background: #0f172a; color: #e2e8f0;
+  border: 2px solid #334155;
+  border-radius: 10px; outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+.scan-input:focus     { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
+.scan-input.filled    { border-color: #10b981; background: rgba(16,185,129,0.08); color: #6ee7b7; }
+.scan-input[readonly] { opacity: 0.5; cursor: not-allowed; }
+
+/* Camera button */
+.cam-btn {
+  flex-shrink: 0;
+  width: 42px; height: 42px;
+  border-radius: 10px;
+  border: 2px solid #334155;
+  background: #0f172a;
+  color: #94a3b8;
+  font-size: 1.05rem;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+  position: relative;
+}
+.cam-btn:hover:not(:disabled)   { border-color: #6366f1; color: #a5b4fc; background: rgba(99,102,241,0.12); }
+.cam-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.cam-btn.scanning { border-color: #f59e0b; color: #fbbf24; background: rgba(245,158,11,0.12); animation: cam-pulse 1s infinite; }
+
+@keyframes cam-pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(245,158,11,0.3); }
+  50%      { box-shadow: 0 0 0 6px rgba(245,158,11,0.05); }
+}
+
+/* =============================================
+   CAMERA OVERLAY MODAL (FULL SCREEN ISOLATION)
+============================================= */
+body.camera-active {
+  overflow: hidden !important;
+}
+body.camera-active .header,
+body.camera-active .mobile-bottom-nav,
+body.camera-active nav[class*="fixed bottom-0"],
+body.camera-active .sidebar,
+body.camera-active .sidebar-overlay {
+  display: none !important;
+}
+
+#cameraModal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  z-index: 9999999 !important;
+  background: #000;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+}
+#cameraModal.open {
+  display: flex !important;
+}
+
+#camVideo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  position: absolute;
+  inset: 0;
+}
+
+/* Scanning frame */
+.cam-frame-wrap {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f1f5f9;
-  overflow: hidden;
+  pointer-events: none;
+  z-index: 5;
 }
-
-.scanner-card {
-  background: #fff;
-  border-radius: 18px;
-  box-shadow: 0 6px 32px rgba(0,0,0,0.11);
-  padding: 1.5rem 2rem 1.25rem;
-  width: 100%;
-  max-width: 500px;
+.cam-frame {
+  width: min(72vw, 290px);
+  height: min(72vw, 290px);
   position: relative;
 }
-
-.scanner-card::before {
+.cam-frame::before, .cam-frame::after,
+.cam-corner-br, .cam-corner-bl {
   content: '';
   position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 4px;
-  border-radius: 18px 18px 0 0;
-  background: linear-gradient(90deg, #6366f1, #0ea5e9, #10b981);
+  width: 28px;
+  height: 28px;
+  border-color: #fff;
+  border-style: solid;
+}
+.cam-frame::before { top: 0; left: 0; border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
+.cam-frame::after  { top: 0; right: 0; border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
+.cam-corner-br { bottom: 0; right: 0; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
+.cam-corner-bl { bottom: 0; left: 0; border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
+
+.cam-scan-line {
+  position: absolute;
+  left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #6366f1, transparent);
+  animation: scan-sweep 1.8s linear infinite;
+  box-shadow: 0 0 10px #6366f1;
+}
+@keyframes scan-sweep {
+  0%   { top: 0; }
+  100% { top: 100%; }
 }
 
-.scanner-icon  { font-size: 1.8rem; text-align: center; display: block; margin-bottom: 0.1rem; }
-.scanner-title {
-  text-align: center;
-  font-size: 1.3rem;
-  font-weight: 800;
-  color: #1e293b;
-  margin: 0 0 0.1rem;
-  letter-spacing: -0.02em;
+/* Close + Flip buttons */
+.cam-close-btn, .cam-flip-btn {
+  position: absolute;
+  top: calc(1rem + env(safe-area-inset-top, 0px));
+  z-index: 25;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  color: #f8fafc;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: all 0.2s;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
 }
-.scanner-subtitle {
+.cam-close-btn { right: 1rem; }
+.cam-close-btn:hover { background: rgba(239, 68, 68, 0.9); border-color: #ef4444; }
+.cam-flip-btn  { right: 4.3rem; }
+.cam-flip-btn:hover  { background: rgba(99, 102, 241, 0.9); border-color: #6366f1; }
+.cam-flip-btn.spinning { animation: flip-spin 0.45s ease; }
+@keyframes flip-spin {
+  0%   { transform: rotate(0deg) scale(1); }
+  50%  { transform: rotate(180deg) scale(0.8); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+/* Cam top label */
+.cam-top-label {
+  position: absolute;
+  top: calc(1rem + env(safe-area-inset-top, 0px));
+  left: 1rem;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #f8fafc;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  white-space: nowrap;
+  z-index: 25;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  max-width: calc(100vw - 165px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Camera info panel — shows live data at bottom */
+.cam-info-panel {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: rgba(15, 23, 42, 0.97);
+  padding: 0.9rem 1rem calc(1.3rem + env(safe-area-inset-bottom, 12px));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-top: 1.5px solid rgba(255, 255, 255, 0.12);
+  z-index: 25;
+  box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.5);
+}
+
+.cam-instruction {
   text-align: center;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  margin-bottom: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.cam-instruction .pulse-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #f59e0b;
+  animation: cam-pulse-dot 1s infinite;
+  flex-shrink: 0;
+}
+@keyframes cam-pulse-dot {
+  0%,100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.4); opacity: 0.6; }
+}
+
+.cam-qr-row {
+  display: flex;
+  gap: 0.65rem;
+}
+
+.cam-qr-box {
+  flex: 1;
+  background: #090d16;
+  border: 1.5px solid #334155;
+  border-radius: 12px;
+  padding: 0.6rem 0.75rem;
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.cam-qr-box-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.3rem;
+}
+
+.cam-qr-box.old .cam-qr-box-label { color: #f59e0b; }
+.cam-qr-box.new .cam-qr-box-label { color: #38bdf8; }
+
+.cam-qr-box.current-target {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.25);
+}
+
+.cam-qr-box.filled {
+  border-color: #10b981 !important;
+  background: rgba(16, 185, 129, 0.12) !important;
+}
+
+.cam-qr-box.filled .cam-qr-box-label {
+  color: #34d399 !important;
+}
+
+.cam-qr-value {
+  font-size: 0.76rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #f8fafc;
+  word-break: break-all;
+  line-height: 1.35;
+  max-height: 48px;
+  overflow-y: auto;
+}
+
+.cam-qr-value.empty {
   color: #64748b;
-  font-size: 0.77rem;
-  margin: 0 0 0.85rem;
+  font-style: italic;
+  font-size: 0.72rem;
 }
-
-/* Step indicator */
-.step-indicator {
-  display: flex; align-items: center; justify-content: center;
-  gap: 0.4rem; margin-bottom: 0.85rem;
-}
-.step-dot  { width: 9px; height: 9px; border-radius: 50%; background: #e2e8f0; transition: all 0.3s; }
-.step-line { flex:1; height:2px; background:#e2e8f0; max-width:80px; transition:background 0.4s; }
-.step-dot.active { background:#6366f1; transform:scale(1.4); }
-.step-dot.done   { background:#10b981; }
-.step-line.done  { background:#10b981; }
-
-/* Scan fields */
-.scan-field-group { margin-bottom: 0.7rem; }
-.scan-field-label {
-  display: flex; align-items: center; gap: 0.4rem;
-  font-size: 0.71rem; font-weight: 700; color: #475569;
-  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.28rem;
-}
-.scan-field-label .dot {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: #cbd5e1; transition: background 0.3s; flex-shrink: 0;
-}
-.scan-field-label .dot.active {
-  background: #6366f1;
-  box-shadow: 0 0 0 3px rgba(99,102,241,0.2);
-  animation: pulse-dot 1.5s infinite;
-}
-.scan-field-label .dot.done { background: #10b981; }
-
-@keyframes pulse-dot {
-  0%,100% { box-shadow:0 0 0 3px rgba(99,102,241,0.18); }
-  50%      { box-shadow:0 0 0 7px rgba(99,102,241,0.07); }
-}
-
-.scan-input {
-  width: 100%;
-  padding: 0.62rem 0.875rem;
-  font-size: 0.93rem;
-  font-family: 'Courier New', monospace;
-  border: 2px solid #e2e8f0;
-  border-radius: 10px;
-  background: #f8fafc;
-  color: #1e293b;
-  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
-  outline: none;
-  box-sizing: border-box;
-}
-.scan-input:focus     { border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,0.12); background:#fff; }
-.scan-input:read-only { background:#f1f5f9; color:#94a3b8; cursor:not-allowed; }
-.scan-input.filled    { border-color:#10b981; background:#f0fdf4; color:#065f46; }
 
 /* =============================================
-   RESULT BANNER (always below inputs, never hides them)
+   RESULT BANNER
 ============================================= */
 .result-banner {
   display: none;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.9rem 1.25rem;
-  border-radius: 12px;
-  margin-top: 0.75rem;
-  animation: banner-slide 0.35s cubic-bezier(0.34,1.56,0.64,1);
+  align-items: center; gap: 1rem;
+  padding: 0.85rem 1.1rem;
+  border-radius: 14px;
+  margin-top: 0.65rem;
+  animation: banner-in 0.35s cubic-bezier(0.34,1.56,0.64,1);
 }
 .result-banner.visible { display: flex; }
-
-@keyframes banner-slide {
-  0%   { transform:translateY(8px) scale(0.96); opacity:0; }
-  100% { transform:translateY(0) scale(1);      opacity:1; }
+@keyframes banner-in {
+  0%   { transform: translateY(8px) scale(0.95); opacity: 0; }
+  100% { transform: translateY(0)  scale(1);    opacity: 1; }
 }
-
-.result-banner.pass { background:linear-gradient(135deg,#dcfce7,#bbf7d0); border:2px solid #86efac; }
-.result-banner.fail { background:linear-gradient(135deg,#fee2e2,#fecaca); border:2px solid #fca5a5; }
-
-.result-emoji {
-  font-size: 2.5rem;
-  line-height: 1;
-  animation: pop 0.4s 0.1s cubic-bezier(0.34,1.56,0.64,1) both;
-  flex-shrink: 0;
-}
+.result-banner.pass { background: linear-gradient(135deg,#052e16,#14532d); border: 2px solid #16a34a; }
+.result-banner.fail { background: linear-gradient(135deg,#1c0a0a,#450a0a); border: 2px solid #dc2626; }
+.result-emoji { font-size: 2.4rem; flex-shrink: 0; animation: pop 0.4s cubic-bezier(0.34,1.56,0.64,1) both; }
 @keyframes pop { 0%{transform:scale(0.3)} 100%{transform:scale(1)} }
+.result-word { font-size: 2.4rem; font-weight: 900; line-height: 1; letter-spacing: -0.03em; }
+.result-banner.pass .result-word { color: #4ade80; }
+.result-banner.fail .result-word { color: #f87171; }
+.result-desc { font-size: 0.72rem; font-weight: 600; opacity: 0.75; margin-top: 0.1rem; }
+.result-banner.pass .result-desc { color: #86efac; }
+.result-banner.fail .result-desc { color: #fca5a5; }
 
-.result-text-block { flex: 1; }
-.result-word {
-  font-size: 2.6rem;
-  font-weight: 900;
-  letter-spacing: -0.03em;
-  line-height: 1;
-}
-.result-banner.pass .result-word { color: #15803d; }
-.result-banner.fail .result-word { color: #dc2626; }
-
-.result-desc {
-  font-size: 0.75rem;
-  font-weight: 600;
-  opacity: 0.7;
-  margin-top: 0.1rem;
-}
-.result-banner.pass .result-desc { color: #166534; }
-.result-banner.fail .result-desc { color: #991b1b; }
-
-
-
-/* History strip */
+/* =============================================
+   HISTORY
+============================================= */
 .scan-history {
-  margin-top: 0.65rem;
-  border-top: 1px solid #f1f5f9;
-  padding-top: 0.55rem;
-  max-height: 80px;
-  overflow-y: auto;
+  margin-top: 0.75rem;
+  border-top: 1px solid #1e293b;
+  padding-top: 0.6rem;
+  max-height: 90px; overflow-y: auto;
 }
-.history-title { font-size:0.66rem; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:0.35rem; }
-.history-item  { display:flex; align-items:center; gap:0.55rem; padding:0.28rem 0.5rem; border-radius:6px; margin-bottom:0.18rem; background:#f8fafc; font-size:0.75rem; }
-.history-badge { padding:0.08rem 0.38rem; border-radius:4px; font-size:0.65rem; font-weight:700; flex-shrink:0; }
-.badge-pass    { background:#dcfce7; color:#15803d; }
-.badge-fail    { background:#fee2e2; color:#dc2626; }
-.history-codes { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#64748b; font-family:monospace; }
+.history-title { font-size: 0.62rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.35rem; }
+.history-item  { display:flex; align-items:center; gap:0.5rem; padding:0.28rem 0.5rem; border-radius:6px; margin-bottom:0.2rem; background:#0f172a; font-size:0.73rem; }
+.history-badge { padding:0.06rem 0.36rem; border-radius:4px; font-size:0.62rem; font-weight:700; flex-shrink:0; }
+.badge-pass    { background:#052e16; color:#4ade80; border:1px solid #16a34a; }
+.badge-fail    { background:#1c0a0a; color:#f87171; border:1px solid #dc2626; }
+.history-codes { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#64748b; font-family:monospace; font-size:0.7rem; }
+
+/* =============================================
+   NO CAMERA message
+============================================= */
+#noCameraMsg {
+  display:none;
+  font-size:0.75rem; color:#f87171;
+  text-align:center; margin-top:0.4rem;
+  padding: 0.5rem; background: rgba(239,68,68,0.1);
+  border-radius: 8px; border: 1px solid rgba(239,68,68,0.2);
+}
 </style>
 {% endblock %}
 
@@ -179,250 +432,722 @@
 <div class="scanner-page">
   <div class="scanner-card">
 
-    <span class="scanner-icon">📷</span>
-    <h1 class="scanner-title">QR Scanner</h1>
-    <p class="scanner-subtitle">Scan Old Material QR first, then New Material QR</p>
-
-    <!-- Step Indicator -->
-    <div class="step-indicator">
-      <div class="step-dot active" id="step1Dot"></div>
-      <div class="step-line"       id="stepLine"></div>
-      <div class="step-dot"        id="step2Dot"></div>
+    <!-- Header -->
+    <div class="card-header">
+      <span class="card-header-icon">📷</span>
+      <div class="card-header-text">
+        <h1>QR Scanner</h1>
+        <p>Scan Old Material first, then New Material QR</p>
+      </div>
     </div>
 
-    <!-- OLD MATERIAL — always visible -->
-    <div class="scan-field-group">
-      <label class="scan-field-label" for="qr1Input">
-        <span class="dot active" id="dot1"></span>
-        Old Material QR
-      </label>
-      <input type="text" id="qr1Input" class="scan-input"
-             placeholder="Scan Old Material QR here…"
-             autocomplete="off" autofocus />
-    </div>
+    <div class="card-body">
 
-    <!-- NEW MATERIAL — always visible -->
-    <div class="scan-field-group">
-      <label class="scan-field-label" for="qr2Input">
-        <span class="dot" id="dot2"></span>
-        New Material QR
-      </label>
-      <input type="text" id="qr2Input" class="scan-input"
-             placeholder="Scan New Material QR here…"
-             autocomplete="off" readonly />
-    </div>
-
-    <!-- RESULT BANNER — appears below inputs, never hides them -->
-    <div class="result-banner" id="resultBanner">
-      <div class="result-emoji" id="resultEmoji"></div>
-      <div class="result-text-block">
-        <div class="result-word" id="resultWord"></div>
-        <div class="result-desc" id="resultDesc"></div>
+      <!-- Steps -->
+      <div class="step-row">
+        <div class="step-pill active" id="pill1">
+          <div class="step-num">1</div>
+          Old Material QR
+        </div>
+        <span class="step-arrow">→</span>
+        <div class="step-pill" id="pill2">
+          <div class="step-num">2</div>
+          New Material QR
+        </div>
       </div>
 
+      <!-- OLD MATERIAL -->
+      <div class="scan-field-group">
+        <div class="scan-field-label">
+          <span class="led active" id="led1"></span>
+          Old Material QR
+        </div>
+        <div class="scan-input-row">
+          <input type="text" id="qr1Input" class="scan-input"
+                 placeholder="Scan or type Old Material QR…"
+                 autocomplete="off" autofocus />
+          <button class="cam-btn" id="camBtn1" title="Open camera for Old Material QR">
+            📷
+          </button>
+        </div>
+      </div>
+
+      <!-- NEW MATERIAL -->
+      <div class="scan-field-group">
+        <div class="scan-field-label">
+          <span class="led" id="led2"></span>
+          New Material QR
+        </div>
+        <div class="scan-input-row">
+          <input type="text" id="qr2Input" class="scan-input"
+                 placeholder="Scan or type New Material QR…"
+                 autocomplete="off" readonly />
+          <button class="cam-btn" id="camBtn2" title="Open camera for New Material QR" disabled>
+            📷
+          </button>
+        </div>
+      </div>
+
+      <!-- No camera message -->
+      <div id="noCameraMsg">⚠️ Camera not available on this device or permission denied.</div>
+
+      <!-- RESULT BANNER -->
+      <div class="result-banner" id="resultBanner">
+        <div class="result-emoji" id="resultEmoji"></div>
+        <div>
+          <div class="result-word" id="resultWord"></div>
+          <div class="result-desc" id="resultDesc"></div>
+        </div>
+      </div>
+
+      <!-- HISTORY -->
+      <div class="scan-history" id="scanHistory" style="display:none;">
+        <div class="history-title">Recent Scans</div>
+        <div id="historyList"></div>
+      </div>
+
+    </div><!-- /card-body -->
+  </div><!-- /scanner-card -->
+</div>
+
+<!-- =============================================
+     CAMERA MODAL
+============================================= -->
+<div id="cameraModal">
+  <!-- Live video -->
+  <video id="camVideo" playsinline autoplay muted></video>
+
+  <!-- Hidden canvas for frame capture -->
+  <canvas id="camCanvas" style="display:none;"></canvas>
+
+  <!-- Scanning frame overlay -->
+  <div class="cam-frame-wrap">
+    <div class="cam-frame">
+      <span class="cam-corner-br"></span>
+      <span class="cam-corner-bl"></span>
+      <div class="cam-scan-line"></div>
+    </div>
+  </div>
+
+  <!-- Top label -->
+  <div class="cam-top-label" id="camTopLabel">Scanning Old Material QR…</div>
+
+  <!-- Flip camera -->
+  <button class="cam-flip-btn" id="camFlipBtn" title="Flip camera">🔄</button>
+
+  <!-- Close -->
+  <button class="cam-close-btn" id="camCloseBtn" title="Close camera">✕</button>
+
+  <!-- Info panel at bottom -->
+  <div class="cam-info-panel">
+    <div class="cam-instruction">
+      <span class="pulse-dot"></span>
+      <span id="camInstruction">Point camera at the QR code</span>
     </div>
 
-    <!-- History strip -->
-    <div class="scan-history" id="scanHistory" style="display:none;">
-      <div class="history-title"><i class="fas fa-clock-rotate-left mr-1"></i> Recent Scans</div>
-      <div id="historyList"></div>
+    <div class="cam-qr-row">
+      <div class="cam-qr-box old" id="camBox1">
+        <div class="cam-qr-box-label">📦 Old Material</div>
+        <div class="cam-qr-value empty" id="camVal1">Not scanned yet</div>
+      </div>
+      <div class="cam-qr-box new" id="camBox2">
+        <div class="cam-qr-box-label">🆕 New Material</div>
+        <div class="cam-qr-value empty" id="camVal2">Not scanned yet</div>
+      </div>
     </div>
-
   </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
+<!-- Multi-format Barcode & DataMatrix Scanner Engines -->
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script>
-  const SAVE_URL      = "{% url 'qr_scanner:qr_scan_save' %}";
-  const CSRF_TOKEN    = "{{ csrf_token }}";
-  const SHOW_MS       = 2000;   // show result for 2 seconds then reset
+/* =============================================
+   CONFIG
+============================================= */
+const SAVE_URL   = "{% url 'qr_scanner:qr_scan_save' %}";
+const CSRF_TOKEN = "{{ csrf_token }}";
+const SHOW_MS    = 2500;
 
-  const qr1Input       = document.getElementById("qr1Input");
-  const qr2Input       = document.getElementById("qr2Input");
-  const resultBanner   = document.getElementById("resultBanner");
-  const resultEmoji    = document.getElementById("resultEmoji");
-  const resultWord     = document.getElementById("resultWord");
-  const resultDesc     = document.getElementById("resultDesc");
+/* =============================================
+   DOM REFS
+============================================= */
+const qr1Input     = document.getElementById("qr1Input");
+const qr2Input     = document.getElementById("qr2Input");
+const camBtn1      = document.getElementById("camBtn1");
+const camBtn2      = document.getElementById("camBtn2");
+const led1         = document.getElementById("led1");
+const led2         = document.getElementById("led2");
+const pill1        = document.getElementById("pill1");
+const pill2        = document.getElementById("pill2");
+const resultBanner = document.getElementById("resultBanner");
+const resultEmoji  = document.getElementById("resultEmoji");
+const resultWord   = document.getElementById("resultWord");
+const resultDesc   = document.getElementById("resultDesc");
+const historySection = document.getElementById("scanHistory");
+const historyList    = document.getElementById("historyList");
+const noCameraMsg    = document.getElementById("noCameraMsg");
 
-  const dot1           = document.getElementById("dot1");
-  const dot2           = document.getElementById("dot2");
-  const step1Dot       = document.getElementById("step1Dot");
-  const step2Dot       = document.getElementById("step2Dot");
-  const stepLine       = document.getElementById("stepLine");
-  const historySection = document.getElementById("scanHistory");
-  const historyList    = document.getElementById("historyList");
+// Camera modal
+const cameraModal    = document.getElementById("cameraModal");
+const camVideo       = document.getElementById("camVideo");
+const camCanvas      = document.getElementById("camCanvas");
+const camCloseBtn    = document.getElementById("camCloseBtn");
+const camFlipBtn     = document.getElementById("camFlipBtn");
+const camTopLabel    = document.getElementById("camTopLabel");
+const camInstruction = document.getElementById("camInstruction");
+const camBox1        = document.getElementById("camBox1");
+const camBox2        = document.getElementById("camBox2");
+const camVal1        = document.getElementById("camVal1");
+const camVal2        = document.getElementById("camVal2");
 
-  let recentScans   = [];
-  let resetTimer    = null;
-  let barAnim       = null;
+/* =============================================
+   STATE & DETECTOR ENGINES
+============================================= */
+let recentScans  = [];
+let resetTimer   = null;
+let cameraStream = null;
+let scanTarget   = 1; // which field camera is scanning for
+let rafId        = null;
+let facingMode   = "environment"; // "environment" = rear, "user" = front
+let isDetecting  = false;
 
-  /* =========================================
-     VOICE — Google Translate Indian Female (en-IN)
-     Proxied via Django to avoid CORS.
-     Web Audio GainNode amplifies volume 3x.
-     Falls back to Web Speech API if proxy unavailable.
-  ========================================= */
-  const TTS_URL    = "/scanner/tts/";
-  const audioCtx   = new (window.AudioContext || window.webkitAudioContext)();
-  const GAIN_LEVEL = 3.0;
-  const audioCache = {};
+// 1. ZXing MultiFormatReader (Supports Data Matrix ECC200, QR Code, Code 128, Code 39, etc.)
+let zxingReader = null;
+try {
+  if (typeof ZXing !== "undefined") {
+    const hints = new Map();
+    const formats = [
+      ZXing.BarcodeFormat.DATA_MATRIX,
+      ZXing.BarcodeFormat.QR_CODE,
+      ZXing.BarcodeFormat.CODE_128,
+      ZXing.BarcodeFormat.CODE_39,
+      ZXing.BarcodeFormat.EAN_13,
+      ZXing.BarcodeFormat.EAN_8,
+      ZXing.BarcodeFormat.UPC_A,
+      ZXing.BarcodeFormat.UPC_E,
+      ZXing.BarcodeFormat.ITF,
+      ZXing.BarcodeFormat.AZTEC,
+      ZXing.BarcodeFormat.PDF_417
+    ];
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+    zxingReader = new ZXing.MultiFormatReader();
+    zxingReader.setHints(hints);
+  }
+} catch (e) {
+  console.warn("ZXing init warning:", e);
+}
 
-  async function fetchAudioBuffer(text) {
-    if (audioCache[text]) return audioCache[text];
-    const resp = await fetch(TTS_URL + "?text=" + encodeURIComponent(text));
-    if (!resp.ok) throw new Error("TTS HTTP " + resp.status);
-    const arrayBuf = await resp.arrayBuffer();
-    const decoded  = await audioCtx.decodeAudioData(arrayBuf);
-    audioCache[text] = decoded;
-    return decoded;
+// 2. Native BarcodeDetector (Hardware-accelerated in Chrome / Edge / Android)
+let nativeDetector = null;
+if ("BarcodeDetector" in window) {
+  try {
+    nativeDetector = new BarcodeDetector({
+      formats: [
+        "data_matrix",
+        "qr_code",
+        "code_128",
+        "code_39",
+        "ean_13",
+        "ean_8",
+        "upc_a",
+        "upc_e",
+        "itf",
+        "aztec",
+        "pdf417"
+      ]
+    });
+  } catch (e) {
+    try { nativeDetector = new BarcodeDetector(); } catch (_) {}
+  }
+}
+
+/* =============================================
+   VOICE
+============================================= */
+const TTS_URL    = "/scanner/tts/";
+let   audioCtx   = null;
+const GAIN_LEVEL = 3.0;
+const audioCache = {};
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+async function fetchAudioBuffer(text) {
+  if (audioCache[text]) return audioCache[text];
+  const resp = await fetch(TTS_URL + "?text=" + encodeURIComponent(text));
+  if (!resp.ok) throw new Error("TTS " + resp.status);
+  const buf = await getAudioCtx().decodeAudioData(await resp.arrayBuffer());
+  audioCache[text] = buf;
+  return buf;
+}
+
+async function speak(isPass) {
+  const ctx = getAudioCtx();
+  if (ctx.state === "suspended") await ctx.resume();
+  const word = isPass ? "Pass" : "Fail";
+  try {
+    const buf    = await fetchAudioBuffer(word);
+    const src    = ctx.createBufferSource();
+    const gain   = ctx.createGain();
+    gain.gain.value = GAIN_LEVEL;
+    src.buffer = buf;
+    src.connect(gain);
+    gain.connect(ctx.destination);
+    src.start(0);
+  } catch {
+    speakFallback(isPass);
+  }
+}
+
+function speakFallback(isPass) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(isPass ? "Pass" : "Fail");
+  u.lang = "en-IN"; u.volume = 1; u.rate = 0.88;
+  window.speechSynthesis.speak(u);
+}
+
+/* =============================================
+   KEYBOARD / SCANNER INPUT — FIELD 1
+============================================= */
+qr1Input.addEventListener("keydown", e => {
+  if ((e.key === "Enter" || e.key === "Tab") && qr1Input.value.trim()) {
+    e.preventDefault();
+    advanceToField2();
+  }
+});
+qr1Input.addEventListener("input", () => {
+  if (/[\r\n]/.test(qr1Input.value)) {
+    qr1Input.value = qr1Input.value.replace(/[\r\n]/g, "").trim();
+    if (qr1Input.value) advanceToField2();
+  }
+});
+
+/* =============================================
+   KEYBOARD / SCANNER INPUT — FIELD 2
+============================================= */
+qr2Input.addEventListener("keydown", e => {
+  if ((e.key === "Enter" || e.key === "Tab") && qr2Input.value.trim() && qr1Input.value.trim()) {
+    e.preventDefault();
+    submitScan();
+  }
+});
+qr2Input.addEventListener("input", () => {
+  if (/[\r\n]/.test(qr2Input.value)) {
+    qr2Input.value = qr2Input.value.replace(/[\r\n]/g, "").trim();
+    if (qr2Input.value && qr1Input.value.trim()) submitScan();
+  }
+});
+
+/* =============================================
+   ADVANCE TO FIELD 2
+============================================= */
+function advanceToField2() {
+  qr1Input.classList.add("filled");
+  qr1Input.readOnly = true;
+
+  led1.className = "led done";
+  led2.className = "led active";
+  pill1.className = "step-pill done";
+  pill2.className = "step-pill active";
+
+  qr2Input.readOnly = false;
+  camBtn2.disabled  = false;
+  qr2Input.focus();
+
+  // update camera panel
+  syncCameraPanel();
+}
+
+/* =============================================
+   SUBMIT
+============================================= */
+async function submitScan() {
+  const qr1 = qr1Input.value.trim();
+  const qr2 = qr2Input.value.trim();
+  if (!qr1 || !qr2) return;
+
+  closeCamera();
+
+  const isMatch = (qr1 === qr2);
+  showBanner(isMatch, qr1, qr2);
+  speak(isMatch);
+
+  fetch(SAVE_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRFToken": CSRF_TOKEN },
+    body: JSON.stringify({ qr_code_1: qr1, qr_code_2: qr2 }),
+  }).catch(console.error);
+
+  addToHistory(isMatch, qr1, qr2);
+  scheduleReset();
+}
+
+/* =============================================
+   RESULT BANNER
+============================================= */
+function showBanner(isMatch, qr1, qr2) {
+  resultBanner.className  = "result-banner visible " + (isMatch ? "pass" : "fail");
+  resultEmoji.textContent = isMatch ? "✅" : "❌";
+  resultWord.textContent  = isMatch ? "PASS" : "FAIL";
+  resultDesc.textContent  = isMatch
+    ? "Old & New Material match!"
+    : "Codes do NOT match — recheck!";
+}
+
+/* =============================================
+   RESET
+============================================= */
+function scheduleReset() {
+  clearTimeout(resetTimer);
+  resetTimer = setTimeout(resetScanner, SHOW_MS);
+}
+
+function resetScanner() {
+  qr1Input.value    = "";
+  qr2Input.value    = "";
+  qr1Input.readOnly = false;
+  qr2Input.readOnly = true;
+  qr1Input.classList.remove("filled");
+  qr2Input.classList.remove("filled");
+  led1.className  = "led active";
+  led2.className  = "led";
+  pill1.className = "step-pill active";
+  pill2.className = "step-pill";
+  camBtn1.classList.remove("scanning");
+  camBtn2.classList.remove("scanning");
+  camBtn2.disabled = true;
+  resultBanner.className = "result-banner";
+  syncCameraPanel();
+  qr1Input.focus();
+}
+
+/* =============================================
+   HISTORY
+============================================= */
+function addToHistory(isMatch, qr1, qr2) {
+  recentScans.unshift({ isMatch, qr1, qr2, time: new Date().toLocaleTimeString() });
+  if (recentScans.length > 5) recentScans.pop();
+  historySection.style.display = "block";
+  historyList.innerHTML = recentScans.map(s =>
+    '<div class="history-item">' +
+      '<span class="history-badge ' + (s.isMatch ? "badge-pass" : "badge-fail") + '">' +
+        (s.isMatch ? "PASS" : "FAIL") +
+      '</span>' +
+      '<span class="history-codes" title="' + s.qr1 + ' | ' + s.qr2 + '">' +
+        trunc(s.qr1, 18) + ' → ' + trunc(s.qr2, 18) +
+      '</span>' +
+      '<span style="font-size:0.63rem;color:#334155;flex-shrink:0;">' + s.time + '</span>' +
+    '</div>'
+  ).join("");
+}
+
+function trunc(s, n) { return s.length > n ? s.slice(0, n) + "…" : s; }
+
+/* =============================================
+   CAMERA — OPEN
+============================================= */
+async function openCamera(targetField) {
+  // Check camera support
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    noCameraMsg.textContent = "⚠️ Camera not available on this device or permission denied.";
+    noCameraMsg.style.display = "block";
+    return;
+  }
+  if (typeof ZXing === "undefined" && typeof jsQR === "undefined" && !("BarcodeDetector" in window)) {
+    noCameraMsg.textContent = "⚠️ Decoder library not loaded. Check internet connection.";
+    noCameraMsg.style.display = "block";
+    return;
   }
 
-  async function speak(isPass) {
-    if (audioCtx.state === "suspended") await audioCtx.resume();
-    const word = isPass ? "Pass" : "Fail";
-    try {
-      const buffer   = await fetchAudioBuffer(word);
-      const source   = audioCtx.createBufferSource();
-      const gainNode = audioCtx.createGain();
-      gainNode.gain.value = GAIN_LEVEL;
-      source.buffer = buffer;
-      source.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-      source.start(0);
-    } catch (err) {
-      console.warn("TTS proxy failed, fallback:", err);
-      speakFallback(isPass);
+  noCameraMsg.style.display = "none";
+  scanTarget = targetField;
+
+  if (targetField === 1) {
+    camBtn1.classList.add("scanning");
+    camTopLabel.textContent = "Scanning Old Material…";
+    camInstruction.textContent = "Point camera at Old Material QR / Data Matrix code";
+  } else {
+    camBtn2.classList.add("scanning");
+    camTopLabel.textContent = "Scanning New Material…";
+    camInstruction.textContent = "Point camera at New Material QR / Data Matrix code";
+  }
+
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: facingMode,
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      }
+    });
+    camVideo.srcObject = cameraStream;
+    await camVideo.play();
+  } catch (err) {
+    noCameraMsg.style.display = "block";
+    noCameraMsg.textContent = "⚠️ Camera access denied or unavailable: " + err.message;
+    closeCamera();
+    return;
+  }
+
+  document.body.classList.add("camera-active");
+  cameraModal.classList.add("open");
+  syncCameraPanel();
+  startBarcodeDetection();
+}
+
+/* =============================================
+   CAMERA — CLOSE
+============================================= */
+function closeCamera() {
+  document.body.classList.remove("camera-active");
+  cameraModal.classList.remove("open");
+  stopStream();
+  camBtn1.classList.remove("scanning");
+  camBtn2.classList.remove("scanning");
+  if (rafId) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+  }
+  isDetecting = false;
+}
+
+/* =============================================
+   FLIP CAMERA
+============================================= */
+async function flipCamera() {
+  camFlipBtn.classList.add("spinning");
+  setTimeout(() => camFlipBtn.classList.remove("spinning"), 450);
+
+  facingMode = facingMode === "environment" ? "user" : "environment";
+
+  // Stop current stream
+  if (rafId) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+  }
+  stopStream();
+
+  // Restart with new facing mode
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: facingMode,
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      }
+    });
+    camVideo.srcObject = cameraStream;
+    await camVideo.play();
+    startBarcodeDetection();
+  } catch (err) {
+    // Flip failed (e.g. only one camera) — revert
+    facingMode = facingMode === "environment" ? "user" : "environment";
+    noCameraMsg.textContent = "⚠️ Could not switch camera: " + err.message;
+    noCameraMsg.style.display = "block";
+    // Reopen original
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: facingMode }
+    });
+    camVideo.srcObject = cameraStream;
+    await camVideo.play();
+    startBarcodeDetection();
+  }
+}
+
+function stopStream() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+  }
+  camVideo.srcObject = null;
+}
+
+/* =============================================
+   MULTI-FORMAT DETECTION LOOP
+   (Native BarcodeDetector -> ZXing DataMatrix/QR -> jsQR)
+============================================= */
+function startBarcodeDetection() {
+  const ctx = camCanvas.getContext("2d", { willReadFrequently: true });
+  isDetecting = false;
+
+  async function tick() {
+    if (!cameraStream) return; // stopped
+
+    if (camVideo.readyState === camVideo.HAVE_ENOUGH_DATA && !isDetecting) {
+      const w = camVideo.videoWidth;
+      const h = camVideo.videoHeight;
+
+      if (w > 0 && h > 0) {
+        camCanvas.width  = w;
+        camCanvas.height = h;
+        ctx.drawImage(camVideo, 0, 0, w, h);
+
+        isDetecting = true;
+        let detectedText = null;
+
+        // 1. Try Hardware Native BarcodeDetector (Fastest & high accuracy for Data Matrix + QR)
+        if (nativeDetector) {
+          try {
+            const barcodes = await nativeDetector.detect(camVideo);
+            if (barcodes && barcodes.length > 0) {
+              const raw = barcodes[0].rawValue;
+              if (raw && raw.trim()) {
+                detectedText = raw.trim();
+              }
+            }
+          } catch (err) {
+            // Ignore frame detection error
+          }
+        }
+
+        // 2. Try ZXing MultiFormatReader (Supports Data Matrix ECC 200, QR Code, Code 128, etc.)
+        if (!detectedText && zxingReader && typeof ZXing !== "undefined") {
+          try {
+            const imgData = ctx.getImageData(0, 0, w, h);
+            const luminanceSource = new ZXing.RGBLuminanceSource(imgData.data, w, h);
+            const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
+            const result = zxingReader.decode(binaryBitmap);
+            if (result && result.getText && result.getText().trim()) {
+              detectedText = result.getText().trim();
+            }
+          } catch (err) {
+            // NotFoundException is normal when no barcode is in frame
+          }
+        }
+
+        // 3. Try jsQR (Fast fallback for standard QR codes)
+        if (!detectedText && typeof jsQR !== "undefined") {
+          try {
+            const imgData = ctx.getImageData(0, 0, w, h);
+            const code = jsQR(imgData.data, w, h, { inversionAttempts: "dontInvert" });
+            if (code && code.data && code.data.trim()) {
+              detectedText = code.data.trim();
+            }
+          } catch (err) {
+            // Ignore
+          }
+        }
+
+        if (detectedText) {
+          handleDetected(detectedText);
+          return; // Stop RAF loop
+        }
+
+        isDetecting = false;
+      }
     }
+
+    rafId = requestAnimationFrame(tick);
   }
 
-  function speakFallback(isPass) {
-    if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const utter  = new SpeechSynthesisUtterance(isPass ? "Pass" : "Fail");
-    utter.lang   = "en-IN";
-    utter.volume = 1;
-    utter.rate   = 0.88;
-    utter.pitch  = isPass ? 1.1 : 0.9;
-    window.speechSynthesis.speak(utter);
+  rafId = requestAnimationFrame(tick);
+}
+
+/* =============================================
+   HANDLE DETECTED CODE
+============================================= */
+function handleDetected(value) {
+  // Flash feedback
+  flashDetected();
+
+  if (scanTarget === 1) {
+    qr1Input.value = value;
+    closeCamera();
+    advanceToField2(); // will auto-open camera for field 2
+  } else {
+    qr2Input.value = value;
+    syncCameraPanel();
+    closeCamera();
+    // Small delay so the close animation is visible before banner shows
+    setTimeout(submitScan, 100);
+  }
+}
+
+function flashDetected() {
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(99,102,241,0.35);z-index:99999;pointer-events:none;";
+  document.body.appendChild(overlay);
+  setTimeout(() => overlay.remove(), 200);
+}
+
+/* =============================================
+   SYNC CAMERA INFO PANEL
+============================================= */
+function syncCameraPanel() {
+  const v1 = qr1Input.value.trim();
+  const v2 = qr2Input.value.trim();
+
+  // Field 1 (Old Material)
+  if (v1) {
+    camVal1.textContent = v1;
+    camVal1.className   = "cam-qr-value";
+    camBox1.classList.add("filled");
+    camBox1.classList.remove("current-target");
+  } else {
+    camVal1.textContent = (scanTarget === 1) ? "Scanning now…" : "Not scanned yet";
+    camVal1.className   = "cam-qr-value empty";
+    camBox1.classList.remove("filled");
+    camBox1.classList.toggle("current-target", scanTarget === 1);
   }
 
-  /* =========================================
-     FIELD 1 -> advance to field 2
-  ========================================= */
-  qr1Input.addEventListener("keydown", e => {
-    if ((e.key === "Enter" || e.key === "Tab") && qr1Input.value.trim()) {
-      e.preventDefault();
-      advanceToField2();
-    }
-  });
-  qr1Input.addEventListener("input", () => {
-    if (/[\r\n]/.test(qr1Input.value)) {
-      qr1Input.value = qr1Input.value.replace(/[\r\n]/g, "").trim();
-      if (qr1Input.value) advanceToField2();
-    }
-  });
+  // Field 2 (New Material)
+  if (v2) {
+    camVal2.textContent = v2;
+    camVal2.className   = "cam-qr-value";
+    camBox2.classList.add("filled");
+    camBox2.classList.remove("current-target");
+  } else {
+    camVal2.textContent = (scanTarget === 2) ? "Scanning now…" : (v1 ? "Ready to scan" : "Waiting for Step 1");
+    camVal2.className   = "cam-qr-value empty";
+    camBox2.classList.remove("filled");
+    camBox2.classList.toggle("current-target", scanTarget === 2);
+  }
+}
 
-  function advanceToField2() {
-    qr1Input.classList.add("filled");
-    qr1Input.readOnly = true;
-    dot1.className     = "dot done";
-    dot2.className     = "dot active";
-    step1Dot.className = "step-dot done";
-    step2Dot.className = "step-dot active";
-    stepLine.classList.add("done");
-    qr2Input.readOnly  = false;
-    qr2Input.focus();
+/* =============================================
+   CAMERA BUTTON CLICKS
+============================================= */
+camBtn1.addEventListener("click", () => {
+  if (qr1Input.readOnly && qr1Input.value.trim()) return; // already filled
+  openCamera(1);
+});
+
+camBtn2.addEventListener("click", () => {
+  if (camBtn2.disabled) return;
+  openCamera(2);
+});
+
+camCloseBtn.addEventListener("click", closeCamera);
+camFlipBtn.addEventListener("click",  flipCamera);
+
+/* Close on background tap */
+cameraModal.addEventListener("click", e => {
+  if (e.target === cameraModal) closeCamera();
+});
+
+/* =============================================
+   INIT
+============================================= */
+window.addEventListener("DOMContentLoaded", () => {
+  // Move cameraModal directly under <body> to escape .main-content stacking context
+  if (cameraModal && cameraModal.parentElement !== document.body) {
+    document.body.appendChild(cameraModal);
   }
 
-  /* =========================================
-     FIELD 2 -> submit
-  ========================================= */
-  qr2Input.addEventListener("keydown", e => {
-    if ((e.key === "Enter" || e.key === "Tab") && qr2Input.value.trim() && qr1Input.value.trim()) {
-      e.preventDefault();
-      submitScan();
-    }
-  });
-  qr2Input.addEventListener("input", () => {
-    if (/[\r\n]/.test(qr2Input.value)) {
-      qr2Input.value = qr2Input.value.replace(/[\r\n]/g, "").trim();
-      if (qr2Input.value && qr1Input.value.trim()) submitScan();
-    }
-  });
-
-  async function submitScan() {
-    const qr1 = qr1Input.value.trim();
-    const qr2 = qr2Input.value.trim();
-    if (!qr1 || !qr2) return;
-    const isMatch = (qr1 === qr2);
-    showBanner(isMatch);
-    speak(isMatch);
-    fetch(SAVE_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-CSRFToken": CSRF_TOKEN },
-      body: JSON.stringify({ qr_code_1: qr1, qr_code_2: qr2 }),
-    }).catch(err => console.error(err));
-    addToHistory(isMatch, qr1, qr2);
-    scheduleReset();
-  }
-
-  function showBanner(isMatch) {
-    resultBanner.className  = "result-banner visible " + (isMatch ? "pass" : "fail");
-    resultEmoji.textContent = isMatch ? "\u2705" : "\u274C";
-    resultWord.textContent  = isMatch ? "PASS" : "FAIL";
-    resultDesc.textContent  = isMatch
-      ? "Old & New Material QR match!"
-      : "QR codes do NOT match - recheck!";
-  }
-
-  function scheduleReset() {
-    clearTimeout(resetTimer);
-    resetTimer = setTimeout(resetScanner, SHOW_MS);
-  }
-
-  function resetScanner() {
-    qr1Input.value    = "";
-    qr2Input.value    = "";
-    qr1Input.readOnly = false;
-    qr2Input.readOnly = true;
-    qr1Input.classList.remove("filled");
-    qr2Input.classList.remove("filled");
-    dot1.className     = "dot active";
-    dot2.className     = "dot";
-    step1Dot.className = "step-dot active";
-    step2Dot.className = "step-dot";
-    stepLine.classList.remove("done");
-    resultBanner.className = "result-banner";
-    qr1Input.focus();
-  }
-
-  function addToHistory(isMatch, qr1, qr2) {
-    recentScans.unshift({ isMatch, qr1, qr2 });
-    if (recentScans.length > 4) recentScans.pop();
-    historySection.style.display = "block";
-    historyList.innerHTML = recentScans.map(s =>
-      '<div class="history-item">' +
-        '<span class="history-badge ' + (s.isMatch ? "badge-pass" : "badge-fail") + '">' +
-          (s.isMatch ? "PASS" : "FAIL") +
-        "</span>" +
-        '<span class="history-codes" title="' + s.qr1 + " | " + s.qr2 + '">' +
-          trunc(s.qr1, 22) + " > " + trunc(s.qr2, 22) +
-        "</span>" +
-      "</div>"
-    ).join("");
-  }
-
-  function trunc(s, n) { return s.length > n ? s.slice(0, n) + "..." : s; }
-
-  window.addEventListener("DOMContentLoaded", () => {
-    qr1Input.focus();
-    // Warm up audio cache after 1.5s (after first user interaction resolves autoplay policy)
-    setTimeout(() => {
-      fetchAudioBuffer("Pass").catch(() => {});
-      fetchAudioBuffer("Fail").catch(() => {});
-    }, 1500);
-  });
-
+  qr1Input.focus();
+  syncCameraPanel();
+  // Warm TTS cache
+  setTimeout(() => {
+    fetchAudioBuffer("Pass").catch(() => {});
+    fetchAudioBuffer("Fail").catch(() => {});
+  }, 1500);
+});
 </script>
 {% endblock %}

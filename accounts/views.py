@@ -7,15 +7,10 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_protect
 from django.db import transaction
-from django.conf import settings
-import threading
 from accounts.decorators import admin_required
 from core.identity.models import UserScope, Role, Department, EmployeeProfile
 from core.identity.services import generate_employee_password
 from org.models import Plant
-from integrations.bitable.user_service import sync_user_to_bitable
-from integrations.bitable.upsert_client import upsert_bitable_record_via_relay
-from django.utils import timezone
 
 
 def login_view(request):
@@ -121,7 +116,8 @@ def user_create(request):
                 # ---- EMPLOYEE PROFILE ----
                 EmployeeProfile.objects.create(
                     user=user,
-                    employee_id=employee_id
+                    employee_id=employee_id,
+                    plain_password=raw_password,
                 )
 
                 # ---- USER SCOPE ----
@@ -136,23 +132,6 @@ def user_create(request):
             messages.error(request, f"Error creating user: {e}")
             return redirect("accounts:user_create")
 
-        # =====================================================
-        # 🔥 BITABLE SYNC (NON-BLOCKING - CLOUDFLARE RELAY)
-        # =====================================================
-        def _sync_user():
-            try:
-                sync_user_to_bitable(
-                    user=user,
-                    raw_password=raw_password,
-                    scope=scope,
-                    app_token=settings.BITABLE_USER_APP_TOKEN,
-                    table_id=settings.BITABLE_USER_TABLE_ID,
-                    created_by=request.user,
-                )
-            except Exception as e:
-                print("Bitable user sync failed:", e)
-
-        threading.Thread(target=_sync_user, daemon=True).start()
 
         # ---- SHOW PASSWORD ONCE ----
         request.session["created_user_credentials"] = {
@@ -206,42 +185,11 @@ def reset_user_password(request, user_id):
     user.set_password(raw_password)
     user.save(update_fields=["password"])
 
-    scope = UserScope.objects.filter(user=user).first()
-
-    # =====================================================
-    # 🔥 UPSERT TO BITABLE (Search + Update)
-    # =====================================================
-    def _sync_user():
-        try:
-            fields = {
-                "Employee_ID": str(user.username),   # 🔥 match field
-                "First_Name": user.first_name or "",
-                "Last_Name": user.last_name or "",
-                "Email": user.email or "",
-                "Password": raw_password,
-                "Is_Active": str(user.is_active),
-                "Is_Staff": str(user.is_staff),
-                "Created_At": int(timezone.now().timestamp() * 1000),
-            }
-
-            if scope:
-                fields.update({
-                    "Plant": scope.plant.name if scope.plant else "",
-                    "Department": scope.department.name if scope.department else "",
-                    "Role": scope.role.name if scope.role else "",
-                })
-
-            upsert_bitable_record_via_relay(
-                app_token=settings.BITABLE_USER_APP_TOKEN,
-                table_id=settings.BITABLE_USER_TABLE_ID,
-                records=[fields],
-                match_field="Employee_ID",   # 🔥 worker will search this column
-            )
-
-        except Exception as e:
-            print("Bitable password reset sync failed:", e)
-
-    threading.Thread(target=_sync_user, daemon=True).start()
+    # ---- Save new plain password to DB ----
+    profile = getattr(user, "employee_profile", None)
+    if profile:
+        profile.plain_password = raw_password
+        profile.save(update_fields=["plain_password"])
 
     request.session["created_user_credentials"] = {
         "username": user.username,
@@ -469,7 +417,8 @@ def bulk_user_preview(request):
 
                     EmployeeProfile.objects.create(
                         user=user,
-                        employee_id=employee_id
+                        employee_id=employee_id,
+                        plain_password=raw_password,
                     )
 
                     scope = UserScope.objects.create(
@@ -485,24 +434,6 @@ def bulk_user_preview(request):
             messages.error(request, f"Creation failed: {e}")
             return redirect("accounts:bulk_user_upload")
 
-        # 🔥 Background Bitable Sync
-        import threading
-
-        def _sync():
-            for user, raw_password, scope in created_users:
-                try:
-                    sync_user_to_bitable(
-                        user=user,
-                        raw_password=raw_password,
-                        scope=scope,
-                        app_token=settings.BITABLE_USER_APP_TOKEN,
-                        table_id=settings.BITABLE_USER_TABLE_ID,
-                        created_by=request.user,
-                    )
-                except Exception as e:
-                    print("Bulk Bitable sync failed:", e)
-
-        threading.Thread(target=_sync, daemon=True).start()
 
         request.session.pop("bulk_users_preview", None)
 
@@ -536,3 +467,22 @@ def delete_user(request, user_id):
     user.delete()
 
     return JsonResponse({"success": True})
+
+
+# =====================================================
+# REVEAL PASSWORD (Superuser only)
+# =====================================================
+
+@require_POST
+@csrf_protect
+def reveal_user_password(request, user_id):
+    if not request.user.is_authenticated or not request.user.is_superuser:
+        return JsonResponse({"error": "Not allowed"}, status=403)
+
+    user = get_object_or_404(User, id=user_id)
+
+    profile = getattr(user, "employee_profile", None)
+    if not profile or not profile.plain_password:
+        return JsonResponse({"error": "Password not available"}, status=404)
+
+    return JsonResponse({"password": profile.plain_password})

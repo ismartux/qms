@@ -125,6 +125,14 @@ class EmployeeProfile(models.Model):
         related_name="employee_profiles",
     )
 
+    # 🔐 Plain password storage (superuser-only access)
+    plain_password = models.CharField(
+        max_length=128,
+        blank=True,
+        default="",
+        help_text="Last-set plain text password — visible to superusers only",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

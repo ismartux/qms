@@ -1,314 +1,1356 @@
 {% extends "shell/app.html" %}
-{% block title %}IPQC Dashboard{% endblock %}
+{% load static %}
+{% block title %}Quality Intelligence Dashboard{% endblock %}
+
+{% block extra_css %}
+<!-- SheetJS for client-side Excel Export -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+/* =============================================
+   DASHBOARD CUSTOM STYLES
+============================================= */
+.kpi-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  cursor: pointer;
+  position: relative;
+}
+.kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 30px -8px rgba(0, 0, 0, 0.12);
+  border-color: #38bdf8;
+}
+.kpi-card .click-hint {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.kpi-card:hover .click-hint {
+  opacity: 1;
+}
+.tab-btn {
+  transition: all 0.2s ease;
+}
+.tab-btn.active {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: #0284c7;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
+}
+.progress-bar-fill {
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.clickable-row {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.clickable-row:hover {
+  background-color: #f0f9ff !important;
+}
+.table-container {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f8fafc;
+}
+.table-container::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.table-container::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+.table-container::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+/* Modal styles */
+#detailModal.open {
+  display: flex !important;
+}
+</style>
+{% endblock %}
 
 {% block content %}
+<div class="max-w-[1400px] mx-auto space-y-8 pb-16">
 
-<div class="max-w-7xl mx-auto space-y-8 pb-12">
-
-  <!-- ================= HEADER ================= -->
-  <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-
-    <div class="flex items-center gap-4">
-      <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-400 to-blue-500
-                  text-white flex items-center justify-center text-xl shadow-lg">
-        <i class="fas fa-chart-pie"></i>
-      </div>
-
-      <div>
-        <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900">
-          IPQC Dashboard
-        </h1>
-        <div class="flex items-center gap-2 text-sm text-gray-500 mt-1">
-          <span>{{ request.user.get_full_name|default:request.user.username }}</span>
+  <!-- =============================================
+       HEADER & CONTEXT
+  ============================================= -->
+  <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-gradient-to-r from-slate-900 via-sky-950 to-indigo-950 p-6 md:p-8 rounded-3xl text-white shadow-xl">
+    <div class="space-y-2">
+      <div class="flex items-center gap-3">
+        <span class="p-2.5 bg-sky-500/20 border border-sky-400/30 rounded-2xl text-sky-400 text-xl shadow-inner">
+          <i class="fas fa-chart-line"></i>
+        </span>
+        <div>
+          <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white flex items-center gap-3">
+            Quality Intelligence Dashboard
+            <span class="text-xs font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-0.5 rounded-full">
+              Live Operations
+            </span>
+          </h1>
+          <p class="text-xs md:text-sm text-slate-300">
+            Real-time analytics across IPQC Inspections, PQE Approvals &amp; Team Leader Supervision
+          </p>
         </div>
       </div>
     </div>
 
+    <!-- Quick Meta Info -->
+    <div class="flex flex-wrap items-center gap-3 text-xs">
+      <div class="bg-white/10 backdrop-blur border border-white/15 px-3.5 py-2 rounded-xl flex items-center gap-2">
+        <i class="fas fa-industry text-sky-400"></i>
+        <span class="text-slate-200">Active Lines:</span>
+        <strong class="text-white">{{ kpis.active_lines|default:"0" }} Lines</strong>
+      </div>
+      <div class="bg-white/10 backdrop-blur border border-white/15 px-3.5 py-2 rounded-xl flex items-center gap-2">
+        <i class="fas fa-tags text-indigo-400"></i>
+        <span class="text-slate-200">Brands:</span>
+        <strong class="text-white">{{ kpis.active_brands|default:"0" }}</strong>
+      </div>
+      <div class="bg-white/10 backdrop-blur border border-white/15 px-3.5 py-2 rounded-xl flex items-center gap-2">
+        <i class="fas fa-user-check text-emerald-400"></i>
+        <span class="text-slate-200">Inspectors:</span>
+        <strong class="text-white">{{ kpis.active_inspectors|default:"0" }}</strong>
+      </div>
+    </div>
   </div>
 
-  <!-- ================= DATE FILTERS ================= -->
-  <div class="flex flex-wrap gap-2">
+  <!-- =============================================
+       TIME PERIOD SELECTOR & FILTER BAR
+  ============================================= -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4">
+    
+    <!-- Range Pills -->
+    <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100">
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400 mr-2 flex items-center gap-1.5">
+          <i class="far fa-calendar-alt text-slate-500"></i> Period:
+        </span>
+        <div class="flex flex-wrap gap-1.5">
+          <a href="?range=today{% if selected_plant_id %}&plant={{ selected_plant_id }}{% endif %}{% if selected_shop_id %}&shop={{ selected_shop_id }}{% endif %}{% if selected_brand %}&brand={{ selected_brand }}{% endif %}{% if selected_line_id %}&line={{ selected_line_id }}{% endif %}&tab={{ active_tab }}"
+             class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition {% if selected_range == 'today' %}bg-sky-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+            Today
+          </a>
+          <a href="?range=yesterday{% if selected_plant_id %}&plant={{ selected_plant_id }}{% endif %}{% if selected_shop_id %}&shop={{ selected_shop_id }}{% endif %}{% if selected_brand %}&brand={{ selected_brand }}{% endif %}{% if selected_line_id %}&line={{ selected_line_id }}{% endif %}&tab={{ active_tab }}"
+             class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition {% if selected_range == 'yesterday' %}bg-sky-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+            Yesterday
+          </a>
+          <a href="?range=this_week{% if selected_plant_id %}&plant={{ selected_plant_id }}{% endif %}{% if selected_shop_id %}&shop={{ selected_shop_id }}{% endif %}{% if selected_brand %}&brand={{ selected_brand }}{% endif %}{% if selected_line_id %}&line={{ selected_line_id }}{% endif %}&tab={{ active_tab }}"
+             class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition {% if selected_range == 'this_week' %}bg-sky-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+            This Week
+          </a>
+          <a href="?range=last_week{% if selected_plant_id %}&plant={{ selected_plant_id }}{% endif %}{% if selected_shop_id %}&shop={{ selected_shop_id }}{% endif %}{% if selected_brand %}&brand={{ selected_brand }}{% endif %}{% if selected_line_id %}&line={{ selected_line_id }}{% endif %}&tab={{ active_tab }}"
+             class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition {% if selected_range == 'last_week' %}bg-sky-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+            Last Week
+          </a>
+          <a href="?range=this_month{% if selected_plant_id %}&plant={{ selected_plant_id }}{% endif %}{% if selected_shop_id %}&shop={{ selected_shop_id }}{% endif %}{% if selected_brand %}&brand={{ selected_brand }}{% endif %}{% if selected_line_id %}&line={{ selected_line_id }}{% endif %}&tab={{ active_tab }}"
+             class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition {% if selected_range == 'this_month' %}bg-sky-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+            This Month
+          </a>
+          <a href="?range=all{% if selected_plant_id %}&plant={{ selected_plant_id }}{% endif %}{% if selected_shop_id %}&shop={{ selected_shop_id }}{% endif %}{% if selected_brand %}&brand={{ selected_brand }}{% endif %}{% if selected_line_id %}&line={{ selected_line_id }}{% endif %}&tab={{ active_tab }}"
+             class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition {% if selected_range == 'all' %}bg-sky-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+            All Time
+          </a>
+        </div>
+      </div>
 
-    <a href="?range=today"
-       class="px-4 py-1.5 rounded-full text-sm font-semibold border transition
-       {% if selected_range == 'today' %}
-         bg-sky-600 text-white border-sky-600
-       {% else %}
-         bg-white text-gray-600 border-gray-300 hover:bg-gray-100
-       {% endif %}">
-      Today
-    </a>
-
-    <a href="?range=this_week"
-       class="px-4 py-1.5 rounded-full text-sm font-semibold border transition
-       {% if selected_range == 'this_week' %}
-         bg-sky-600 text-white border-sky-600
-       {% else %}
-         bg-white text-gray-600 border-gray-300 hover:bg-gray-100
-       {% endif %}">
-      This Week
-    </a>
-
-    <a href="?range=last_week"
-       class="px-4 py-1.5 rounded-full text-sm font-semibold border transition
-       {% if selected_range == 'last_week' %}
-         bg-sky-600 text-white border-sky-600
-       {% else %}
-         bg-white text-gray-600 border-gray-300 hover:bg-gray-100
-       {% endif %}">
-      Last Week
-    </a>
-
-    <a href="?range=this_month"
-       class="px-4 py-1.5 rounded-full text-sm font-semibold border transition
-       {% if selected_range == 'this_month' %}
-         bg-sky-600 text-white border-sky-600
-       {% else %}
-         bg-white text-gray-600 border-gray-300 hover:bg-gray-100
-       {% endif %}">
-      This Month
-    </a>
-
-  </div>
-
-  <!-- ================= RECENT SUBMISSIONS ================= -->
-  <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
-
-    <div class="px-6 py-5 border-b bg-gray-50 flex justify-between items-center">
-      <h3 class="text-lg font-bold text-gray-900">
-        Your Recent Submissions
-      </h3>
-      <span class="bg-gray-200 text-gray-600 text-xs font-bold px-2 py-1 rounded-full">
-        {{ page_obj.paginator.count }}
-      </span>
+      {% if selected_plant_id or selected_shop_id or selected_brand or selected_line_id %}
+      <a href="?range={{ selected_range }}&tab={{ active_tab }}"
+         class="text-xs font-semibold text-rose-600 hover:text-rose-800 flex items-center gap-1.5 transition">
+        <i class="fas fa-times-circle"></i> Clear Filters
+      </a>
+      {% endif %}
     </div>
 
-    <div class="p-6">
+    <!-- Multi-Dimensional Filter Dropdowns -->
+    <form method="GET" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-1">
+      <input type="hidden" name="range" value="{{ selected_range }}">
+      <input type="hidden" name="tab" value="{{ active_tab }}">
 
-      {% if page_obj %}
+      <!-- Plant -->
+      <div>
+        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Plant</label>
+        <select name="plant" onchange="this.form.submit()"
+                class="w-full text-xs rounded-xl border-slate-200 bg-slate-50 font-medium text-slate-700 py-2 px-3 focus:ring-2 focus:ring-sky-500 focus:bg-white transition">
+          <option value="">All Plants</option>
+          {% for p in filter_options.plants %}
+          <option value="{{ p.id }}" {% if selected_plant_id == p.id|stringformat:"i" or selected_plant_id == p.id %}selected{% endif %}>
+            {{ p.name }} ({{ p.code }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+      <!-- Section / Shop -->
+      <div>
+        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Section / Shop</label>
+        <select name="shop" onchange="this.form.submit()"
+                class="w-full text-xs rounded-xl border-slate-200 bg-slate-50 font-medium text-slate-700 py-2 px-3 focus:ring-2 focus:ring-sky-500 focus:bg-white transition">
+          <option value="">All Sections</option>
+          {% for s in filter_options.shops %}
+          <option value="{{ s.id }}" {% if selected_shop_id == s.id|stringformat:"i" or selected_shop_id == s.id %}selected{% endif %}>
+            {{ s.name }} ({{ s.plant__name }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
 
-        {% for s in page_obj %}
-        <div class="rounded-xl border bg-white p-5 flex flex-col shadow-sm hover:shadow-md transition">
+      <!-- Brand -->
+      <div>
+        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Brand</label>
+        <select name="brand" onchange="this.form.submit()"
+                class="w-full text-xs rounded-xl border-slate-200 bg-slate-50 font-medium text-slate-700 py-2 px-3 focus:ring-2 focus:ring-sky-500 focus:bg-white transition">
+          <option value="">All Brands</option>
+          {% for b in filter_options.brands %}
+          <option value="{{ b }}" {% if selected_brand == b %}selected{% endif %}>
+            {{ b }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
 
-          <!-- TITLE -->
-          <h4 class="font-bold text-gray-900 text-lg mb-3">
-            {{ s.template_name }}
-          </h4>
+      <!-- Line -->
+      <div>
+        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Line</label>
+        <select name="line" onchange="this.form.submit()"
+                class="w-full text-xs rounded-xl border-slate-200 bg-slate-50 font-medium text-slate-700 py-2 px-3 focus:ring-2 focus:ring-sky-500 focus:bg-white transition">
+          <option value="">All Lines</option>
+          {% for l in filter_options.lines %}
+          <option value="{{ l.id }}" {% if selected_line_id == l.id|stringformat:"i" or selected_line_id == l.id %}selected{% endif %}>
+            {{ l.name }} {% if l.shop__name %}({{ l.shop__name }}){% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
 
-          <!-- META -->
-          <div class="space-y-2 text-xs text-gray-500 mb-4">
+      <!-- Submit / Refresh -->
+      <div class="flex items-end">
+        <button type="submit"
+                class="w-full py-2 px-4 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-sky-600 transition flex items-center justify-center gap-2 shadow-sm">
+          <i class="fas fa-filter text-[11px]"></i> Apply Filters
+        </button>
+      </div>
+    </form>
 
-            <div class="flex items-center">
-              <i class="far fa-clock w-4 text-gray-400"></i>
-              <span class="ml-2">
-                {{ s.submitted_at|date:"d M Y, H:i" }}
+  </div>
+
+  <!-- =============================================
+       EXECUTIVE KPI SUMMARY CARDS (CLICKABLE POPUP)
+  ============================================= -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+
+    <!-- Total Submissions Card -->
+    <div onclick="openDetailModal('total', '', '', 'All Submissions in Filtered Period')"
+         class="kpi-card bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"
+         title="Click to view all submission details">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Submissions</span>
+        <span class="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center text-sm">
+          <i class="fas fa-file-invoice"></i>
+        </span>
+      </div>
+      <div class="text-2xl md:text-3xl font-black text-slate-900">
+        {{ kpis.total|default:"0" }}
+      </div>
+      <div class="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+        <span class="flex items-center gap-1.5">
+          <i class="fas fa-circle text-[6px] text-sky-500"></i> Filtered period
+        </span>
+        <span class="click-hint text-sky-600 font-bold flex items-center gap-1">
+          View details <i class="fas fa-arrow-right text-[10px]"></i>
+        </span>
+      </div>
+    </div>
+
+    <!-- PQE Approved Card -->
+    <div onclick="openDetailModal('approved', '', '', 'PQE Approved Submissions')"
+         class="kpi-card bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"
+         title="Click to view approved submission details">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Approved</span>
+        <span class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm">
+          <i class="fas fa-check-circle"></i>
+        </span>
+      </div>
+      <div class="flex items-baseline gap-2">
+        <span class="text-2xl md:text-3xl font-black text-emerald-600">{{ kpis.approved|default:"0" }}</span>
+        <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+          {{ kpis.approval_rate }}%
+        </span>
+      </div>
+      <div class="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+        <span class="flex items-center gap-1.5">
+          <i class="fas fa-shield-alt text-emerald-500 text-[10px]"></i> PQE approved
+        </span>
+        <span class="click-hint text-emerald-600 font-bold flex items-center gap-1">
+          View details <i class="fas fa-arrow-right text-[10px]"></i>
+        </span>
+      </div>
+    </div>
+
+    <!-- Pending Review Card -->
+    <div onclick="openDetailModal('pending', '', '', 'Pending PQE Review Submissions')"
+         class="kpi-card bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"
+         title="Click to view pending submission details">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Pending Review</span>
+        <span class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-sm">
+          <i class="fas fa-hourglass-half"></i>
+        </span>
+      </div>
+      <div class="text-2xl md:text-3xl font-black text-amber-600">
+        {{ kpis.pending|default:"0" }}
+      </div>
+      <div class="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+        <span class="flex items-center gap-1.5">
+          <i class="fas fa-clock text-amber-500 text-[10px]"></i> Awaiting review
+        </span>
+        <span class="click-hint text-amber-600 font-bold flex items-center gap-1">
+          View details <i class="fas fa-arrow-right text-[10px]"></i>
+        </span>
+      </div>
+    </div>
+
+    <!-- Rejected Card -->
+    <div onclick="openDetailModal('rejected', '', '', 'PQE Rejected Submissions')"
+         class="kpi-card bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"
+         title="Click to view rejected submission details">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Rejected</span>
+        <span class="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-sm">
+          <i class="fas fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="flex items-baseline gap-2">
+        <span class="text-2xl md:text-3xl font-black text-rose-600">{{ kpis.rejected|default:"0" }}</span>
+        <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">
+          {{ kpis.rejection_rate }}%
+        </span>
+      </div>
+      <div class="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+        <span class="flex items-center gap-1.5">
+          <i class="fas fa-exclamation-triangle text-rose-500 text-[10px]"></i> Avg Sev: {{ kpis.avg_severity }}
+        </span>
+        <span class="click-hint text-rose-600 font-bold flex items-center gap-1">
+          View details <i class="fas fa-arrow-right text-[10px]"></i>
+        </span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- =============================================
+       ROLE PERSPECTIVE NAVIGATION TABS
+  ============================================= -->
+  <div class="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
+    <button type="button" onclick="switchRoleTab('overview')"
+            id="tab-btn-overview"
+            class="tab-btn px-5 py-2.5 rounded-xl text-xs font-bold border flex items-center gap-2 {% if active_tab == 'overview' or not active_tab %}active{% else %}border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}">
+      <i class="fas fa-globe"></i> Overall Operations
+    </button>
+    <button type="button" onclick="switchRoleTab('ipqc')"
+            id="tab-btn-ipqc"
+            class="tab-btn px-5 py-2.5 rounded-xl text-xs font-bold border flex items-center gap-2 {% if active_tab == 'ipqc' %}active{% else %}border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}">
+      <i class="fas fa-user-shield"></i> IPQC Inspectors ({{ ipqc_breakdown|length }})
+    </button>
+    <button type="button" onclick="switchRoleTab('pqe')"
+            id="tab-btn-pqe"
+            class="tab-btn px-5 py-2.5 rounded-xl text-xs font-bold border flex items-center gap-2 {% if active_tab == 'pqe' %}active{% else %}border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}">
+      <i class="fas fa-clipboard-check"></i> PQE Quality Review ({{ pqe_breakdown|length }})
+    </button>
+    <button type="button" onclick="switchRoleTab('tl')"
+            id="tab-btn-tl"
+            class="tab-btn px-5 py-2.5 rounded-xl text-xs font-bold border flex items-center gap-2 {% if active_tab == 'tl' %}active{% else %}border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}">
+      <i class="fas fa-users-cog"></i> TL / Floor Oversight ({{ tl_breakdown|length }})
+    </button>
+  </div>
+
+  <!-- =============================================
+       TAB 1: OVERALL OPERATIONS (Plant, Section, Brand, Line)
+  ============================================= -->
+  <div id="tab-content-overview" class="role-tab-pane space-y-8 {% if active_tab != 'overview' and active_tab %}hidden{% endif %}">
+
+    <!-- Plant & Section Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      <!-- Plant-Wise Breakdown Card -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+          <div class="flex items-center gap-2">
+            <i class="fas fa-industry text-sky-600"></i>
+            <h3 class="font-bold text-sm text-slate-800">Plant-Wise Quality Performance</h3>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="exportTableToExcel('plantTable', 'Plant_Quality_Performance')"
+                    class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 text-xs font-bold transition flex items-center gap-1.5"
+                    title="Export Plant data to Excel">
+              <i class="fas fa-file-excel"></i> Export
+            </button>
+            <span class="text-xs font-bold bg-sky-100 text-sky-700 px-2.5 py-0.5 rounded-full">
+              {{ plant_breakdown|length }} Plants
+            </span>
+          </div>
+        </div>
+        <div class="p-5">
+          <div class="table-container overflow-x-auto">
+            <table id="plantTable" class="w-full text-left text-xs text-slate-600">
+              <thead class="text-[11px] font-bold text-slate-400 uppercase bg-slate-50 border-b border-slate-100">
+                <tr>
+                  <th class="py-2.5 px-3">Plant</th>
+                  <th class="py-2.5 px-3 text-center">Submissions</th>
+                  <th class="py-2.5 px-3 text-center">Approved</th>
+                  <th class="py-2.5 px-3 text-center">Pending</th>
+                  <th class="py-2.5 px-3 text-center">Rejected</th>
+                  <th class="py-2.5 px-3 text-right">Approval Rate</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                {% for p in plant_breakdown %}
+                <tr onclick="openDetailModal('plant', '{{ p.id }}', '{{ p.name }}', 'Submissions for {{ p.name }} Plant')"
+                    class="clickable-row hover:bg-slate-50/80 transition"
+                    title="Click to view details for {{ p.name }}">
+                  <td class="py-3 px-3 font-bold text-slate-800">
+                    <span class="text-sky-700 hover:underline">{{ p.name }}</span>
+                    <span class="block text-[10px] text-slate-400 font-normal">{{ p.lines_count }} Active Lines</span>
+                  </td>
+                  <td class="py-3 px-3 text-center font-bold text-slate-700">{{ p.total }}</td>
+                  <td class="py-3 px-3 text-center text-emerald-600 font-semibold">{{ p.approved }}</td>
+                  <td class="py-3 px-3 text-center text-amber-600 font-semibold">{{ p.pending }}</td>
+                  <td class="py-3 px-3 text-center text-rose-600 font-semibold">{{ p.rejected }}</td>
+                  <td class="py-3 px-3 text-right">
+                    <div class="flex items-center justify-end gap-2">
+                      <span class="font-bold text-slate-800">{{ p.approval_rate }}%</span>
+                      <div class="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div class="progress-bar-fill h-full bg-emerald-500" style="width: {{ p.approval_rate }}%;"></div>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="6" class="py-6 text-center text-slate-400">No plant records found for this period.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section / Shop-Wise Breakdown Card -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+          <div class="flex items-center gap-2">
+            <i class="fas fa-layer-group text-indigo-600"></i>
+            <h3 class="font-bold text-sm text-slate-800">Section / Segment Performance</h3>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="exportTableToExcel('sectionTable', 'Section_Segment_Performance')"
+                    class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 text-xs font-bold transition flex items-center gap-1.5"
+                    title="Export Section data to Excel">
+              <i class="fas fa-file-excel"></i> Export
+            </button>
+            <span class="text-xs font-bold bg-indigo-100 text-indigo-700 px-2.5 py-0.5 rounded-full">
+              {{ section_breakdown|length }} Sections
+            </span>
+          </div>
+        </div>
+        <div class="p-5">
+          <div class="table-container overflow-x-auto">
+            <table id="sectionTable" class="w-full text-left text-xs text-slate-600">
+              <thead class="text-[11px] font-bold text-slate-400 uppercase bg-slate-50 border-b border-slate-100">
+                <tr>
+                  <th class="py-2.5 px-3">Section / Shop</th>
+                  <th class="py-2.5 px-3 text-center">Submissions</th>
+                  <th class="py-2.5 px-3 text-center">Approved</th>
+                  <th class="py-2.5 px-3 text-center">Pending</th>
+                  <th class="py-2.5 px-3 text-center">Rejected</th>
+                  <th class="py-2.5 px-3 text-right">Approval Rate</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                {% for sec in section_breakdown %}
+                <tr onclick="openDetailModal('shop', '{{ sec.id }}', '{{ sec.name }}', 'Submissions for Section: {{ sec.name }}')"
+                    class="clickable-row hover:bg-slate-50/80 transition"
+                    title="Click to view details for {{ sec.name }}">
+                  <td class="py-3 px-3 font-bold text-slate-800">
+                    <span class="text-indigo-700 hover:underline">{{ sec.name }}</span>
+                    <span class="block text-[10px] text-slate-400 font-normal">{{ sec.lines_count }} Lines • {{ sec.plant_name }}</span>
+                  </td>
+                  <td class="py-3 px-3 text-center font-bold text-slate-700">{{ sec.total }}</td>
+                  <td class="py-3 px-3 text-center text-emerald-600 font-semibold">{{ sec.approved }}</td>
+                  <td class="py-3 px-3 text-center text-amber-600 font-semibold">{{ sec.pending }}</td>
+                  <td class="py-3 px-3 text-center text-rose-600 font-semibold">{{ sec.rejected }}</td>
+                  <td class="py-3 px-3 text-right">
+                    <div class="flex items-center justify-end gap-2">
+                      <span class="font-bold text-slate-800">{{ sec.approval_rate }}%</span>
+                      <div class="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div class="progress-bar-fill h-full bg-indigo-500" style="width: {{ sec.approval_rate }}%;"></div>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="6" class="py-6 text-center text-slate-400">No section data for selected filters.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Brand & Line Breakdown Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      <!-- Brand-Wise Breakdown Card -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+          <div class="flex items-center gap-2">
+            <i class="fas fa-tags text-purple-600"></i>
+            <h3 class="font-bold text-sm text-slate-800">Brand-Wise Quality Compliance</h3>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="exportTableToExcel('brandTable', 'Brand_Quality_Compliance')"
+                    class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 text-xs font-bold transition flex items-center gap-1.5"
+                    title="Export Brand data to Excel">
+              <i class="fas fa-file-excel"></i> Export
+            </button>
+            <span class="text-xs font-bold bg-purple-100 text-purple-700 px-2.5 py-0.5 rounded-full">
+              {{ brand_breakdown|length }} Brands
+            </span>
+          </div>
+        </div>
+        <div class="p-5">
+          <div class="table-container overflow-x-auto">
+            <table id="brandTable" class="w-full text-left text-xs text-slate-600">
+              <thead class="text-[11px] font-bold text-slate-400 uppercase bg-slate-50 border-b border-slate-100">
+                <tr>
+                  <th class="py-2.5 px-3">Brand</th>
+                  <th class="py-2.5 px-3 text-center">Submissions</th>
+                  <th class="py-2.5 px-3 text-center">Approved</th>
+                  <th class="py-2.5 px-3 text-center">Pending</th>
+                  <th class="py-2.5 px-3 text-center">Rejected</th>
+                  <th class="py-2.5 px-3 text-right">Approval %</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                {% for b in brand_breakdown %}
+                <tr onclick="openDetailModal('brand', '', '{{ b.brand }}', 'Submissions for Brand: {{ b.brand }}')"
+                    class="clickable-row hover:bg-slate-50/80 transition"
+                    title="Click to view details for {{ b.brand }}">
+                  <td class="py-3 px-3 font-bold text-slate-900">
+                    <span class="inline-flex items-center gap-1.5 text-purple-700 hover:underline">
+                      <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                      {{ b.brand }}
+                    </span>
+                    <span class="block text-[10px] text-slate-400 font-normal">{{ b.models_count }} Models</span>
+                  </td>
+                  <td class="py-3 px-3 text-center font-bold text-slate-700">{{ b.total }}</td>
+                  <td class="py-3 px-3 text-center text-emerald-600 font-semibold">{{ b.approved }}</td>
+                  <td class="py-3 px-3 text-center text-amber-600 font-semibold">{{ b.pending }}</td>
+                  <td class="py-3 px-3 text-center text-rose-600 font-semibold">{{ b.rejected }}</td>
+                  <td class="py-3 px-3 text-right font-bold text-slate-800">
+                    {{ b.approval_rate }}%
+                  </td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="6" class="py-6 text-center text-slate-400">No brand records found.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Line-Wise Performance Card -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+          <div class="flex items-center gap-2">
+            <i class="fas fa-sitemap text-teal-600"></i>
+            <h3 class="font-bold text-sm text-slate-800">Production Line Compliance</h3>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="exportTableToExcel('lineTable', 'Line_Production_Compliance')"
+                    class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 text-xs font-bold transition flex items-center gap-1.5"
+                    title="Export Line data to Excel">
+              <i class="fas fa-file-excel"></i> Export
+            </button>
+            <span class="text-xs font-bold bg-teal-100 text-teal-700 px-2.5 py-0.5 rounded-full">
+              {{ line_breakdown|length }} Lines
+            </span>
+          </div>
+        </div>
+        <div class="p-5">
+          <div class="table-container overflow-x-auto max-h-[340px]">
+            <table id="lineTable" class="w-full text-left text-xs text-slate-600">
+              <thead class="text-[11px] font-bold text-slate-400 uppercase bg-slate-50 border-b border-slate-100 sticky top-0">
+                <tr>
+                  <th class="py-2.5 px-3">Line</th>
+                  <th class="py-2.5 px-3">Section</th>
+                  <th class="py-2.5 px-3 text-center">Submissions</th>
+                  <th class="py-2.5 px-3 text-center">Approved</th>
+                  <th class="py-2.5 px-3 text-center">Pending</th>
+                  <th class="py-2.5 px-3 text-center">Rejected</th>
+                  <th class="py-2.5 px-3 text-right">Approval %</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                {% for l in line_breakdown %}
+                <tr onclick="openDetailModal('line', '{{ l.id }}', '{{ l.name }}', 'Submissions for Line: {{ l.name }}')"
+                    class="clickable-row hover:bg-slate-50/80 transition"
+                    title="Click to view details for {{ l.name }}">
+                  <td class="py-2.5 px-3 font-bold text-teal-700 hover:underline">{{ l.name }}</td>
+                  <td class="py-2.5 px-3 text-slate-500">{{ l.shop_name }}</td>
+                  <td class="py-2.5 px-3 text-center font-bold text-slate-700">{{ l.total }}</td>
+                  <td class="py-2.5 px-3 text-center text-emerald-600 font-semibold">{{ l.approved }}</td>
+                  <td class="py-2.5 px-3 text-center text-amber-600 font-semibold">{{ l.pending }}</td>
+                  <td class="py-2.5 px-3 text-center text-rose-600 font-semibold">{{ l.rejected }}</td>
+                  <td class="py-2.5 px-3 text-right font-bold text-slate-800">{{ l.approval_rate }}%</td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="7" class="py-6 text-center text-slate-400">No line records found.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- =============================================
+       TAB 2: IPQC INSPECTORS LEADERBOARD
+  ============================================= -->
+  <div id="tab-content-ipqc" class="role-tab-pane space-y-6 {% if active_tab != 'ipqc' %}hidden{% endif %}">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="px-6 py-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/70">
+        <div>
+          <h3 class="font-bold text-base text-slate-900 flex items-center gap-2">
+            <i class="fas fa-user-shield text-sky-600"></i> IPQC Inspector Performance &amp; Activity
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">
+            Inspections executed, lines audited, and quality pass rates by inspector (click any inspector for full records)
+          </p>
+        </div>
+        <div class="flex items-center gap-3 w-full sm:w-auto">
+          <button type="button" onclick="exportTableToExcel('ipqcInspectorTable', 'IPQC_Inspector_Leaderboard')"
+                  class="px-3 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 text-xs font-bold transition flex items-center gap-1.5 shadow-sm whitespace-nowrap">
+            <i class="fas fa-file-excel"></i> Export Excel
+          </button>
+          <div class="relative w-full sm:w-64">
+            <input type="text" id="inspectorSearch" onkeyup="filterTable('inspectorSearch', 'ipqcInspectorTable')"
+                   placeholder="Search inspector..."
+                   class="w-full text-xs rounded-xl border-slate-200 bg-white py-2 pl-8 pr-3 focus:ring-2 focus:ring-sky-500 transition">
+            <i class="fas fa-search absolute left-2.5 top-2.5 text-slate-400 text-xs"></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-6">
+        <div class="table-container overflow-x-auto">
+          <table id="ipqcInspectorTable" class="w-full text-left text-xs text-slate-600">
+            <thead class="text-[11px] font-bold text-slate-400 uppercase bg-slate-50 border-b border-slate-100">
+              <tr>
+                <th class="py-3 px-4"># Rank</th>
+                <th class="py-3 px-4">Inspector Name</th>
+                <th class="py-3 px-4">Employee ID</th>
+                <th class="py-3 px-4">Plant</th>
+                <th class="py-3 px-4 text-center">Lines Audited</th>
+                <th class="py-3 px-4 text-center">Total Submissions</th>
+                <th class="py-3 px-4 text-center">Approved</th>
+                <th class="py-3 px-4 text-center">Pending</th>
+                <th class="py-3 px-4 text-center">Rejected</th>
+                <th class="py-3 px-4 text-right">Pass Rate</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              {% for insp in ipqc_breakdown %}
+              <tr onclick="openDetailModal('inspector', '{{ insp.user_id }}', '{{ insp.name }}', 'Inspections by {{ insp.name }} ({{ insp.username }})')"
+                  class="clickable-row hover:bg-slate-50/80 transition"
+                  title="Click to view all submissions by {{ insp.name }}">
+                <td class="py-3 px-4 font-bold text-slate-400">
+                  {% if forloop.counter == 1 %}
+                    <span class="w-6 h-6 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-xs">🥇</span>
+                  {% elif forloop.counter == 2 %}
+                    <span class="w-6 h-6 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center text-xs">🥈</span>
+                  {% elif forloop.counter == 3 %}
+                    <span class="w-6 h-6 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center text-xs">🥉</span>
+                  {% else %}
+                    {{ forloop.counter }}
+                  {% endif %}
+                </td>
+                <td class="py-3 px-4 font-bold text-sky-700 hover:underline">{{ insp.name }}</td>
+                <td class="py-3 px-4 font-mono text-slate-500">{{ insp.username }}</td>
+                <td class="py-3 px-4 text-slate-600">{{ insp.plant_name }}</td>
+                <td class="py-3 px-4 text-center">
+                  <span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold text-[11px]">
+                    {{ insp.lines_covered }} lines
+                  </span>
+                </td>
+                <td class="py-3 px-4 text-center font-bold text-slate-800 text-sm">{{ insp.total }}</td>
+                <td class="py-3 px-4 text-center text-emerald-600 font-semibold">{{ insp.approved }}</td>
+                <td class="py-3 px-4 text-center text-amber-600 font-semibold">{{ insp.pending }}</td>
+                <td class="py-3 px-4 text-center text-rose-600 font-semibold">{{ insp.rejected }}</td>
+                <td class="py-3 px-4 text-right">
+                  <span class="font-bold text-emerald-600">{{ insp.approval_rate }}%</span>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="10" class="py-8 text-center text-slate-400">No inspector activity recorded for this filter.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =============================================
+       TAB 3: PQE QUALITY APPROVAL REVIEW
+  ============================================= -->
+  <div id="tab-content-pqe" class="role-tab-pane space-y-6 {% if active_tab != 'pqe' %}hidden{% endif %}">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="px-6 py-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/70">
+        <div>
+          <h3 class="font-bold text-base text-slate-900 flex items-center gap-2">
+            <i class="fas fa-clipboard-check text-emerald-600"></i> PQE Quality Engineer Approvals &amp; Rejections
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">
+            Audit decisions, approval velocity, and quality feedback per PQE approver (click any reviewer for records)
+          </p>
+        </div>
+        <div class="flex items-center gap-3 w-full sm:w-auto">
+          <button type="button" onclick="exportTableToExcel('pqeTable', 'PQE_Quality_Review_Decisions')"
+                  class="px-3 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 text-xs font-bold transition flex items-center gap-1.5 shadow-sm whitespace-nowrap">
+            <i class="fas fa-file-excel"></i> Export Excel
+          </button>
+          <div class="relative w-full sm:w-64">
+            <input type="text" id="pqeSearch" onkeyup="filterTable('pqeSearch', 'pqeTable')"
+                   placeholder="Search PQE reviewer..."
+                   class="w-full text-xs rounded-xl border-slate-200 bg-white py-2 pl-8 pr-3 focus:ring-2 focus:ring-emerald-500 transition">
+            <i class="fas fa-search absolute left-2.5 top-2.5 text-slate-400 text-xs"></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-6">
+        <div class="table-container overflow-x-auto">
+          <table id="pqeTable" class="w-full text-left text-xs text-slate-600">
+            <thead class="text-[11px] font-bold text-slate-400 uppercase bg-slate-50 border-b border-slate-100">
+              <tr>
+                <th class="py-3 px-4">PQE Reviewer</th>
+                <th class="py-3 px-4 text-center">Total Reviewed</th>
+                <th class="py-3 px-4 text-center">Approved</th>
+                <th class="py-3 px-4 text-center">Rejected</th>
+                <th class="py-3 px-4 text-center">Approval Rate</th>
+                <th class="py-3 px-4 text-right">Rejection Rate</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              {% for p in pqe_breakdown %}
+              <tr onclick="openDetailModal('pqe', '', '{{ p.approver_name }}', 'Decisions by PQE: {{ p.approver_name }}')"
+                  class="clickable-row hover:bg-slate-50/80 transition"
+                  title="Click to view all reviews by {{ p.approver_name }}">
+                <td class="py-3 px-4 font-bold text-slate-900">
+                  <div class="flex items-center gap-2.5">
+                    <span class="w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">
+                      {{ p.approver_name|slice:":1"|upper }}
+                    </span>
+                    <span class="text-emerald-800 hover:underline">{{ p.approver_name }}</span>
+                  </div>
+                </td>
+                <td class="py-3 px-4 text-center font-bold text-slate-800 text-sm">{{ p.total }}</td>
+                <td class="py-3 px-4 text-center font-bold text-emerald-600">{{ p.approved }}</td>
+                <td class="py-3 px-4 text-center font-bold text-rose-600">{{ p.rejected }}</td>
+                <td class="py-3 px-4 text-center">
+                  <span class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold text-xs border border-emerald-200">
+                    {{ p.approval_rate }}%
+                  </span>
+                </td>
+                <td class="py-3 px-4 text-right">
+                  <span class="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 font-bold text-xs border border-rose-200">
+                    {{ p.rejection_rate }}%
+                  </span>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="6" class="py-8 text-center text-slate-400">No PQE decisions recorded for this period.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =============================================
+       TAB 4: TL / FLOOR OVERSIGHT
+  ============================================= -->
+  <div id="tab-content-tl" class="role-tab-pane space-y-6 {% if active_tab != 'tl' %}hidden{% endif %}">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="px-6 py-5 border-b border-slate-100 bg-slate-50/70 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h3 class="font-bold text-base text-slate-900 flex items-center gap-2">
+            <i class="fas fa-users-cog text-purple-600"></i> Team Leader (TL) Floor &amp; Line Oversight
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">
+            Operational floor assignments, line health, and shift supervisory metrics (click any card for floor records)
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="exportTLDataToExcel()"
+                  class="px-3 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 text-xs font-bold transition flex items-center gap-1.5 shadow-sm whitespace-nowrap">
+            <i class="fas fa-file-excel"></i> Export Excel
+          </button>
+          <span class="text-xs font-bold bg-purple-100 text-purple-700 px-3 py-1 rounded-full">
+            {{ tl_breakdown|length }} Assigned Leaders
+          </span>
+        </div>
+      </div>
+
+      <div class="p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+          {% for tl in tl_breakdown %}
+          <div onclick="openDetailModal('tl', '', '{{ tl.floor_name }}', 'Floor Submissions: {{ tl.floor_name }} (TL: {{ tl.tl_name }})')"
+               class="border border-slate-200 rounded-2xl p-5 bg-gradient-to-br from-white to-slate-50 hover:shadow-md hover:border-purple-300 transition space-y-4 cursor-pointer"
+               title="Click to view submissions for {{ tl.floor_name }}">
+            <div class="flex items-start justify-between">
+              <div>
+                <h4 class="font-bold text-purple-900 text-base hover:underline">{{ tl.tl_name }}</h4>
+                <div class="text-xs text-slate-500 mt-0.5 font-mono">ID: {{ tl.employee_id }}</div>
+              </div>
+              <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                Shift: {{ tl.shift }}
               </span>
             </div>
 
-            {% if s.line %}
-            <div class="flex items-center">
-              <i class="fas fa-sitemap w-4 text-gray-400"></i>
-              <span class="ml-2">{{ s.line }}</span>
+            <div class="flex items-center gap-4 text-xs text-slate-600 border-t border-slate-100 pt-3">
+              <div>
+                <span class="text-slate-400 block text-[10px] uppercase font-bold">Floor</span>
+                <span class="font-bold text-slate-800">{{ tl.floor_name }}</span>
+              </div>
+              <div>
+                <span class="text-slate-400 block text-[10px] uppercase font-bold">Plant</span>
+                <span class="font-bold text-slate-800">{{ tl.plant_name }}</span>
+              </div>
+              <div class="ml-auto text-right">
+                <span class="text-slate-400 block text-[10px] uppercase font-bold">Approval %</span>
+                <span class="font-bold text-emerald-600">{{ tl.approval_rate }}%</span>
+              </div>
             </div>
-            {% endif %}
 
-            {% if s.product %}
-            <div class="flex items-center">
-              <i class="fas fa-box w-4 text-gray-400"></i>
-              <span class="ml-2">{{ s.product }}</span>
+            <div class="grid grid-cols-4 gap-2 pt-2 text-center text-xs">
+              <div class="p-2 rounded-xl bg-slate-100">
+                <span class="block text-slate-400 text-[10px]">Total</span>
+                <strong class="text-slate-800 text-sm">{{ tl.total }}</strong>
+              </div>
+              <div class="p-2 rounded-xl bg-emerald-50">
+                <span class="block text-emerald-600 text-[10px]">Approved</span>
+                <strong class="text-emerald-700 text-sm">{{ tl.approved }}</strong>
+              </div>
+              <div class="p-2 rounded-xl bg-amber-50">
+                <span class="block text-amber-600 text-[10px]">Pending</span>
+                <strong class="text-amber-700 text-sm">{{ tl.pending }}</strong>
+              </div>
+              <div class="p-2 rounded-xl bg-rose-50">
+                <span class="block text-rose-600 text-[10px]">Rejected</span>
+                <strong class="text-rose-700 text-sm">{{ tl.rejected }}</strong>
+              </div>
             </div>
-            {% endif %}
-
           </div>
-
-          <!-- APPROVAL STATUS -->
-          <div class="mb-4">
-            <span class="text-xs font-bold uppercase px-2 py-1 rounded-full
-              {% if s.approval_status == 'APPROVED' %}
-                bg-green-100 text-green-700
-              {% elif s.approval_status == 'REJECTED' %}
-                bg-red-100 text-red-700
-              {% else %}
-                bg-amber-100 text-amber-700
-              {% endif %}
-            ">
-              {{ s.approval_status }}
-            </span>
+          {% empty %}
+          <div class="col-span-2 py-8 text-center text-slate-400">
+            No floor assignments recorded.
           </div>
-
-          <!-- SEVERITY (CHECKLIST ONLY) -->
-          {% if s.severity is not None %}
-          <div class="flex justify-between items-center mb-3">
-            <span class="text-xs font-bold text-gray-400 uppercase">
-              Severity
-            </span>
-
-            <span class="px-3 py-1 rounded-full text-xs font-bold
-              {% if s.severity >= 8 %}
-                bg-red-100 text-red-700
-              {% elif s.severity >= 4 %}
-                bg-amber-100 text-amber-700
-              {% else %}
-                bg-emerald-100 text-emerald-700
-              {% endif %}
-            ">
-              {{ s.severity }} / 10
-            </span>
-          </div>
-          {% endif %}
-
-          <!-- ACTION -->
-          <div class="mt-auto pt-4 border-t">
-            <button
-              type="button"
-              class="w-full py-2.5 text-sm font-semibold rounded-lg
-                     bg-sky-50 text-sky-700 border
-                     hover:bg-sky-500 hover:text-white transition"
-              data-url="{% url 'ui:submission_detail' s.id %}"
-              onclick="openSubmissionModal(this)">
-              View Full Report
-            </button>
-          </div>
-
+          {% endfor %}
         </div>
-        {% endfor %}
-
       </div>
+    </div>
+  </div>
 
-      {% else %}
-      <div class="text-center py-12 text-gray-500">
-        No submissions available.
+  <!-- =============================================
+       RECENT SUBMISSIONS STREAM TABLE
+  ============================================= -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="px-6 py-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/70">
+      <div>
+        <h3 class="font-bold text-base text-slate-900 flex items-center gap-2">
+          <i class="fas fa-stream text-sky-600"></i> Recent Submissions Stream
+        </h3>
+        <p class="text-xs text-slate-500 mt-0.5">
+          Live stream of latest submissions with line, brand, inspector, and approval status
+        </p>
       </div>
-      {% endif %}
-
+      <div class="flex items-center gap-3 w-full sm:w-auto">
+        <button type="button" onclick="exportTableToExcel('recentStreamTable', 'Recent_Submissions_Live_Stream')"
+                class="px-3 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 text-xs font-bold transition flex items-center gap-1.5 shadow-sm whitespace-nowrap">
+          <i class="fas fa-file-excel"></i> Export Excel
+        </button>
+        <div class="relative w-full sm:w-64">
+          <input type="text" id="streamSearch" onkeyup="filterTable('streamSearch', 'recentStreamTable')"
+                 placeholder="Filter live submissions..."
+                 class="w-full text-xs rounded-xl border-slate-200 bg-white py-2 pl-8 pr-3 focus:ring-2 focus:ring-sky-500 transition">
+          <i class="fas fa-search absolute left-2.5 top-2.5 text-slate-400 text-xs"></i>
+        </div>
+      </div>
     </div>
 
+    <div class="p-6">
+      <div class="table-container overflow-x-auto">
+        <table id="recentStreamTable" class="w-full text-left text-xs text-slate-600">
+          <thead class="text-[11px] font-bold text-slate-400 uppercase bg-slate-50 border-b border-slate-100">
+            <tr>
+              <th class="py-3 px-3">Date &amp; Time</th>
+              <th class="py-3 px-3">Template</th>
+              <th class="py-3 px-3">Plant &amp; Line</th>
+              <th class="py-3 px-3">Brand &amp; Model</th>
+              <th class="py-3 px-3">Inspector (IPQC)</th>
+              <th class="py-3 px-3 text-center">PQE Status</th>
+              <th class="py-3 px-3">Approver</th>
+              <th class="py-3 px-3 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for s in recent_submissions %}
+            <tr class="hover:bg-slate-50/80 transition">
+              <td class="py-3 px-3 whitespace-nowrap">
+                <span class="font-bold text-slate-800">{{ s.submitted_at|date:"d M, H:i" }}</span>
+                <span class="block text-[10px] text-slate-400">{{ s.submitted_at|timesince }} ago</span>
+              </td>
+              <td class="py-3 px-3 font-semibold text-slate-900">{{ s.template_name }}</td>
+              <td class="py-3 px-3">
+                <span class="font-bold text-slate-800">{{ s.line_name }}</span>
+                <span class="block text-[10px] text-slate-400">{{ s.plant_name }} • {{ s.shop_name }}</span>
+              </td>
+              <td class="py-3 px-3">
+                <span class="font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded text-[11px]">{{ s.brand }}</span>
+                <span class="block text-[10px] text-slate-500 mt-0.5">{{ s.product_name }}</span>
+              </td>
+              <td class="py-3 px-3">
+                <span class="font-semibold text-slate-800">{{ s.submitted_by_name }}</span>
+                <span class="block text-[10px] font-mono text-slate-400">{{ s.submitted_by_username }}</span>
+              </td>
+              <td class="py-3 px-3 text-center">
+                {% if s.pqe_status == 'APPROVED' %}
+                  <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    <i class="fas fa-check-circle mr-1"></i> Approved
+                  </span>
+                {% elif s.pqe_status == 'REJECTED' %}
+                  <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200" title="{{ s.rejection_reason }}">
+                    <i class="fas fa-times-circle mr-1"></i> Rejected
+                  </span>
+                {% else %}
+                  <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                    <i class="fas fa-clock mr-1"></i> Pending
+                  </span>
+                {% endif %}
+              </td>
+              <td class="py-3 px-3 text-slate-700 text-xs">
+                {{ s.pqe_approver }}
+              </td>
+              <td class="py-3 px-3 text-right">
+                <a href="{% url 'ui:submission_detail' s.submission_id %}"
+                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-sky-600 bg-sky-50 hover:bg-sky-600 hover:text-white transition">
+                  <span>View</span>
+                  <i class="fas fa-arrow-right text-[10px]"></i>
+                </a>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="8" class="py-8 text-center text-slate-400">No submissions found matching criteria.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
 </div>
 
-<!-- ================= SUBMISSION MODAL ================= -->
-<div id="submissionOverlay"
-     class="fixed inset-0 bg-gray-900/60 backdrop-blur-md hidden items-center justify-center z-[9999]">
+<!-- =============================================
+     UNIVERSAL CARD DETAIL POPUP MODAL
+============================================= -->
+<div id="detailModal"
+     style="display: none;"
+     class="fixed inset-0 z-[9999] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-3 md:p-6 overflow-y-auto">
+  
+  <div class="bg-white rounded-3xl max-w-6xl w-full shadow-2xl border border-slate-200 flex flex-col max-h-[90vh] overflow-hidden transform transition-all">
+    
+    <!-- Modal Header -->
+    <div class="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-900 to-slate-800 text-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div>
+        <div class="flex items-center gap-3">
+          <span class="w-8 h-8 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center text-sm">
+            <i class="fas fa-list-alt"></i>
+          </span>
+          <h2 id="modalTitle" class="text-lg md:text-xl font-black text-white">
+            Submission Details
+          </h2>
+          <span id="modalCountBadge" class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-white/20 text-white">
+            0 records
+          </span>
+        </div>
+        <p id="modalFilterSummary" class="text-xs text-slate-300 mt-1 pl-11">
+          Filtered by: Period: {{ selected_range }}
+        </p>
+      </div>
 
-  <div class="bg-white w-full max-w-5xl max-h-[90vh]
-              rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-       onclick="event.stopPropagation()">
+      <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+        <!-- Export Modal Data to Excel -->
+        <button type="button" onclick="exportCurrentModalToExcel()"
+                class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-2 shadow-sm">
+          <i class="fas fa-file-excel"></i> Export to Excel
+        </button>
 
-    <div class="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
-      <h3 class="text-lg font-bold">Submission Details</h3>
-      <button onclick="closeSubmissionModal()" class="text-gray-400 hover:text-red-600">
-        <i class="fas fa-times text-lg"></i>
+        <!-- Close Button -->
+        <button type="button" onclick="closeDetailModal()"
+                class="w-9 h-9 rounded-xl bg-white/10 hover:bg-rose-600 text-white transition flex items-center justify-center text-sm font-bold">
+          ✕
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal Search & Filters -->
+    <div class="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-4">
+      <div class="relative w-full max-w-md">
+        <input type="text" id="modalSearch" onkeyup="filterTable('modalSearch', 'modalRecordsTable')"
+               placeholder="Search within these records (ID, Line, Inspector, Status, Brand)..."
+               class="w-full text-xs rounded-xl border-slate-200 bg-white py-2 pl-8 pr-3 focus:ring-2 focus:ring-sky-500 transition">
+        <i class="fas fa-search absolute left-2.5 top-2.5 text-slate-400 text-xs"></i>
+      </div>
+      <div id="modalLoadingSpinner" style="display:none;" class="text-xs text-sky-600 font-bold flex items-center gap-2">
+        <i class="fas fa-spinner fa-spin"></i> Loading records...
+      </div>
+    </div>
+
+    <!-- Modal Table Content -->
+    <div class="p-6 overflow-y-auto flex-1 table-container">
+      <table id="modalRecordsTable" class="w-full text-left text-xs text-slate-600">
+        <thead class="text-[11px] font-bold text-slate-400 uppercase bg-slate-50 border-b border-slate-100 sticky top-0">
+          <tr>
+            <th class="py-2.5 px-3">Date &amp; Time</th>
+            <th class="py-2.5 px-3">Template</th>
+            <th class="py-2.5 px-3">Plant &amp; Section</th>
+            <th class="py-2.5 px-3">Line</th>
+            <th class="py-2.5 px-3">Brand &amp; Product</th>
+            <th class="py-2.5 px-3">Inspector (IPQC)</th>
+            <th class="py-2.5 px-3 text-center">PQE Status</th>
+            <th class="py-2.5 px-3">PQE Approver</th>
+            <th class="py-2.5 px-3 text-right">Action</th>
+          </tr>
+        </thead>
+        <tbody id="modalTableBody" class="divide-y divide-slate-100">
+          <!-- Dynamically populated -->
+        </tbody>
+      </table>
+      <div id="modalEmptyState" style="display:none;" class="py-12 text-center text-slate-400">
+        <i class="fas fa-inbox text-3xl text-slate-300 mb-2 block"></i>
+        No matching records found for this selection.
+      </div>
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="px-6 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
+      <span>Showing up to 500 records. All data honors active dashboard filters.</span>
+      <button type="button" onclick="closeDetailModal()"
+              class="px-4 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 font-bold text-slate-700 transition">
+        Close
       </button>
     </div>
 
-    <div id="submissionContent" class="overflow-y-auto p-6 flex-1"></div>
-
   </div>
 </div>
-
-<!-- ================= IMAGE PREVIEW MODAL ================= -->
-<div id="imagePreviewOverlay"
-     class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-[10001]">
-
-  <div class="relative max-w-[90vw] max-h-[90vh]"
-       onclick="event.stopPropagation()">
-
-    <button onclick="closeImagePreview()"
-            class="absolute -top-10 right-0 text-white text-2xl hover:text-red-400">
-      ✖
-    </button>
-
-    <img id="previewImage"
-         src=""
-         class="max-w-full max-h-[90vh] rounded-xl shadow-2xl object-contain">
-  </div>
-</div>
-
 {% endblock %}
 
 {% block extra_js %}
 <script>
-/* ============================================================
-   SUBMISSION MODAL (CHECKLIST + DYNAMIC)
-============================================================ */
+/* =============================================
+   CURRENT DASHBOARD FILTER STATE
+============================================= */
+const CURRENT_RANGE    = "{{ selected_range|default:'today' }}";
+const CURRENT_PLANT_ID = "{{ selected_plant_id|default:'' }}";
+const CURRENT_SHOP_ID  = "{{ selected_shop_id|default:'' }}";
+const CURRENT_BRAND    = "{{ selected_brand|default:'' }}";
+const CURRENT_LINE_ID  = "{{ selected_line_id|default:'' }}";
+const DETAILS_API_URL  = "{% url 'ui:ipqc_dashboard_details_api' %}";
 
-function openSubmissionModal(btn) {
-  const url = btn.dataset.url;
-  const overlay = document.getElementById("submissionOverlay");
-  const content = document.getElementById("submissionContent");
+let currentModalRecords = [];
+let currentModalTitle = "Submissions";
 
-  overlay.classList.remove("hidden");
-  overlay.classList.add("flex");
+/* =============================================
+   TAB SWITCHING LOGIC
+============================================= */
+function switchRoleTab(tabName) {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.remove('active');
+    btn.classList.add('border-slate-200', 'text-slate-600');
+  });
+  const activeBtn = document.getElementById('tab-btn-' + tabName);
+  if (activeBtn) {
+    activeBtn.classList.add('active');
+    activeBtn.classList.remove('border-slate-200', 'text-slate-600');
+  }
 
-  content.innerHTML =
-    "<div class='text-center py-12 text-gray-500'>Loading…</div>";
+  document.querySelectorAll('.role-tab-pane').forEach(pane => {
+    pane.classList.add('hidden');
+  });
+  const targetPane = document.getElementById('tab-content-' + tabName);
+  if (targetPane) {
+    targetPane.classList.remove('hidden');
+  }
 
-  fetch(url)
-    .then(res => res.text())
-    .then(html => {
-      content.innerHTML = html;
+  const url = new URL(window.location);
+  url.searchParams.set('tab', tabName);
+  window.history.replaceState({}, '', url);
+
+  document.querySelectorAll('input[name="tab"]').forEach(inp => {
+    inp.value = tabName;
+  });
+}
+
+/* =============================================
+   CLIENT-SIDE TABLE FILTER SEARCH
+============================================= */
+function filterTable(inputId, tableId) {
+  const input = document.getElementById(inputId);
+  const filter = input.value.toLowerCase();
+  const table = document.getElementById(tableId);
+  if (!table) return;
+  const tbody = table.getElementsByTagName('tbody')[0];
+  if (!tbody) return;
+  const rows = tbody.getElementsByTagName('tr');
+
+  for (let i = 0; i < rows.length; i++) {
+    const text = rows[i].textContent.toLowerCase();
+    if (text.indexOf(filter) > -1) {
+      rows[i].style.display = '';
+    } else {
+      rows[i].style.display = 'none';
+    }
+  }
+}
+
+/* =============================================
+   UNIVERSAL EXCEL EXPORT (SheetJS)
+============================================= */
+function exportTableToExcel(tableId, filename) {
+  const table = document.getElementById(tableId);
+  if (!table) {
+    alert("Table not found for export.");
+    return;
+  }
+
+  // Clone table to strip out non-export elements like buttons
+  const clone = table.cloneNode(true);
+  
+  // Remove action buttons or interactive cells from the clone
+  const actionHeaders = clone.querySelectorAll('th:last-child');
+  const actionCells = clone.querySelectorAll('td:last-child');
+  
+  // Convert table to worksheet
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.table_to_sheet(clone);
+  
+  const safeFilename = (filename || "QMS_Export") + "_" + new Date().toISOString().slice(0, 10) + ".xlsx";
+  XLSX.utils.book_append_sheet(wb, ws, "Report");
+  XLSX.writeFile(wb, safeFilename);
+}
+
+function exportCurrentModalToExcel() {
+  if (!currentModalRecords || currentModalRecords.length === 0) {
+    alert("No records to export.");
+    return;
+  }
+
+  const exportData = currentModalRecords.map((r, idx) => ({
+    "No": idx + 1,
+    "Submission ID": r.submission_id,
+    "Date & Time": r.submitted_at_str,
+    "Template": r.template_name,
+    "Plant": r.plant_name,
+    "Section / Shop": r.shop_name,
+    "Line": r.line_name,
+    "Brand": r.brand,
+    "Product Model": r.product_name,
+    "Inspector (IPQC)": r.submitted_by_name + " (" + r.submitted_by_username + ")",
+    "PQE Status": r.pqe_status,
+    "PQE Approver": r.pqe_approver,
+    "Rejection Reason": r.rejection_reason || "—",
+    "Severity Score": r.severity_score
+  }));
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(exportData);
+  const safeName = (currentModalTitle.replace(/[^a-zA-Z0-9_-]/g, "_") || "QMS_Details") + "_" + new Date().toISOString().slice(0, 10) + ".xlsx";
+  XLSX.utils.book_append_sheet(wb, ws, "Details");
+  XLSX.writeFile(wb, safeName);
+}
+
+function exportTLDataToExcel() {
+  const tlCards = document.querySelectorAll('#tab-content-tl .border.rounded-2xl');
+  if (!tlCards.length) {
+    alert("No TL data to export.");
+    return;
+  }
+
+  const rows = [];
+  tlCards.forEach(card => {
+    const name = card.querySelector('h4')?.textContent.trim() || "";
+    const id = card.querySelector('.font-mono')?.textContent.replace('ID:', '').trim() || "";
+    const shift = card.querySelector('.rounded-full')?.textContent.replace('Shift:', '').trim() || "";
+    const stats = card.querySelectorAll('strong');
+    rows.push({
+      "Team Leader": name,
+      "Employee ID": id,
+      "Shift": shift,
+      "Total Submissions": stats[0]?.textContent.trim() || 0,
+      "Approved": stats[1]?.textContent.trim() || 0,
+      "Pending": stats[2]?.textContent.trim() || 0,
+      "Rejected": stats[3]?.textContent.trim() || 0,
+    });
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, "TL_Oversight");
+  XLSX.writeFile(wb, "QMS_TL_Floor_Oversight_" + new Date().toISOString().slice(0, 10) + ".xlsx");
+}
+
+/* =============================================
+   DETAIL POPUP MODAL LOGIC
+============================================= */
+function openDetailModal(metric, targetId, targetName, displayTitle) {
+  const modal = document.getElementById('detailModal');
+  const titleEl = document.getElementById('modalTitle');
+  const countBadge = document.getElementById('modalCountBadge');
+  const filterSummary = document.getElementById('modalFilterSummary');
+  const tbody = document.getElementById('modalTableBody');
+  const spinner = document.getElementById('modalLoadingSpinner');
+  const emptyState = document.getElementById('modalEmptyState');
+  const searchInput = document.getElementById('modalSearch');
+
+  currentModalTitle = displayTitle || "Submissions";
+  titleEl.textContent = currentModalTitle;
+  countBadge.textContent = "Loading...";
+  tbody.innerHTML = "";
+  emptyState.style.display = "none";
+  spinner.style.display = "flex";
+  searchInput.value = "";
+
+  // Build filter summary
+  let summaryParts = ["Period: " + CURRENT_RANGE];
+  if (CURRENT_PLANT_ID) summaryParts.push("Plant ID: " + CURRENT_PLANT_ID);
+  if (CURRENT_SHOP_ID) summaryParts.push("Section ID: " + CURRENT_SHOP_ID);
+  if (CURRENT_BRAND) summaryParts.push("Brand: " + CURRENT_BRAND);
+  if (CURRENT_LINE_ID) summaryParts.push("Line ID: " + CURRENT_LINE_ID);
+  filterSummary.textContent = "Active Filters: " + summaryParts.join(" • ");
+
+  modal.classList.add('open');
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+
+  // Build query URL
+  const params = new URLSearchParams({
+    metric: metric || 'total',
+    range: CURRENT_RANGE,
+  });
+  if (targetId) params.append('target_id', targetId);
+  if (targetName) params.append('target_name', targetName);
+  if (CURRENT_PLANT_ID) params.append('plant', CURRENT_PLANT_ID);
+  if (CURRENT_SHOP_ID) params.append('shop', CURRENT_SHOP_ID);
+  if (CURRENT_BRAND) params.append('brand', CURRENT_BRAND);
+  if (CURRENT_LINE_ID) params.append('line', CURRENT_LINE_ID);
+
+  fetch(DETAILS_API_URL + "?" + params.toString())
+    .then(r => r.json())
+    .then(data => {
+      spinner.style.display = "none";
+      if (!data.success || !data.records || data.records.length === 0) {
+        countBadge.textContent = "0 records";
+        emptyState.style.display = "block";
+        currentModalRecords = [];
+        return;
+      }
+
+      currentModalRecords = data.records;
+      countBadge.textContent = data.count + " records";
+
+      let rowsHtml = "";
+      data.records.forEach(r => {
+        let statusBadge = "";
+        if (r.pqe_status === 'APPROVED') {
+          statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">Approved</span>';
+        } else if (r.pqe_status === 'REJECTED') {
+          statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200" title="' + (r.rejection_reason || '') + '">Rejected</span>';
+        } else {
+          statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">Pending</span>';
+        }
+
+        rowsHtml += `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-2.5 px-3 whitespace-nowrap font-bold text-slate-800">${r.submitted_at_str}</td>
+            <td class="py-2.5 px-3 font-semibold text-slate-900">${r.template_name}</td>
+            <td class="py-2.5 px-3 text-slate-600">${r.plant_name} • ${r.shop_name}</td>
+            <td class="py-2.5 px-3 font-bold text-slate-800">${r.line_name}</td>
+            <td class="py-2.5 px-3">
+              <span class="font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded text-[10px]">${r.brand}</span>
+              <span class="block text-[10px] text-slate-500 mt-0.5">${r.product_name}</span>
+            </td>
+            <td class="py-2.5 px-3">
+              <span class="font-semibold text-slate-800">${r.submitted_by_name}</span>
+              <span class="block text-[10px] font-mono text-slate-400">${r.submitted_by_username}</span>
+            </td>
+            <td class="py-2.5 px-3 text-center">${statusBadge}</td>
+            <td class="py-2.5 px-3 text-slate-700">${r.pqe_approver || '—'}</td>
+            <td class="py-2.5 px-3 text-right">
+              <a href="${r.detail_url}" target="_blank"
+                 class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-sky-600 bg-sky-50 hover:bg-sky-600 hover:text-white transition">
+                <span>View</span>
+                <i class="fas fa-external-link-alt text-[9px]"></i>
+              </a>
+            </td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = rowsHtml;
     })
-    .catch(() => {
-      content.innerHTML =
-        "<div class='text-center py-12 text-red-600'>Failed to load</div>";
+    .catch(err => {
+      spinner.style.display = "none";
+      countBadge.textContent = "Error";
+      emptyState.style.display = "block";
+      emptyState.innerHTML = '<span class="text-rose-600 font-bold">Failed to load records. Please try again.</span>';
+      console.error(err);
     });
 }
 
-function closeSubmissionModal() {
-  const overlay = document.getElementById("submissionOverlay");
-  overlay.classList.add("hidden");
-  overlay.classList.remove("flex");
+function closeDetailModal() {
+  const modal = document.getElementById('detailModal');
+  modal.classList.remove('open');
+  modal.style.display = 'none';
+  document.body.style.overflow = '';
 }
 
-/* Outside click closes modal */
-document.getElementById("submissionOverlay")
-  ?.addEventListener("click", function (e) {
-    if (e.target === this) closeSubmissionModal();
-  });
-
-/* ESC closes modal */
-document.addEventListener("keydown", function (e) {
-  if (e.key === "Escape") closeSubmissionModal();
+// Close modal on Escape key or background click
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeDetailModal();
 });
-
-/* Move modal to root to avoid stacking issues */
-document.addEventListener("DOMContentLoaded", function () {
-  const root = document.getElementById("modal-root");
-  const modal = document.getElementById("submissionOverlay");
-  if (root && modal && modal.parentElement !== root) {
-    root.appendChild(modal);
-  }
-});
-
-/* ============================================================
-   IMAGE PREVIEW MODAL
-============================================================ */
-function openImagePreview(src) {
-  if (!src) return;
-  document.getElementById("previewImage").src = src;
-  document.getElementById("imagePreviewOverlay").classList.remove("hidden");
-}
-
-function closeImagePreview() {
-  document.getElementById("imagePreviewOverlay").classList.add("hidden");
-  document.getElementById("previewImage").src = "";
-}
-
-document.getElementById("imagePreviewOverlay")
-  ?.addEventListener("click", function (e) {
-    if (e.target === this) closeImagePreview();
-  });
-
-/* 🔥 ENSURE IMAGE MODAL IS ABOVE SUBMISSION MODAL */
-document.addEventListener("DOMContentLoaded", function () {
-  const root = document.getElementById("modal-root");
-  const imageModal = document.getElementById("imagePreviewOverlay");
-  if (root && imageModal && imageModal.parentElement !== root) {
-    root.appendChild(imageModal);
-  }
+document.getElementById('detailModal').addEventListener('click', e => {
+  if (e.target.id === 'detailModal') closeDetailModal();
 });
 </script>
 {% endblock %}

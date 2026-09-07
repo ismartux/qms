@@ -3,7 +3,6 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 
 from integrations.services.payload import build_payload
-from integrations.bitable.client import BitableClient
 from integrations.models import IntegrationTemplateMapping
 
 from submissions.models import (
@@ -27,26 +26,9 @@ def sync_submission_to_target(submission, target_code):
     """
 
     def _push():
-
-        # Ensure plant context (important for background jobs)
         set_current_plant(submission.plant)
-
-        mapping = IntegrationTemplateMapping.objects.get(
-            template=submission.template_version.template,
-            target__code=target_code,
-            enabled=True,
-        )
-
-        payload = build_payload(submission, mapping)
-
-        client = BitableClient()
-        client.push(mapping.external_table_id, payload)
-
-        SubmissionSyncLog.objects.update_or_create(
-            submission=submission,
-            target=target_code,
-            defaults={"status": "SYNCED"},
-        )
+        # Integration push disabled (DB-only mode)
+        pass
 
     transaction.on_commit(_push)
 

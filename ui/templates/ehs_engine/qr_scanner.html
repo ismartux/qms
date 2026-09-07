@@ -40,7 +40,12 @@
         "reader",
         {
             fps: 10,
-            qrbox: { width: 250, height: 250 }
+            qrbox: { width: 250, height: 250 },
+            formatsToSupport: [
+                Html5QrcodeSupportedFormats.QR_CODE,
+                Html5QrcodeSupportedFormats.DATA_MATRIX,
+                Html5QrcodeSupportedFormats.CODE_128
+            ]
         },
         false
     );

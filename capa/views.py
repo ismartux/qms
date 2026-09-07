@@ -2,8 +2,11 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django import forms
+from django.http import JsonResponse
 from django.utils import timezone
 from django.db.models import Case, When, Value, IntegerField, Q
+
+from analytics.services.capa_analytics import CapaAnalyticsService
 
 from core.identity.models import UserScope
 from capa.models import CAPA
@@ -409,3 +412,168 @@ def my_assigned_capas(request):
         "user_role_ids": role_ids,
         "today": timezone.now().date(),
     })
+
+
+# =========================================================
+# CAPA DASHBOARD & ANALYTICS VIEWS
+# =========================================================
+
+@login_required
+def capa_dashboard_view(request):
+    """
+    Renders the Executive & Operational CAPA Quality Dashboard
+    with multi-dimensional breakdowns (Plant, Section, Brand, Line, SLA, Severity, Roles).
+    """
+    base_queryset = CAPA.objects.select_related(
+        "submission",
+        "submission__work_context__plant",
+        "submission__work_context__product",
+        "submission__work_context__line",
+        "submission__work_context__shop",
+        "submission__template_version__template",
+        "rca_role",
+        "capa_role",
+    )
+
+    if not request.user.is_superuser:
+        plant_ids = request.user.scopes.values_list("plant_id", flat=True)
+        base_queryset = base_queryset.filter(
+            submission__work_context__plant_id__in=plant_ids
+        )
+        base_queryset = filter_capas_for_pqe_scope(request.user, base_queryset)
+
+    # Extract query params
+    selected_range = request.GET.get("range", "all")
+    plant_id = request.GET.get("plant")
+    shop_id = request.GET.get("shop")
+    brand = request.GET.get("brand")
+    line_id = request.GET.get("line")
+    status = request.GET.get("status")
+    severity = request.GET.get("severity")
+    active_tab = request.GET.get("tab", "overview")
+
+    plant_id = int(plant_id) if plant_id and str(plant_id).isdigit() else None
+    shop_id = int(shop_id) if shop_id and str(shop_id).isdigit() else None
+    line_id = int(line_id) if line_id and str(line_id).isdigit() else None
+    brand = brand.strip() if brand else None
+    status = status.strip() if status else None
+    severity = severity.strip() if severity else None
+
+    # Dimensional queryset (preserves plant, shop, brand, line, status, severity without date restriction)
+    dimensional_qs = CapaAnalyticsService.apply_filters(
+        base_queryset,
+        range_key="all",
+        plant_id=plant_id,
+        shop_id=shop_id,
+        brand=brand,
+        line_id=line_id,
+        status=status,
+        severity=severity,
+    )
+
+    # Filter base queryset for selected range
+    filtered_qs = CapaAnalyticsService.apply_filters(
+        base_queryset,
+        range_key=selected_range,
+        plant_id=plant_id,
+        shop_id=shop_id,
+        brand=brand,
+        line_id=line_id,
+        status=status,
+        severity=severity,
+    )
+
+    # Computations
+    kpis = CapaAnalyticsService.compute_summary_kpis(
+        filtered_qs,
+        base_qs=dimensional_qs,
+        range_key=selected_range,
+    )
+    plant_breakdown = CapaAnalyticsService.get_plant_breakdown(filtered_qs)
+    section_breakdown = CapaAnalyticsService.get_section_breakdown(filtered_qs)
+    brand_breakdown = CapaAnalyticsService.get_brand_breakdown(filtered_qs)
+    line_breakdown = CapaAnalyticsService.get_line_breakdown(filtered_qs)
+    sla_aging = CapaAnalyticsService.get_sla_aging_breakdown(
+        filtered_qs,
+        base_qs=dimensional_qs,
+        range_key=selected_range,
+    )
+    severity_dist = CapaAnalyticsService.get_severity_distribution(filtered_qs)
+    role_breakdown = CapaAnalyticsService.get_role_assignment_breakdown(filtered_qs)
+    recent_capas = CapaAnalyticsService.get_recent_capas(filtered_qs, limit=25)
+    filter_options = CapaAnalyticsService.get_filter_options()
+
+    context = {
+        "kpis": kpis,
+        "plant_breakdown": plant_breakdown,
+        "section_breakdown": section_breakdown,
+        "brand_breakdown": brand_breakdown,
+        "line_breakdown": line_breakdown,
+        "sla_aging": sla_aging,
+        "severity_dist": severity_dist,
+        "role_breakdown": role_breakdown,
+        "recent_capas": recent_capas,
+        "filter_options": filter_options,
+        "selected_range": selected_range,
+        "selected_plant_id": plant_id,
+        "selected_shop_id": shop_id,
+        "selected_brand": brand,
+        "selected_line_id": line_id,
+        "selected_status": status,
+        "selected_severity": severity,
+        "active_tab": active_tab,
+        "today": timezone.now().date(),
+    }
+
+    return render(request, "capa/capa_dashboard.html", context)
+
+
+@login_required
+def capa_dashboard_details_api(request):
+    """
+    JSON API for #capaDetailModal drilldown.
+    Honors all current dashboard filters and returns matching CAPA records.
+    """
+    metric = request.GET.get("metric", "total")
+    target_id = request.GET.get("target_id")
+    target_name = request.GET.get("target_name")
+    selected_range = request.GET.get("range") or request.GET.get("date_range") or "all"
+    plant_id = request.GET.get("plant")
+    shop_id = request.GET.get("shop")
+    brand = request.GET.get("brand")
+    line_id = request.GET.get("line")
+    status = request.GET.get("status")
+    severity = request.GET.get("severity")
+
+    plant_id = int(plant_id) if plant_id and str(plant_id).isdigit() else None
+    shop_id = int(shop_id) if shop_id and str(shop_id).isdigit() else None
+    line_id = int(line_id) if line_id and str(line_id).isdigit() else None
+    target_id = int(target_id) if target_id and str(target_id).isdigit() else None
+    brand = brand.strip() if brand else None
+    target_name = target_name.strip() if target_name else None
+    status = status.strip() if status else None
+    severity = severity.strip() if severity else None
+
+    drill = CapaAnalyticsService.get_drilldown_details(
+        metric=metric,
+        target_id=target_id,
+        target_name=target_name,
+        plant_id=plant_id,
+        shop_id=shop_id,
+        brand=brand,
+        line_id=line_id,
+        status=status,
+        severity=severity,
+        range_key=selected_range,
+        limit=500,
+    )
+
+    return JsonResponse({
+        "success": True,
+        "metric": metric,
+        "target_id": target_id,
+        "target_name": target_name,
+        "count": drill["count"],
+        "records": drill["records"],
+    })
+

@@ -1,0 +1,1457 @@
+{% extends "shell/app.html" %}
+
+{% block title %}CAPA Operations & Quality Intelligence Dashboard{% endblock %}
+
+{% block extra_css %}
+<!-- SheetJS for client-side Excel (.xlsx) export -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<style>
+  .kpi-card {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 28px -10px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.06);
+    border-color: #38bdf8;
+  }
+  .kpi-card:active {
+    transform: translateY(-1px);
+  }
+  .kpi-card .click-hint {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  .kpi-card:hover .click-hint {
+    opacity: 1;
+  }
+
+  .interactive-row {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+  }
+  .interactive-row:hover {
+    background-color: #f0f9ff !important;
+  }
+
+  .tab-btn {
+    transition: all 0.15s ease;
+  }
+  .tab-btn.active {
+    background: #0f172a;
+    color: #ffffff;
+    border-color: #0f172a;
+    box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.2);
+  }
+
+  /* Modal Backdrop & Animation */
+  #capaDetailModal {
+    transition: opacity 0.25s ease, visibility 0.25s ease;
+  }
+  #capaDetailModal.open {
+    opacity: 1;
+    visibility: visible;
+  }
+  #capaDetailModalContent {
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    transform: scale(0.96) translateY(8px);
+  }
+  #capaDetailModal.open #capaDetailModalContent {
+    transform: scale(1) translateY(0);
+  }
+
+  /* Custom scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f5f9;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto pb-24 px-4 sm:px-6 space-y-6">
+
+  <!-- =============================================
+       HERO & EXECUTIVE CONTEXT HEADER
+  ============================================= -->
+  <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 rounded-3xl text-white p-6 sm:p-8 shadow-xl relative overflow-hidden">
+    <div class="absolute -right-16 -bottom-16 w-80 h-80 bg-red-500/10 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute right-1/3 -top-16 w-64 h-64 bg-sky-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+    <div class="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+      <div>
+        <div class="flex items-center gap-2.5 mb-2">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase bg-red-500/20 text-red-300 border border-red-500/30">
+            <span class="w-2 h-2 rounded-full bg-red-400 animate-pulse"></span>
+            CAPA Quality Intelligence
+          </span>
+          <span class="text-xs font-semibold text-slate-400">
+            Corrective & Preventive Action Engine
+          </span>
+        </div>
+        <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-white flex items-center gap-3">
+          <i class="fas fa-clipboard-check text-red-400"></i>
+          Operational CAPA Dashboard
+        </h1>
+        <p class="text-sm text-slate-300 mt-1 max-w-2xl">
+          Real-time resolution oversight, multi-dimensional defect analytics, root cause accountability (RCA), and SLA compliance across all manufacturing lines.
+        </p>
+      </div>
+
+      <!-- Quick Metrics & Navigation Actions -->
+      <div class="flex flex-wrap items-center gap-3">
+        {% if kpis.overdue > 0 %}
+        <div class="px-4 py-2.5 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center gap-3">
+          <i class="fas fa-exclamation-triangle text-rose-400 text-lg animate-bounce"></i>
+          <div>
+            <div class="text-[10px] font-bold uppercase tracking-wider text-rose-300">SLA Overdue</div>
+            <div class="text-xl font-black text-white">{{ kpis.overdue }} CAPAs</div>
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="px-4 py-2.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 flex items-center gap-3">
+          <i class="fas fa-check-double text-emerald-400 text-lg"></i>
+          <div>
+            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-300">Resolution Rate</div>
+            <div class="text-xl font-black text-white">{{ kpis.closure_rate }}%</div>
+          </div>
+        </div>
+
+        <a href="{% url 'capa:capa_list_view' %}"
+           class="px-4 py-2.5 rounded-2xl bg-white text-slate-900 font-bold text-xs hover:bg-slate-100 transition shadow-md flex items-center gap-2">
+          <i class="fas fa-list-check text-red-600"></i>
+          <span>All CAPAs List</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- =============================================
+       TIME PERIOD & MULTI-DIMENSIONAL FILTER BAR
+  ============================================= -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-4">
+    
+    <!-- Time Period Selector Pills -->
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+          <i class="far fa-calendar-alt text-sky-500"></i> Time Period:
+        </span>
+        <div class="inline-flex p-1 bg-slate-100 rounded-2xl flex-wrap gap-1">
+          <a href="?range=today{% if selected_plant_id %}&plant={{ selected_plant_id }}{% endif %}{% if selected_shop_id %}&shop={{ selected_shop_id }}{% endif %}{% if selected_brand %}&brand={{ selected_brand }}{% endif %}{% if selected_line_id %}&line={{ selected_line_id }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_severity %}&severity={{ selected_severity }}{% endif %}&tab={{ active_tab }}"
+             class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition {% if selected_range == 'today' %}bg-sky-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+            Today
+          </a>
+          <a href="?range=yesterday{% if selected_plant_id %}&plant={{ selected_plant_id }}{% endif %}{% if selected_shop_id %}&shop={{ selected_shop_id }}{% endif %}{% if selected_brand %}&brand={{ selected_brand }}{% endif %}{% if selected_line_id %}&line={{ selected_line_id }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_severity %}&severity={{ selected_severity }}{% endif %}&tab={{ active_tab }}"
+             class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition {% if selected_range == 'yesterday' %}bg-sky-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+            Yesterday
+          </a>
+          <a href="?range=this_week{% if selected_plant_id %}&plant={{ selected_plant_id }}{% endif %}{% if selected_shop_id %}&shop={{ selected_shop_id }}{% endif %}{% if selected_brand %}&brand={{ selected_brand }}{% endif %}{% if selected_line_id %}&line={{ selected_line_id }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_severity %}&severity={{ selected_severity }}{% endif %}&tab={{ active_tab }}"
+             class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition {% if selected_range == 'this_week' %}bg-sky-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+            This Week
+          </a>
+          <a href="?range=last_week{% if selected_plant_id %}&plant={{ selected_plant_id }}{% endif %}{% if selected_shop_id %}&shop={{ selected_shop_id }}{% endif %}{% if selected_brand %}&brand={{ selected_brand }}{% endif %}{% if selected_line_id %}&line={{ selected_line_id }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_severity %}&severity={{ selected_severity }}{% endif %}&tab={{ active_tab }}"
+             class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition {% if selected_range == 'last_week' %}bg-sky-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+            Last Week
+          </a>
+          <a href="?range=this_month{% if selected_plant_id %}&plant={{ selected_plant_id }}{% endif %}{% if selected_shop_id %}&shop={{ selected_shop_id }}{% endif %}{% if selected_brand %}&brand={{ selected_brand }}{% endif %}{% if selected_line_id %}&line={{ selected_line_id }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_severity %}&severity={{ selected_severity }}{% endif %}&tab={{ active_tab }}"
+             class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition {% if selected_range == 'this_month' %}bg-sky-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+            This Month
+          </a>
+          <a href="?range=all{% if selected_plant_id %}&plant={{ selected_plant_id }}{% endif %}{% if selected_shop_id %}&shop={{ selected_shop_id }}{% endif %}{% if selected_brand %}&brand={{ selected_brand }}{% endif %}{% if selected_line_id %}&line={{ selected_line_id }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_severity %}&severity={{ selected_severity }}{% endif %}&tab={{ active_tab }}"
+             class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition {% if selected_range == 'all' or not selected_range %}bg-sky-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+            All Time
+          </a>
+        </div>
+      </div>
+
+      {% if selected_plant_id or selected_shop_id or selected_brand or selected_line_id or selected_status or selected_severity %}
+      <a href="?range={{ selected_range }}&tab={{ active_tab }}"
+         class="text-xs font-semibold text-rose-600 hover:text-rose-800 flex items-center gap-1.5 transition">
+        <i class="fas fa-times-circle"></i> Clear Filters
+      </a>
+      {% endif %}
+    </div>
+
+    <!-- Multi-Dimensional Filter Dropdowns -->
+    <form method="GET" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 pt-1">
+      <input type="hidden" name="range" value="{{ selected_range }}">
+      <input type="hidden" name="tab" value="{{ active_tab }}">
+
+      <!-- Plant -->
+      <div>
+        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Plant</label>
+        <select name="plant" onchange="this.form.submit()"
+                class="w-full text-xs rounded-xl border-slate-200 bg-slate-50 font-medium text-slate-700 py-2 px-3 focus:ring-2 focus:ring-sky-500 focus:bg-white transition">
+          <option value="">All Plants</option>
+          {% for p in filter_options.plants %}
+          <option value="{{ p.id }}" {% if selected_plant_id == p.id|stringformat:"i" or selected_plant_id == p.id %}selected{% endif %}>
+            {{ p.name }} ({{ p.code }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Section / Shop -->
+      <div>
+        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Section / Shop</label>
+        <select name="shop" onchange="this.form.submit()"
+                class="w-full text-xs rounded-xl border-slate-200 bg-slate-50 font-medium text-slate-700 py-2 px-3 focus:ring-2 focus:ring-sky-500 focus:bg-white transition">
+          <option value="">All Sections</option>
+          {% for s in filter_options.shops %}
+          <option value="{{ s.id }}" {% if selected_shop_id == s.id|stringformat:"i" or selected_shop_id == s.id %}selected{% endif %}>
+            {{ s.name }} ({{ s.plant__name }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Brand -->
+      <div>
+        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Brand</label>
+        <select name="brand" onchange="this.form.submit()"
+                class="w-full text-xs rounded-xl border-slate-200 bg-slate-50 font-medium text-slate-700 py-2 px-3 focus:ring-2 focus:ring-sky-500 focus:bg-white transition">
+          <option value="">All Brands</option>
+          {% for b in filter_options.brands %}
+          <option value="{{ b }}" {% if selected_brand == b %}selected{% endif %}>
+            {{ b }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Line -->
+      <div>
+        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Line</label>
+        <select name="line" onchange="this.form.submit()"
+                class="w-full text-xs rounded-xl border-slate-200 bg-slate-50 font-medium text-slate-700 py-2 px-3 focus:ring-2 focus:ring-sky-500 focus:bg-white transition">
+          <option value="">All Lines</option>
+          {% for l in filter_options.lines %}
+          <option value="{{ l.id }}" {% if selected_line_id == l.id|stringformat:"i" or selected_line_id == l.id %}selected{% endif %}>
+            {{ l.name }} {% if l.shop__name %}({{ l.shop__name }}){% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Status -->
+      <div>
+        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Status</label>
+        <select name="status" onchange="this.form.submit()"
+                class="w-full text-xs rounded-xl border-slate-200 bg-slate-50 font-medium text-slate-700 py-2 px-3 focus:ring-2 focus:ring-sky-500 focus:bg-white transition">
+          <option value="">All Statuses</option>
+          <option value="OPEN" {% if selected_status == 'OPEN' %}selected{% endif %}>Open</option>
+          <option value="ASSIGNED" {% if selected_status == 'ASSIGNED' %}selected{% endif %}>Assigned / In Progress</option>
+          <option value="ACTION_DONE" {% if selected_status == 'ACTION_DONE' %}selected{% endif %}>Action Done</option>
+          <option value="OVERDUE" {% if selected_status == 'OVERDUE' %}selected{% endif %}>SLA Overdue</option>
+          <option value="CLOSED" {% if selected_status == 'CLOSED' %}selected{% endif %}>Closed</option>
+        </select>
+      </div>
+
+      <!-- Severity -->
+      <div>
+        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Severity</label>
+        <select name="severity" onchange="this.form.submit()"
+                class="w-full text-xs rounded-xl border-slate-200 bg-slate-50 font-medium text-slate-700 py-2 px-3 focus:ring-2 focus:ring-sky-500 focus:bg-white transition">
+          <option value="">All Severities</option>
+          <option value="high" {% if selected_severity == 'high' %}selected{% endif %}>High / Critical (7-10)</option>
+          <option value="medium" {% if selected_severity == 'medium' %}selected{% endif %}>Medium (4-6)</option>
+          <option value="low" {% if selected_severity == 'low' %}selected{% endif %}>Low (1-3)</option>
+        </select>
+      </div>
+    </form>
+
+  </div>
+
+  <!-- =============================================
+       EXECUTIVE KPI SUMMARY CARDS (ALL CLICKABLE)
+  ============================================= -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5">
+
+    <!-- Total CAPAs Card -->
+    <div onclick="openDetailModal('total', '', '', 'Total CAPAs (Filtered Period)')"
+         class="kpi-card bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"
+         title="Click to view all matching CAPAs">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Total CAPAs</span>
+        <span class="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center text-sm">
+          <i class="fas fa-folder-open"></i>
+        </span>
+      </div>
+      <div class="text-2xl md:text-3xl font-black text-slate-900">
+        {{ kpis.total }}
+      </div>
+      <div class="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+        <span>Active & historical</span>
+        <span class="click-hint text-sky-600 font-bold flex items-center gap-1">
+          View all <i class="fas fa-arrow-right text-[10px]"></i>
+        </span>
+      </div>
+    </div>
+
+    <!-- Open CAPAs Card -->
+    <div onclick="openDetailModal('open', '', '', 'Open / Unassigned CAPAs')"
+         class="kpi-card bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"
+         title="Click to view Open CAPAs">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Open (Pending)</span>
+        <span class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-sm">
+          <i class="fas fa-envelope-open-text"></i>
+        </span>
+      </div>
+      <div class="text-2xl md:text-3xl font-black text-amber-600">
+        {{ kpis.open }}
+      </div>
+      <div class="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+        <span>Awaiting assignment</span>
+        <span class="click-hint text-amber-600 font-bold flex items-center gap-1">
+          View details <i class="fas fa-arrow-right text-[10px]"></i>
+        </span>
+      </div>
+    </div>
+
+    <!-- In Progress / Assigned Card -->
+    <div onclick="openDetailModal('assigned', '', '', 'Assigned / In Progress CAPAs')"
+         class="kpi-card bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"
+         title="Click to view assigned CAPAs">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">In Progress</span>
+        <span class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm">
+          <i class="fas fa-user-gear"></i>
+        </span>
+      </div>
+      <div class="text-2xl md:text-3xl font-black text-indigo-600">
+        {{ kpis.assigned }}
+      </div>
+      <div class="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+        <span>RCA & Plan underway</span>
+        <span class="click-hint text-indigo-600 font-bold flex items-center gap-1">
+          View details <i class="fas fa-arrow-right text-[10px]"></i>
+        </span>
+      </div>
+    </div>
+
+    <!-- Overdue SLA Violations Card (Breakdown by >1d, >3d, >5d, >7d) -->
+    <div class="kpi-card bg-white rounded-2xl border border-rose-200 p-4 sm:p-5 shadow-sm bg-gradient-to-br from-white to-rose-50/30 flex flex-col justify-between"
+         title="SLA Overdue - Click any aging period for details">
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+          <span class="text-xs font-bold uppercase tracking-wider text-rose-600">SLA Overdue</span>
+        </div>
+        <button type="button" onclick="openDetailModal('overdue', '', '', 'All SLA Overdue CAPAs (Total: {{ kpis.overdue }})')"
+                class="text-[10px] font-bold text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 px-2 py-0.5 rounded-full border border-rose-200 transition">
+          {{ kpis.overdue }} Total
+        </button>
+      </div>
+
+      <!-- 4 Clickable Segments for Overdue Breakdown -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 my-1">
+        <!-- > 1 Day -->
+        <div onclick="openDetailModal('overdue_1d', '', '', 'CAPAs Overdue > 1 Day')"
+             class="p-2 rounded-xl bg-white border border-rose-100 hover:border-rose-400 hover:bg-rose-50 transition cursor-pointer text-center group shadow-2xs"
+             title="Click to view CAPAs overdue by more than 1 day">
+          <div class="text-[10px] font-bold text-slate-500 uppercase tracking-tight group-hover:text-rose-600">&gt; 1 Day</div>
+          <div class="text-lg font-black text-rose-600 group-hover:scale-105 transition-transform">{{ kpis.overdue_1d }}</div>
+        </div>
+
+        <!-- > 3 Days -->
+        <div onclick="openDetailModal('overdue_3d', '', '', 'CAPAs Overdue > 3 Days')"
+             class="p-2 rounded-xl bg-white border border-rose-100 hover:border-rose-400 hover:bg-rose-50 transition cursor-pointer text-center group shadow-2xs"
+             title="Click to view CAPAs overdue by more than 3 days">
+          <div class="text-[10px] font-bold text-slate-500 uppercase tracking-tight group-hover:text-rose-600">&gt; 3 Days</div>
+          <div class="text-lg font-black text-rose-600 group-hover:scale-105 transition-transform">{{ kpis.overdue_3d }}</div>
+        </div>
+
+        <!-- > 5 Days -->
+        <div onclick="openDetailModal('overdue_5d', '', '', 'CAPAs Overdue > 5 Days')"
+             class="p-2 rounded-xl bg-white border border-rose-100 hover:border-rose-400 hover:bg-rose-50 transition cursor-pointer text-center group shadow-2xs"
+             title="Click to view CAPAs overdue by more than 5 days">
+          <div class="text-[10px] font-bold text-slate-500 uppercase tracking-tight group-hover:text-rose-700">&gt; 5 Days</div>
+          <div class="text-lg font-black text-rose-700 group-hover:scale-105 transition-transform">{{ kpis.overdue_5d }}</div>
+        </div>
+
+        <!-- > 7 Days -->
+        <div onclick="openDetailModal('overdue_7d', '', '', 'CAPAs Overdue > 7 Days')"
+             class="p-2 rounded-xl bg-white border border-rose-100 hover:border-rose-400 hover:bg-rose-50 transition cursor-pointer text-center group shadow-2xs"
+             title="Click to view CAPAs overdue by more than 7 days">
+          <div class="text-[10px] font-bold text-slate-500 uppercase tracking-tight group-hover:text-rose-800">&gt; 7 Days</div>
+          <div class="text-lg font-black text-rose-800 group-hover:scale-105 transition-transform">{{ kpis.overdue_7d }}</div>
+        </div>
+      </div>
+
+      <div class="mt-1 flex items-center justify-between text-[11px] text-slate-400">
+        <span class="text-[10px]">Click any aging to view records</span>
+        <span onclick="openDetailModal('overdue', '', '', 'All SLA Overdue CAPAs')"
+              class="text-rose-600 font-bold hover:underline cursor-pointer flex items-center gap-0.5 text-[10px]">
+          View all <i class="fas fa-arrow-right text-[8px]"></i>
+        </span>
+      </div>
+    </div>
+
+    <!-- Action Done / Review Pending Card -->
+    <div onclick="openDetailModal('action_done', '', '', 'Action Done (Awaiting PQE Review)')"
+         class="kpi-card bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"
+         title="Click to view CAPAs awaiting verification">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Action Done</span>
+        <span class="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-sm">
+          <i class="fas fa-tasks-alt"></i>
+        </span>
+      </div>
+      <div class="text-2xl md:text-3xl font-black text-purple-600">
+        {{ kpis.action_done }}
+      </div>
+      <div class="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+        <span>Ready for review</span>
+        <span class="click-hint text-purple-600 font-bold flex items-center gap-1">
+          View details <i class="fas fa-arrow-right text-[10px]"></i>
+        </span>
+      </div>
+    </div>
+
+    <!-- Closed / Resolved Card -->
+    <div onclick="openDetailModal('closed', '', '', 'Closed & Resolved CAPAs')"
+         class="kpi-card bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"
+         title="Click to view closed CAPAs">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Closed</span>
+        <span class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm">
+          <i class="fas fa-check-circle"></i>
+        </span>
+      </div>
+      <div class="flex items-baseline gap-2">
+        <span class="text-2xl md:text-3xl font-black text-emerald-600">{{ kpis.closed }}</span>
+        <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+          {{ kpis.closure_rate }}%
+        </span>
+      </div>
+      <div class="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+        <span>Fully resolved</span>
+        <span class="click-hint text-emerald-600 font-bold flex items-center gap-1">
+          View details <i class="fas fa-arrow-right text-[10px]"></i>
+        </span>
+      </div>
+    </div>
+
+    <!-- Critical / High Severity Card -->
+    <div onclick="openDetailModal('high_severity', '', '', 'High & Critical Severity CAPAs (Sev 7-10)')"
+         class="kpi-card bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"
+         title="Click to view high severity CAPAs">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Critical / High Sev</span>
+        <span class="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-sm">
+          <i class="fas fa-fire"></i>
+        </span>
+      </div>
+      <div class="text-2xl md:text-3xl font-black text-slate-900">
+        {{ kpis.high_severity }}
+      </div>
+      <div class="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+        <span class="text-slate-500">Score 7-10</span>
+        <span class="click-hint text-rose-600 font-bold flex items-center gap-1">
+          View details <i class="fas fa-arrow-right text-[10px]"></i>
+        </span>
+      </div>
+    </div>
+
+    <!-- Average Severity Card -->
+    <div onclick="openDetailModal('total', '', '', 'All CAPAs - Severity Spectrum')"
+         class="kpi-card bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"
+         title="Average defect severity score">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Avg Defect Severity</span>
+        <span class="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center text-sm">
+          <i class="fas fa-chart-line"></i>
+        </span>
+      </div>
+      <div class="text-2xl md:text-3xl font-black text-slate-900">
+        {{ kpis.avg_severity }}
+      </div>
+      <div class="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+        <span>Scale 1 to 10</span>
+        <span class="click-hint text-slate-700 font-bold flex items-center gap-1">
+          View all <i class="fas fa-arrow-right text-[10px]"></i>
+        </span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- =============================================
+       PERSPECTIVE NAVIGATION TABS
+  ============================================= -->
+  <div class="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto custom-scrollbar">
+    <button type="button" onclick="switchRoleTab('overview')"
+            id="tab-btn-overview"
+            class="tab-btn px-5 py-2.5 rounded-xl text-xs font-bold border flex items-center gap-2 {% if active_tab == 'overview' or not active_tab %}active{% else %}border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}">
+      <i class="fas fa-industry"></i> Plant & Line Matrix
+    </button>
+    <button type="button" onclick="switchRoleTab('sla')"
+            id="tab-btn-sla"
+            class="tab-btn px-5 py-2.5 rounded-xl text-xs font-bold border flex items-center gap-2 {% if active_tab == 'sla' %}active{% else %}border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}">
+      <i class="fas fa-stopwatch text-rose-500"></i> SLA & Aging Analysis
+    </button>
+    <button type="button" onclick="switchRoleTab('severity')"
+            id="tab-btn-severity"
+            class="tab-btn px-5 py-2.5 rounded-xl text-xs font-bold border flex items-center gap-2 {% if active_tab == 'severity' %}active{% else %}border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}">
+      <i class="fas fa-shield-halved text-amber-500"></i> Severity Spectrum
+    </button>
+    <button type="button" onclick="switchRoleTab('roles')"
+            id="tab-btn-roles"
+            class="tab-btn px-5 py-2.5 rounded-xl text-xs font-bold border flex items-center gap-2 {% if active_tab == 'roles' %}active{% else %}border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}">
+      <i class="fas fa-users-gear text-indigo-500"></i> Roles & Ownership ({{ role_breakdown|length }})
+    </button>
+    <button type="button" onclick="switchRoleTab('recent')"
+            id="tab-btn-recent"
+            class="tab-btn px-5 py-2.5 rounded-xl text-xs font-bold border flex items-center gap-2 {% if active_tab == 'recent' %}active{% else %}border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}">
+      <i class="fas fa-stream text-sky-500"></i> Recent Actions Feed
+    </button>
+  </div>
+
+  <!-- =============================================
+       TAB 1: PLANT, SECTION, BRAND, & LINE MATRIX
+  ============================================= -->
+  <div id="tab-content-overview" class="role-tab-pane space-y-6 {% if active_tab != 'overview' and active_tab %}hidden{% endif %}">
+
+    <!-- Row 1: Plant & Section Breakdowns -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      <!-- Plant Breakdown Card -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center text-sm font-bold">
+              <i class="fas fa-building"></i>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">Plant-Wise Distribution</h3>
+              <p class="text-[11px] text-slate-500">CAPA count and resolution by manufacturing site</p>
+            </div>
+          </div>
+          <button type="button" onclick="exportTableToExcel('plantTable', 'CAPA_Plant_Report')"
+                  class="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 transition shadow-sm flex items-center gap-1.5">
+            <i class="fas fa-file-excel text-emerald-600"></i> 📥 Export Excel
+          </button>
+        </div>
+
+        <div class="overflow-x-auto custom-scrollbar flex-1">
+          <table class="w-full text-left text-xs" id="plantTable">
+            <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold text-[10px]">
+              <tr>
+                <th class="py-3 px-4">Plant</th>
+                <th class="py-3 px-3 text-center">Total</th>
+                <th class="py-3 px-3 text-center">Open</th>
+                <th class="py-3 px-3 text-center">Overdue</th>
+                <th class="py-3 px-3 text-center">Closed</th>
+                <th class="py-3 px-4 text-right">Closure Rate</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              {% for p in plant_breakdown %}
+              <tr class="interactive-row hover:bg-slate-50 transition"
+                  onclick="openDetailModal('plant', '{{ p.plant_id }}', '{{ p.plant_name }}', 'CAPAs for Plant {{ p.plant_name }}')">
+                <td class="py-3 px-4 font-bold text-slate-900">
+                  <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-sky-500"></span>
+                    <span>{{ p.plant_name }}</span>
+                    <span class="text-[10px] font-mono text-slate-400">({{ p.plant_code }})</span>
+                  </div>
+                </td>
+                <td class="py-3 px-3 text-center font-bold text-slate-800">{{ p.total }}</td>
+                <td class="py-3 px-3 text-center text-amber-600 font-semibold">{{ p.open }}</td>
+                <td class="py-3 px-3 text-center text-rose-600 font-bold">{{ p.overdue }}</td>
+                <td class="py-3 px-3 text-center text-emerald-600 font-semibold">{{ p.closed }}</td>
+                <td class="py-3 px-4 text-right">
+                  <div class="flex items-center justify-end gap-2">
+                    <div class="w-16 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div class="bg-emerald-500 h-1.5 rounded-full"></div>
+                    </div>
+                    <span class="font-bold text-slate-700">{{ p.closure_rate }}%</span>
+                  </div>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="6" class="py-8 text-center text-slate-400 font-medium">No plant records found.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Section / Shop Breakdown Card -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">
+              <i class="fas fa-layer-group"></i>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">Section / Shop Breakdown</h3>
+              <p class="text-[11px] text-slate-500">Assembly, Testing, and Sub-segment metrics</p>
+            </div>
+          </div>
+          <button type="button" onclick="exportTableToExcel('sectionTable', 'CAPA_Section_Report')"
+                  class="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 transition shadow-sm flex items-center gap-1.5">
+            <i class="fas fa-file-excel text-emerald-600"></i> 📥 Export Excel
+          </button>
+        </div>
+
+        <div class="overflow-x-auto custom-scrollbar flex-1">
+          <table class="w-full text-left text-xs" id="sectionTable">
+            <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold text-[10px]">
+              <tr>
+                <th class="py-3 px-4">Section / Shop</th>
+                <th class="py-3 px-3 text-center">Total</th>
+                <th class="py-3 px-3 text-center">Open</th>
+                <th class="py-3 px-3 text-center">Overdue</th>
+                <th class="py-3 px-3 text-center">Avg Sev</th>
+                <th class="py-3 px-4 text-right">Closure</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              {% for s in section_breakdown %}
+              <tr class="interactive-row hover:bg-slate-50 transition"
+                  onclick="openDetailModal('section', '{{ s.shop_id }}', '{{ s.shop_name }}', 'CAPAs for Section {{ s.shop_name }}')">
+                <td class="py-3 px-4 font-bold text-slate-900">
+                  <div>{{ s.shop_name }}</div>
+                  <div class="text-[10px] text-slate-400 font-normal">{{ s.plant_name }}</div>
+                </td>
+                <td class="py-3 px-3 text-center font-bold text-slate-800">{{ s.total }}</td>
+                <td class="py-3 px-3 text-center text-amber-600 font-semibold">{{ s.open }}</td>
+                <td class="py-3 px-3 text-center text-rose-600 font-bold">{{ s.overdue }}</td>
+                <td class="py-3 px-3 text-center font-bold text-slate-700">{{ s.avg_severity }}</td>
+                <td class="py-3 px-4 text-right font-bold text-emerald-600">{{ s.closure_rate }}%</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="6" class="py-8 text-center text-slate-400 font-medium">No section records found.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Row 2: Brand & Line Breakdowns -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      <!-- Brand Breakdown Card -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-sm font-bold">
+              <i class="fas fa-tags"></i>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">Brand Quality Compliance</h3>
+              <p class="text-[11px] text-slate-500">CAPA volume by client brand</p>
+            </div>
+          </div>
+          <button type="button" onclick="exportTableToExcel('brandTable', 'CAPA_Brand_Report')"
+                  class="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 transition shadow-sm flex items-center gap-1.5">
+            <i class="fas fa-file-excel text-emerald-600"></i> 📥 Export Excel
+          </button>
+        </div>
+
+        <div class="overflow-x-auto custom-scrollbar flex-1">
+          <table class="w-full text-left text-xs" id="brandTable">
+            <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold text-[10px]">
+              <tr>
+                <th class="py-3 px-4">Brand</th>
+                <th class="py-3 px-3 text-center">Total</th>
+                <th class="py-3 px-3 text-center">Open</th>
+                <th class="py-3 px-3 text-center">Overdue</th>
+                <th class="py-3 px-3 text-center">Avg Sev</th>
+                <th class="py-3 px-4 text-right">Closure</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              {% for b in brand_breakdown %}
+              <tr class="interactive-row hover:bg-slate-50 transition"
+                  onclick="openDetailModal('brand', '', '{{ b.brand }}', 'CAPAs for Brand {{ b.brand }}')">
+                <td class="py-3 px-4 font-bold text-slate-900">
+                  <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-50 text-purple-700 border border-purple-100">
+                    {{ b.brand }}
+                  </span>
+                </td>
+                <td class="py-3 px-3 text-center font-bold text-slate-800">{{ b.total }}</td>
+                <td class="py-3 px-3 text-center text-amber-600 font-semibold">{{ b.open }}</td>
+                <td class="py-3 px-3 text-center text-rose-600 font-bold">{{ b.overdue }}</td>
+                <td class="py-3 px-3 text-center font-bold text-slate-700">{{ b.avg_severity }}</td>
+                <td class="py-3 px-4 text-right font-bold text-emerald-600">{{ b.closure_rate }}%</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="6" class="py-8 text-center text-slate-400 font-medium">No brand records found.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Line Breakdown Card -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm font-bold">
+              <i class="fas fa-diagram-project"></i>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">Line-Wise Defect Density</h3>
+              <p class="text-[11px] text-slate-500">Production lines sorted by CAPA volume</p>
+            </div>
+          </div>
+          <button type="button" onclick="exportTableToExcel('lineTable', 'CAPA_Line_Report')"
+                  class="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 transition shadow-sm flex items-center gap-1.5">
+            <i class="fas fa-file-excel text-emerald-600"></i> 📥 Export Excel
+          </button>
+        </div>
+
+        <div class="overflow-x-auto custom-scrollbar flex-1 max-h-[380px]">
+          <table class="w-full text-left text-xs" id="lineTable">
+            <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold text-[10px] sticky top-0 z-10">
+              <tr>
+                <th class="py-3 px-4">Line</th>
+                <th class="py-3 px-3 text-center">Total</th>
+                <th class="py-3 px-3 text-center">Open</th>
+                <th class="py-3 px-3 text-center">Overdue</th>
+                <th class="py-3 px-3 text-center">Avg Sev</th>
+                <th class="py-3 px-4 text-right">Closure</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              {% for l in line_breakdown %}
+              <tr class="interactive-row hover:bg-slate-50 transition"
+                  onclick="openDetailModal('line', '{{ l.line_id }}', '{{ l.line_name }}', 'CAPAs for Line {{ l.line_name }}')">
+                <td class="py-3 px-4 font-bold text-slate-900">
+                  <div class="flex items-center gap-2">
+                    <span class="w-6 h-6 rounded-md bg-slate-100 flex items-center justify-center text-[10px] font-mono text-slate-700">
+                      {{ forloop.counter }}
+                    </span>
+                    <div>
+                      <div>{{ l.line_name }}</div>
+                      <div class="text-[10px] text-slate-400 font-normal">{{ l.shop_name }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="py-3 px-3 text-center font-bold text-slate-800">{{ l.total }}</td>
+                <td class="py-3 px-3 text-center text-amber-600 font-semibold">{{ l.open }}</td>
+                <td class="py-3 px-3 text-center text-rose-600 font-bold">{{ l.overdue }}</td>
+                <td class="py-3 px-3 text-center font-bold text-slate-700">{{ l.avg_severity }}</td>
+                <td class="py-3 px-4 text-right font-bold text-emerald-600">{{ l.closure_rate }}%</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="6" class="py-8 text-center text-slate-400 font-medium">No line records found.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- =============================================
+       TAB 2: SLA & AGING ANALYSIS
+  ============================================= -->
+  <div id="tab-content-sla" class="role-tab-pane space-y-6 {% if active_tab != 'sla' %}hidden{% endif %}">
+
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-6">
+        <div>
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <i class="fas fa-stopwatch text-rose-500"></i>
+            CAPA Resolution SLA & Aging Schedule
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">
+            Active and resolved CAPAs partitioned by timeline urgency and deadline breach status.
+          </p>
+        </div>
+        <button type="button" onclick="exportTableToExcel('slaAgingTable', 'CAPA_SLA_Aging_Report')"
+                class="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 transition shadow-sm flex items-center gap-2 self-start sm:self-auto">
+          <i class="fas fa-file-excel text-emerald-600"></i> 📥 Export SLA Report
+        </button>
+      </div>
+
+      <!-- SLA Aging Buckets Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6" id="slaBucketsGrid">
+        {% for b in sla_aging %}
+        <div onclick="openDetailModal('sla', '', '{{ b.bucket_key }}', 'CAPAs in {{ b.label }}')"
+             class="kpi-card p-4 rounded-2xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:border-slate-300">
+          <div class="flex items-center justify-between mb-2">
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border {{ b.badge_class }}">
+              {{ b.severity_tier }}
+            </span>
+            <i class="fas {{ b.icon }} text-slate-400 text-sm"></i>
+          </div>
+          <div class="text-2xl font-black text-slate-900 mt-2">{{ b.count }}</div>
+          <div class="text-xs font-semibold text-slate-700 mt-1">{{ b.label }}</div>
+          <div class="mt-2 text-[10px] text-sky-600 font-bold flex items-center gap-1 click-hint">
+            View records <i class="fas fa-arrow-right text-[9px]"></i>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Hidden Table for Excel Export of SLA -->
+      <table class="w-full text-left text-xs" id="slaAgingTable">
+        <thead class="bg-slate-50 border-b border-slate-200 font-bold text-slate-600">
+          <tr>
+            <th class="py-2.5 px-4">Timeline Bucket</th>
+            <th class="py-2.5 px-4">Severity Tier</th>
+            <th class="py-2.5 px-4 text-right">CAPA Count</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for b in sla_aging %}
+          <tr>
+            <td class="py-2.5 px-4 font-bold text-slate-800">{{ b.label }}</td>
+            <td class="py-2.5 px-4">{{ b.severity_tier }}</td>
+            <td class="py-2.5 px-4 text-right font-black">{{ b.count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+    </div>
+
+  </div>
+
+  <!-- =============================================
+       TAB 3: SEVERITY SPECTRUM
+  ============================================= -->
+  <div id="tab-content-severity" class="role-tab-pane space-y-6 {% if active_tab != 'severity' %}hidden{% endif %}">
+
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-6">
+        <div>
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <i class="fas fa-shield-halved text-amber-500"></i>
+            Defect Severity Level Breakdown
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">
+            Stratification of CAPAs across high impact (7-10), moderate (4-6), and minor (1-3) quality issues.
+          </p>
+        </div>
+        <button type="button" onclick="exportTableToExcel('severityTable', 'CAPA_Severity_Report')"
+                class="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 transition shadow-sm flex items-center gap-2 self-start sm:self-auto">
+          <i class="fas fa-file-excel text-emerald-600"></i> 📥 Export Excel
+        </button>
+      </div>
+
+      <div class="overflow-x-auto custom-scrollbar">
+        <table class="w-full text-left text-xs" id="severityTable">
+          <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold text-[10px]">
+            <tr>
+              <th class="py-3 px-4">Severity Tier</th>
+              <th class="py-3 px-3 text-center">Total</th>
+              <th class="py-3 px-3 text-center">Open</th>
+              <th class="py-3 px-3 text-center">In Progress</th>
+              <th class="py-3 px-3 text-center">Overdue</th>
+              <th class="py-3 px-3 text-center">Closed</th>
+              <th class="py-3 px-4 text-right">Closure Rate</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for tier in severity_dist %}
+            <tr class="interactive-row hover:bg-slate-50 transition"
+                onclick="openDetailModal('{{ tier.color }}_severity', '', '', 'CAPAs in {{ tier.name }}')">
+              <td class="py-3 px-4 font-bold text-slate-900">
+                <span class="px-2.5 py-1 rounded-lg text-xs font-bold border {{ tier.badge_class }} flex items-center gap-1.5 w-max">
+                  <i class="fas {{ tier.icon }}"></i>
+                  {{ tier.name }}
+                </span>
+              </td>
+              <td class="py-3 px-3 text-center font-bold text-slate-800">{{ tier.total }}</td>
+              <td class="py-3 px-3 text-center text-amber-600 font-semibold">{{ tier.open }}</td>
+              <td class="py-3 px-3 text-center text-indigo-600 font-semibold">{{ tier.assigned }}</td>
+              <td class="py-3 px-3 text-center text-rose-600 font-bold">{{ tier.overdue }}</td>
+              <td class="py-3 px-3 text-center text-emerald-600 font-semibold">{{ tier.closed }}</td>
+              <td class="py-3 px-4 text-right font-bold text-emerald-600">{{ tier.closure_rate }}%</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- =============================================
+       TAB 4: ROLE & OWNERSHIP BREAKDOWN
+  ============================================= -->
+  <div id="tab-content-roles" class="role-tab-pane space-y-6 {% if active_tab != 'roles' %}hidden{% endif %}">
+
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-6">
+        <div>
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <i class="fas fa-users-gear text-indigo-500"></i>
+            Root Cause Analysis (RCA) & Action Role Matrix
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">
+            Distribution of assigned corrective actions by engineering and quality department roles.
+          </p>
+        </div>
+        <button type="button" onclick="exportTableToExcel('roleTable', 'CAPA_Roles_Report')"
+                class="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 transition shadow-sm flex items-center gap-2 self-start sm:self-auto">
+          <i class="fas fa-file-excel text-emerald-600"></i> 📥 Export Roles
+        </button>
+      </div>
+
+      <div class="overflow-x-auto custom-scrollbar">
+        <table class="w-full text-left text-xs" id="roleTable">
+          <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold text-[10px]">
+            <tr>
+              <th class="py-3 px-4">Assigned Department / Role</th>
+              <th class="py-3 px-3 text-center">Total Assigned</th>
+              <th class="py-3 px-3 text-center">Open</th>
+              <th class="py-3 px-3 text-center">In Progress</th>
+              <th class="py-3 px-3 text-center">Overdue</th>
+              <th class="py-3 px-3 text-center">Closed</th>
+              <th class="py-3 px-4 text-right">Closure Rate</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for r in role_breakdown %}
+            <tr class="interactive-row hover:bg-slate-50 transition"
+                onclick="openDetailModal('role', '{{ r.role_id }}', '{{ r.role_name }}', 'CAPAs Assigned to {{ r.role_name }}')">
+              <td class="py-3 px-4 font-bold text-slate-900">
+                <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                  {{ r.role_name }}
+                </span>
+              </td>
+              <td class="py-3 px-3 text-center font-bold text-slate-800">{{ r.total }}</td>
+              <td class="py-3 px-3 text-center text-amber-600 font-semibold">{{ r.open }}</td>
+              <td class="py-3 px-3 text-center text-indigo-600 font-semibold">{{ r.assigned }}</td>
+              <td class="py-3 px-3 text-center text-rose-600 font-bold">{{ r.overdue }}</td>
+              <td class="py-3 px-3 text-center text-emerald-600 font-semibold">{{ r.closed }}</td>
+              <td class="py-3 px-4 text-right font-bold text-emerald-600">{{ r.closure_rate }}%</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="7" class="py-8 text-center text-slate-400 font-medium">No role records found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- =============================================
+       TAB 5: RECENT ACTIONS STREAM
+  ============================================= -->
+  <div id="tab-content-recent" class="role-tab-pane space-y-6 {% if active_tab != 'recent' %}hidden{% endif %}">
+
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50">
+        <div>
+          <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <i class="fas fa-stream text-sky-500"></i>
+            Live CAPA Activity Stream
+          </h3>
+          <p class="text-[11px] text-slate-500">Latest 25 corrective actions generated across production lines</p>
+        </div>
+        <button type="button" onclick="exportTableToExcel('recentCapaTable', 'Recent_CAPAs_Stream')"
+                class="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 transition shadow-sm flex items-center gap-1.5 self-start sm:self-auto">
+          <i class="fas fa-file-excel text-emerald-600"></i> 📥 Export Excel
+        </button>
+      </div>
+
+      <div class="overflow-x-auto custom-scrollbar">
+        <table class="w-full text-left text-xs" id="recentCapaTable">
+          <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold text-[10px]">
+            <tr>
+              <th class="py-3 px-4">Created Date</th>
+              <th class="py-3 px-4">CAPA Title / Template</th>
+              <th class="py-3 px-3">Plant & Line</th>
+              <th class="py-3 px-3">Brand & Product</th>
+              <th class="py-3 px-3 text-center">Severity</th>
+              <th class="py-3 px-3">RCA Role</th>
+              <th class="py-3 px-3">Due Date</th>
+              <th class="py-3 px-3 text-center">Status</th>
+              <th class="py-3 px-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for c in recent_capas %}
+            <tr class="hover:bg-slate-50 transition">
+              <td class="py-3 px-4 whitespace-nowrap font-bold text-slate-800">{{ c.created_at_str }}</td>
+              <td class="py-3 px-4 font-semibold text-slate-900">
+                <div class="line-clamp-1" title="{{ c.title }}">{{ c.title }}</div>
+                <span class="text-[10px] text-slate-400 font-mono">{{ c.template_name }}</span>
+              </td>
+              <td class="py-3 px-3 text-slate-600 font-medium">
+                <div>{{ c.plant_name }}</div>
+                <span class="text-[10px] font-bold text-slate-900">{{ c.line_name }}</span>
+              </td>
+              <td class="py-3 px-3">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700">{{ c.brand }}</span>
+                <span class="block text-[10px] text-slate-400 mt-0.5">{{ c.product_name }}</span>
+              </td>
+              <td class="py-3 px-3 text-center">
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {% if c.severity >= 7 %}bg-rose-100 text-rose-700{% elif c.severity >= 4 %}bg-amber-100 text-amber-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
+                  Sev {{ c.severity }}
+                </span>
+              </td>
+              <td class="py-3 px-3 font-semibold text-slate-700">{{ c.rca_role_name }}</td>
+              <td class="py-3 px-3 whitespace-nowrap">
+                <div class="{% if c.is_overdue %}text-rose-600 font-bold{% else %}text-slate-600{% endif %}">
+                  {{ c.due_date }}
+                </div>
+                {% if c.is_overdue %}
+                <span class="text-[9px] font-bold text-rose-500 uppercase tracking-wide">
+                  {{ c.days_overdue }}d Overdue
+                </span>
+                {% endif %}
+              </td>
+              <td class="py-3 px-3 text-center">
+                {% if c.status == 'CLOSED' %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">Closed</span>
+                {% elif c.status == 'ACTION_DONE' %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">Action Done</span>
+                {% elif c.status == 'ASSIGNED' %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">Assigned</span>
+                {% elif c.status == 'REJECTED' %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">Rejected</span>
+                {% else %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">Open</span>
+                {% endif %}
+              </td>
+              <td class="py-3 px-4 text-right">
+                <a href="{% url 'capa:capa_detail' c.capa_id %}"
+                   class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-sky-600 bg-sky-50 hover:bg-sky-600 hover:text-white transition">
+                  <span>View</span>
+                  <i class="fas fa-arrow-up-right-from-square text-[9px]"></i>
+                </a>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="9" class="py-8 text-center text-slate-400 font-medium">No recent CAPA actions recorded.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+<!-- =============================================
+     INTERACTIVE DETAIL POPUP MODAL (#capaDetailModal)
+============================================= -->
+<div id="capaDetailModal"
+     class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-3 sm:p-6"
+     style="display: none;">
+  <div id="capaDetailModalContent"
+       class="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
+
+    <!-- Modal Header -->
+    <div class="p-5 sm:p-6 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
+          <h3 id="modalTitle" class="text-base sm:text-lg font-black text-slate-900">
+            CAPA Details Drill-Down
+          </h3>
+          <span id="modalCountBadge"
+                class="px-2.5 py-0.5 rounded-full text-xs font-black bg-red-100 text-red-800 border border-red-200">
+            Loading...
+          </span>
+        </div>
+        <p id="modalFilterSummary" class="text-xs text-slate-500 mt-1 font-medium">
+          Active Filters: Loading...
+        </p>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="exportCurrentModalToExcel()"
+                class="px-3.5 py-1.5 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition shadow-sm flex items-center gap-1.5">
+          <i class="fas fa-file-excel text-emerald-600"></i>
+          <span>📥 Export to Excel</span>
+        </button>
+
+        <button type="button" onclick="closeDetailModal()"
+                class="w-8 h-8 rounded-xl bg-slate-200/80 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition">
+          <i class="fas fa-times text-sm"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal Filter & Live Search Bar -->
+    <div class="p-3 sm:px-6 bg-white border-b border-slate-100 flex items-center justify-between gap-3">
+      <div class="relative w-full max-w-sm">
+        <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+        <input type="text" id="modalSearch"
+               onkeyup="filterTable('modalSearch', 'modalRecordsTable')"
+               placeholder="Search title, template, line, brand, role, status..."
+               class="w-full text-xs rounded-xl pl-9 pr-3 py-2 border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-sky-500 transition font-medium text-slate-800">
+      </div>
+      <div class="text-[11px] text-slate-400 hidden sm:block">
+        Showing up to 500 records
+      </div>
+    </div>
+
+    <!-- Modal Body (Table / Records) -->
+    <div class="overflow-y-auto custom-scrollbar p-0 flex-1 relative min-h-[300px]" id="modalBody">
+      
+      <!-- Loading Spinner -->
+      <div id="modalLoadingSpinner" class="absolute inset-0 bg-white/80 flex flex-col items-center justify-center gap-3 z-20">
+        <div class="w-8 h-8 border-3 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+        <span class="text-xs font-bold text-slate-600">Fetching CAPA records...</span>
+      </div>
+
+      <!-- Empty State -->
+      <div id="modalEmptyState" class="hidden py-16 text-center text-slate-400 font-medium">
+        <i class="fas fa-folder-open text-4xl mb-3 text-slate-300 block"></i>
+        No matching CAPA records found for the selected criteria.
+      </div>
+
+      <!-- Records Table -->
+      <table class="w-full text-left text-xs" id="modalRecordsTable">
+        <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold text-[10px] sticky top-0 z-10 shadow-sm">
+          <tr>
+            <th class="py-2.5 px-3">Date</th>
+            <th class="py-2.5 px-3">Problem Title / Template</th>
+            <th class="py-2.5 px-3">Plant & Line</th>
+            <th class="py-2.5 px-3">Brand & Model</th>
+            <th class="py-2.5 px-3 text-center">Severity</th>
+            <th class="py-2.5 px-3">RCA Role</th>
+            <th class="py-2.5 px-3">Due Date</th>
+            <th class="py-2.5 px-3 text-center">Status</th>
+            <th class="py-2.5 px-3 text-right">Action</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100" id="modalTableBody">
+          <!-- Populated dynamically via JS -->
+        </tbody>
+      </table>
+
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="p-3 sm:px-6 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 font-medium">
+      <div class="flex items-center gap-3">
+        <span class="inline-flex items-center gap-1 text-[11px] text-slate-600 font-semibold">
+          <i class="fas fa-keyboard text-slate-400"></i> Press <kbd class="px-1.5 py-0.5 bg-white border rounded text-[10px]">Esc</kbd> to close
+        </span>
+      </div>
+      <button type="button" onclick="closeDetailModal()"
+              class="px-4 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold transition">
+        Close
+      </button>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* =============================================
+   CURRENT DASHBOARD FILTER STATE
+============================================= */
+const CURRENT_RANGE    = "{{ selected_range|default:'all' }}";
+const CURRENT_PLANT_ID = "{{ selected_plant_id|default:'' }}";
+const CURRENT_SHOP_ID  = "{{ selected_shop_id|default:'' }}";
+const CURRENT_BRAND    = "{{ selected_brand|default:'' }}";
+const CURRENT_LINE_ID  = "{{ selected_line_id|default:'' }}";
+const CURRENT_STATUS   = "{{ selected_status|default:'' }}";
+const CURRENT_SEVERITY = "{{ selected_severity|default:'' }}";
+const DETAILS_API_URL  = "{% url 'capa:capa_dashboard_details_api' %}";
+
+let currentModalRecords = [];
+let currentModalTitle = "CAPA Records";
+
+/* =============================================
+   TAB SWITCHING LOGIC
+============================================= */
+function switchRoleTab(tabName) {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.remove('active');
+    btn.classList.add('border-slate-200', 'text-slate-600');
+  });
+  const activeBtn = document.getElementById('tab-btn-' + tabName);
+  if (activeBtn) {
+    activeBtn.classList.add('active');
+    activeBtn.classList.remove('border-slate-200', 'text-slate-600');
+  }
+
+  document.querySelectorAll('.role-tab-pane').forEach(pane => {
+    pane.classList.add('hidden');
+  });
+  const targetPane = document.getElementById('tab-content-' + tabName);
+  if (targetPane) {
+    targetPane.classList.remove('hidden');
+  }
+
+  const url = new URL(window.location);
+  url.searchParams.set('tab', tabName);
+  window.history.replaceState({}, '', url);
+
+  document.querySelectorAll('input[name="tab"]').forEach(inp => {
+    inp.value = tabName;
+  });
+}
+
+/* =============================================
+   CLIENT-SIDE TABLE SEARCH (MODAL & REPORTS)
+============================================= */
+function filterTable(inputId, tableId) {
+  const input = document.getElementById(inputId);
+  const filter = input.value.toLowerCase();
+  const table = document.getElementById(tableId);
+  if (!table) return;
+  const tbody = table.getElementsByTagName('tbody')[0];
+  if (!tbody) return;
+  const rows = tbody.getElementsByTagName('tr');
+
+  for (let i = 0; i < rows.length; i++) {
+    const text = rows[i].textContent.toLowerCase();
+    rows[i].style.display = (text.indexOf(filter) > -1) ? '' : 'none';
+  }
+}
+
+/* =============================================
+   UNIVERSAL EXCEL EXPORT (SheetJS)
+============================================= */
+function exportTableToExcel(tableId, filename) {
+  const table = document.getElementById(tableId);
+  if (!table) {
+    alert("Table not found for export.");
+    return;
+  }
+
+  const clone = table.cloneNode(true);
+  // Remove last column (Action column) if present
+  const actionHeaders = clone.querySelectorAll('th:last-child');
+  const actionCells = clone.querySelectorAll('td:last-child');
+  actionHeaders.forEach(th => {
+    if (th.textContent.trim().toLowerCase().includes('action')) th.remove();
+  });
+  actionCells.forEach(td => {
+    if (td.querySelector('a, button')) td.remove();
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.table_to_sheet(clone);
+  const safeFilename = (filename || "CAPA_Export") + "_" + new Date().toISOString().slice(0, 10) + ".xlsx";
+  XLSX.utils.book_append_sheet(wb, ws, "Report");
+  XLSX.writeFile(wb, safeFilename);
+}
+
+function exportCurrentModalToExcel() {
+  if (!currentModalRecords || currentModalRecords.length === 0) {
+    alert("No records to export.");
+    return;
+  }
+
+  const exportData = currentModalRecords.map((r, idx) => ({
+    "No": idx + 1,
+    "CAPA ID": r.capa_id,
+    "Created Date": r.created_at_str,
+    "Title": r.title,
+    "Template": r.template_name,
+    "Plant": r.plant_name,
+    "Section / Shop": r.shop_name,
+    "Line": r.line_name,
+    "Brand": r.brand,
+    "Product Model": r.product_name,
+    "Severity Score": r.severity,
+    "RCA Role": r.rca_role_name,
+    "CAPA Action Role": r.capa_role_name,
+    "Due Date": r.due_date_str,
+    "Overdue Status": r.is_overdue ? ("Overdue by " + r.days_overdue + " days") : "On Track",
+    "Status": r.status
+  }));
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(exportData);
+  const safeName = (currentModalTitle.replace(/[^a-zA-Z0-9_-]/g, "_") || "CAPA_Details") + "_" + new Date().toISOString().slice(0, 10) + ".xlsx";
+  XLSX.utils.book_append_sheet(wb, ws, "CAPA_Details");
+  XLSX.writeFile(wb, safeName);
+}
+
+/* =============================================
+   DETAIL POPUP MODAL LOGIC
+============================================= */
+function openDetailModal(metric, targetId, targetName, displayTitle) {
+  const modal = document.getElementById('capaDetailModal');
+  const titleEl = document.getElementById('modalTitle');
+  const countBadge = document.getElementById('modalCountBadge');
+  const filterSummary = document.getElementById('modalFilterSummary');
+  const tbody = document.getElementById('modalTableBody');
+  const spinner = document.getElementById('modalLoadingSpinner');
+  const emptyState = document.getElementById('modalEmptyState');
+  const searchInput = document.getElementById('modalSearch');
+
+  currentModalTitle = displayTitle || "CAPA Records";
+  titleEl.textContent = currentModalTitle;
+  countBadge.textContent = "Loading...";
+  tbody.innerHTML = "";
+  emptyState.style.display = "none";
+  spinner.style.display = "flex";
+  searchInput.value = "";
+
+  // Build filter summary string
+  let summaryParts = ["Period: " + CURRENT_RANGE];
+  if (CURRENT_PLANT_ID) summaryParts.push("Plant ID: " + CURRENT_PLANT_ID);
+  if (CURRENT_SHOP_ID) summaryParts.push("Section ID: " + CURRENT_SHOP_ID);
+  if (CURRENT_BRAND) summaryParts.push("Brand: " + CURRENT_BRAND);
+  if (CURRENT_LINE_ID) summaryParts.push("Line ID: " + CURRENT_LINE_ID);
+  if (CURRENT_STATUS) summaryParts.push("Status: " + CURRENT_STATUS);
+  if (CURRENT_SEVERITY) summaryParts.push("Severity: " + CURRENT_SEVERITY);
+  filterSummary.textContent = "Active Filters: " + summaryParts.join(" • ");
+
+  modal.classList.add('open');
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+
+  // Build query URL
+  const params = new URLSearchParams({
+    metric: metric || 'total',
+    range: CURRENT_RANGE,
+  });
+  if (targetId) params.append('target_id', targetId);
+  if (targetName) params.append('target_name', targetName);
+  if (CURRENT_PLANT_ID) params.append('plant', CURRENT_PLANT_ID);
+  if (CURRENT_SHOP_ID) params.append('shop', CURRENT_SHOP_ID);
+  if (CURRENT_BRAND) params.append('brand', CURRENT_BRAND);
+  if (CURRENT_LINE_ID) params.append('line', CURRENT_LINE_ID);
+  if (CURRENT_STATUS) params.append('status', CURRENT_STATUS);
+  if (CURRENT_SEVERITY) params.append('severity', CURRENT_SEVERITY);
+
+  fetch(DETAILS_API_URL + "?" + params.toString())
+    .then(r => r.json())
+    .then(data => {
+      spinner.style.display = "none";
+      if (!data.success || !data.records || data.records.length === 0) {
+        countBadge.textContent = "0 records";
+        emptyState.style.display = "block";
+        currentModalRecords = [];
+        return;
+      }
+
+      currentModalRecords = data.records;
+      countBadge.textContent = data.count + " records";
+
+      let rowsHtml = "";
+      data.records.forEach(r => {
+        let statusBadge = "";
+        if (r.status === 'CLOSED') {
+          statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">Closed</span>';
+        } else if (r.status === 'ACTION_DONE') {
+          statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">Action Done</span>';
+        } else if (r.status === 'ASSIGNED') {
+          statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">Assigned</span>';
+        } else if (r.status === 'REJECTED') {
+          statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">Rejected</span>';
+        } else {
+          statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">Open</span>';
+        }
+
+        let overdueBadge = "";
+        if (r.is_overdue) {
+          overdueBadge = `<span class="block text-[9px] font-bold text-rose-500 uppercase tracking-wide">${r.days_overdue}d Overdue</span>`;
+        }
+
+        let sevBadge = "";
+        if (r.severity >= 7) {
+          sevBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">Sev ${r.severity}</span>`;
+        } else if (r.severity >= 4) {
+          sevBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">Sev ${r.severity}</span>`;
+        } else {
+          sevBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">Sev ${r.severity}</span>`;
+        }
+
+        rowsHtml += `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-2.5 px-3 whitespace-nowrap font-bold text-slate-800">${r.created_at_str}</td>
+            <td class="py-2.5 px-3 font-semibold text-slate-900">
+              <div class="line-clamp-1" title="${r.title}">${r.title}</div>
+              <span class="text-[10px] text-slate-400 font-mono">${r.template_name}</span>
+            </td>
+            <td class="py-2.5 px-3 text-slate-600">
+              <div>${r.plant_name}</div>
+              <span class="font-bold text-slate-800 text-[11px]">${r.line_name}</span>
+            </td>
+            <td class="py-2.5 px-3">
+              <span class="font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded text-[10px]">${r.brand}</span>
+              <span class="block text-[10px] text-slate-500 mt-0.5">${r.product_name}</span>
+            </td>
+            <td class="py-2.5 px-3 text-center">${sevBadge}</td>
+            <td class="py-2.5 px-3 font-semibold text-slate-700">${r.rca_role_name}</td>
+            <td class="py-2.5 px-3 whitespace-nowrap">
+              <div class="${r.is_overdue ? 'text-rose-600 font-bold' : 'text-slate-700'}">${r.due_date_str}</div>
+              ${overdueBadge}
+            </td>
+            <td class="py-2.5 px-3 text-center">${statusBadge}</td>
+            <td class="py-2.5 px-3 text-right whitespace-nowrap">
+              <a href="${r.detail_url}" target="_blank"
+                 class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-sky-600 bg-sky-50 hover:bg-sky-600 hover:text-white transition">
+                <span>View</span>
+                <i class="fas fa-arrow-up-right-from-square text-[9px]"></i>
+              </a>
+            </td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = rowsHtml;
+    })
+    .catch(err => {
+      spinner.style.display = "none";
+      countBadge.textContent = "Error";
+      emptyState.style.display = "block";
+      emptyState.innerHTML = '<span class="text-rose-600 font-bold">Failed to load records. Please try again.</span>';
+      console.error(err);
+    });
+}
+
+function closeDetailModal() {
+  const modal = document.getElementById('capaDetailModal');
+  modal.classList.remove('open');
+  modal.style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+// Close modal on Escape key or background click
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeDetailModal();
+});
+document.getElementById('capaDetailModal').addEventListener('click', e => {
+  if (e.target.id === 'capaDetailModal') closeDetailModal();
+});
+</script>
+{% endblock %}

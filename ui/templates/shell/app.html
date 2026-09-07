@@ -101,9 +101,17 @@
 
 					{% if can_view_operator_dashboard or can_view_supervisor_dashboard or can_view_management_dashboard or is_admin %}
 					<a href="{% url 'ui:dashboard' %}"
-						class="nav-item {% if current_url == 'dashboard' %}active{% endif %}" data-tooltip="Dashboard">
+						class="nav-item {% if current_url == 'dashboard' or current_url == 'ipqc_dashboard' %}active{% endif %}" data-tooltip="Dashboard">
 						<i class="fas fa-chart-line"></i>
 						<span class="nav-text">Dashboard</span>
+					</a>
+					{% endif %}
+
+					{% if can_manage_capa or my_pending_rca_count or my_pending_capa_count or can_view_operator_dashboard or can_view_supervisor_dashboard or can_view_management_dashboard or is_admin %}
+					<a href="{% url 'capa:capa_dashboard' %}"
+						class="nav-item {% if current_url == 'capa_dashboard' %}active{% endif %}" data-tooltip="CAPA Dashboard">
+						<i class="fas fa-chart-pie"></i>
+						<span class="nav-text">CAPA Dashboard</span>
 					</a>
 					{% endif %}
 

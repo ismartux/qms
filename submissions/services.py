@@ -25,12 +25,7 @@ from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 
-from integrations.bitable.full_submission_sender import (
-    send_full_submission_to_worker,
-)
-from integrations.bitable.approval_sender import (
-    send_submission_approval_record,
-)
+
 
 # 🔐 Tenant context support (middleware compatible)
 from core.tenant.context import set_current_plant
@@ -256,26 +251,6 @@ def submit_submission(submission, user):
     template = submission.template_version.template
 
     # --------------------------------------------------
-    # Bitable configuration guard
-    # --------------------------------------------------
-    # Retrieve Bitable credentials from admin config, fallback to template fields
-    from notifications.models import BitableConfig
-    config = BitableConfig.objects.filter(name=template.code).first()
-    if config:
-        app_token = config.app_token
-        table_id = config.table_id
-    else:
-        app_token = template.bitable_app_token
-        table_id = template.bitable_table_id
-    if not app_token or not table_id:
-        raise ValidationError({
-            "bitable": (
-                f"Bitable is not configured for checklist template '{template.code}'. "
-                "Please set Bitable credentials in admin panel."
-            )
-        })
-
-    # --------------------------------------------------
     # Validation & preprocessing (UNCHANGED)
     # --------------------------------------------------
     auto_fill_na_for_missing_required_booleans(submission)
@@ -338,17 +313,9 @@ def submit_submission(submission, user):
     maybe_trigger_capa(submission)
 
     # --------------------------------------------------
-    # POST-COMMIT EXTERNAL ACTIONS (UNCHANGED STRUCTURE)
+    # POST-COMMIT ACTIONS
     # --------------------------------------------------
-    def post_commit_actions():
-
-        # 🔑 Send approval record ONLY if approval is required
-        if required_categories:
-            send_submission_approval_record(submission)
-
-        send_full_submission_to_worker(submission)
-
-    transaction.on_commit(post_commit_actions)
+    pass
 
 
 # =====================================================

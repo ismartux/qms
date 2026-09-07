@@ -13,6 +13,7 @@ from .views import (
                         bulk_user_upload,
                         bulk_user_preview,
                         delete_user,
+                        reveal_user_password,
                     )
 
 app_name = "accounts"
@@ -35,4 +36,7 @@ urlpatterns = [
     
     path("users/bulk-upload/", bulk_user_upload, name="bulk_user_upload"),
     path("users/bulk-preview/", bulk_user_preview, name="bulk_user_preview"),
+
+    # Superuser: reveal stored password
+    path("users/<int:user_id>/reveal-password/", reveal_user_password, name="reveal_user_password"),
 ]
