@@ -713,42 +713,167 @@ function speakFallback(isPass) {
   window.speechSynthesis.speak(u);
 }
 
+let isSubmitting    = false;
+let field1Done      = false;
+let lastAdvanceTime = 0;
+let input1Debounce  = null;
+let input2Debounce  = null;
+const SCANNER_DEBOUNCE_MS = 100; // Auto-advance for scanners without Enter/Tab suffix
+
+function cleanScan(str) {
+  if (!str) return "";
+  return str.replace(/[\r\n\t\x00-\x1F\x7F]/g, "").trim();
+}
+
+function isEnterOrTabKey(e) {
+  return (
+    e.key === "Enter" ||
+    e.key === "Tab" ||
+    e.key === "Done" ||
+    e.keyCode === 13 ||
+    e.which === 13 ||
+    e.keyCode === 9 ||
+    e.which === 9 ||
+    e.code === "Enter" ||
+    e.code === "NumpadEnter" ||
+    e.code === "Tab"
+  );
+}
+
 /* =============================================
-   KEYBOARD / SCANNER INPUT — FIELD 1
+   KEYBOARD / GUN SCANNER INPUT — FIELD 1
 ============================================= */
 qr1Input.addEventListener("keydown", e => {
-  if ((e.key === "Enter" || e.key === "Tab") && qr1Input.value.trim()) {
+  if (isEnterOrTabKey(e)) {
     e.preventDefault();
-    advanceToField2();
-  }
-});
-qr1Input.addEventListener("input", () => {
-  if (/[\r\n]/.test(qr1Input.value)) {
-    qr1Input.value = qr1Input.value.replace(/[\r\n]/g, "").trim();
-    if (qr1Input.value) advanceToField2();
+    e.stopPropagation();
+    clearTimeout(input1Debounce);
+    // Allow key buffer to flush then advance
+    setTimeout(() => {
+      const v = cleanScan(qr1Input.value);
+      if (v) advanceToField2();
+    }, 10);
   }
 });
 
-/* =============================================
-   KEYBOARD / SCANNER INPUT — FIELD 2
-============================================= */
-qr2Input.addEventListener("keydown", e => {
-  if ((e.key === "Enter" || e.key === "Tab") && qr2Input.value.trim() && qr1Input.value.trim()) {
+qr1Input.addEventListener("keyup", e => {
+  if (isEnterOrTabKey(e)) {
     e.preventDefault();
-    submitScan();
+    clearTimeout(input1Debounce);
+    const v = cleanScan(qr1Input.value);
+    if (v) advanceToField2();
   }
 });
-qr2Input.addEventListener("input", () => {
-  if (/[\r\n]/.test(qr2Input.value)) {
-    qr2Input.value = qr2Input.value.replace(/[\r\n]/g, "").trim();
-    if (qr2Input.value && qr1Input.value.trim()) submitScan();
+
+qr1Input.addEventListener("input", () => {
+  clearTimeout(input1Debounce);
+  // If scanner sends trailing newline / CR / Tab in the stream
+  if (/[\r\n\t]/.test(qr1Input.value)) {
+    qr1Input.value = cleanScan(qr1Input.value);
+    if (qr1Input.value) {
+      advanceToField2();
+      return;
+    }
   }
+  // Auto-advance debounce for gun scanners configured with NO Enter/Tab suffix
+  input1Debounce = setTimeout(() => {
+    const v = cleanScan(qr1Input.value);
+    if (v && !field1Done) {
+      advanceToField2();
+    }
+  }, SCANNER_DEBOUNCE_MS);
+});
+
+qr1Input.addEventListener("change", () => {
+  const v = cleanScan(qr1Input.value);
+  if (v && !field1Done) advanceToField2();
+});
+
+qr1Input.addEventListener("paste", () => {
+  setTimeout(() => {
+    const v = cleanScan(qr1Input.value);
+    if (v && !field1Done) advanceToField2();
+  }, 20);
+});
+
+/* =============================================
+   KEYBOARD / GUN SCANNER INPUT — FIELD 2
+============================================= */
+qr2Input.addEventListener("keydown", e => {
+  // Guard against ghost trailing Enter from field 1 within 80ms if field 2 is empty
+  if (Date.now() - lastAdvanceTime < 80 && !cleanScan(qr2Input.value)) {
+    e.preventDefault();
+    return;
+  }
+  if (isEnterOrTabKey(e)) {
+    e.preventDefault();
+    e.stopPropagation();
+    clearTimeout(input2Debounce);
+    setTimeout(() => {
+      const v1 = cleanScan(qr1Input.value);
+      const v2 = cleanScan(qr2Input.value);
+      if (v1 && v2) submitScan();
+    }, 10);
+  }
+});
+
+qr2Input.addEventListener("keyup", e => {
+  if (isEnterOrTabKey(e)) {
+    e.preventDefault();
+    clearTimeout(input2Debounce);
+    const v1 = cleanScan(qr1Input.value);
+    const v2 = cleanScan(qr2Input.value);
+    if (v1 && v2) submitScan();
+  }
+});
+
+qr2Input.addEventListener("input", () => {
+  clearTimeout(input2Debounce);
+  if (/[\r\n\t]/.test(qr2Input.value)) {
+    qr2Input.value = cleanScan(qr2Input.value);
+    const v1 = cleanScan(qr1Input.value);
+    if (v1 && qr2Input.value) {
+      submitScan();
+      return;
+    }
+  }
+  // Auto-submit debounce for gun scanners configured with NO Enter/Tab suffix
+  input2Debounce = setTimeout(() => {
+    const v1 = cleanScan(qr1Input.value);
+    const v2 = cleanScan(qr2Input.value);
+    if (v1 && v2 && !isSubmitting) {
+      submitScan();
+    }
+  }, SCANNER_DEBOUNCE_MS);
+});
+
+qr2Input.addEventListener("change", () => {
+  const v1 = cleanScan(qr1Input.value);
+  const v2 = cleanScan(qr2Input.value);
+  if (v1 && v2 && !isSubmitting) submitScan();
+});
+
+qr2Input.addEventListener("paste", () => {
+  setTimeout(() => {
+    const v1 = cleanScan(qr1Input.value);
+    const v2 = cleanScan(qr2Input.value);
+    if (v1 && v2 && !isSubmitting) submitScan();
+  }, 20);
 });
 
 /* =============================================
    ADVANCE TO FIELD 2
 ============================================= */
 function advanceToField2() {
+  if (field1Done) return;
+  const v1 = cleanScan(qr1Input.value);
+  if (!v1) return;
+
+  clearTimeout(input1Debounce);
+  field1Done = true;
+  lastAdvanceTime = Date.now();
+
+  qr1Input.value = v1;
   qr1Input.classList.add("filled");
   qr1Input.readOnly = true;
 
@@ -758,20 +883,35 @@ function advanceToField2() {
   pill2.className = "step-pill active";
 
   qr2Input.readOnly = false;
+  qr2Input.value    = "";
   camBtn2.disabled  = false;
-  qr2Input.focus();
 
-  // update camera panel
   syncCameraPanel();
+
+  setTimeout(() => {
+    qr2Input.focus();
+    qr2Input.select();
+  }, 40);
 }
 
 /* =============================================
    SUBMIT
 ============================================= */
 async function submitScan() {
-  const qr1 = qr1Input.value.trim();
-  const qr2 = qr2Input.value.trim();
+  if (isSubmitting) return;
+  const qr1 = cleanScan(qr1Input.value);
+  const qr2 = cleanScan(qr2Input.value);
   if (!qr1 || !qr2) return;
+
+  isSubmitting = true;
+  clearTimeout(input1Debounce);
+  clearTimeout(input2Debounce);
+
+  qr2Input.value = qr2;
+  qr2Input.classList.add("filled");
+  qr2Input.readOnly = true;
+  led2.className = "led done";
+  pill2.className = "step-pill done";
 
   closeCamera();
 
@@ -810,6 +950,11 @@ function scheduleReset() {
 }
 
 function resetScanner() {
+  clearTimeout(input1Debounce);
+  clearTimeout(input2Debounce);
+  field1Done   = false;
+  isSubmitting = false;
+
   qr1Input.value    = "";
   qr2Input.value    = "";
   qr1Input.readOnly = false;
@@ -825,7 +970,7 @@ function resetScanner() {
   camBtn2.disabled = true;
   resultBanner.className = "result-banner";
   syncCameraPanel();
-  qr1Input.focus();
+  setTimeout(() => qr1Input.focus(), 40);
 }
 
 /* =============================================
@@ -1056,16 +1201,16 @@ function startBarcodeDetection() {
 function handleDetected(value) {
   // Flash feedback
   flashDetected();
+  const clean = cleanScan(value);
 
   if (scanTarget === 1) {
-    qr1Input.value = value;
+    qr1Input.value = clean;
     closeCamera();
-    advanceToField2(); // will auto-open camera for field 2
+    advanceToField2();
   } else {
-    qr2Input.value = value;
+    qr2Input.value = clean;
     syncCameraPanel();
     closeCamera();
-    // Small delay so the close animation is visible before banner shows
     setTimeout(submitScan, 100);
   }
 }
@@ -1081,8 +1226,8 @@ function flashDetected() {
    SYNC CAMERA INFO PANEL
 ============================================= */
 function syncCameraPanel() {
-  const v1 = qr1Input.value.trim();
-  const v2 = qr2Input.value.trim();
+  const v1 = cleanScan(qr1Input.value);
+  const v2 = cleanScan(qr2Input.value);
 
   // Field 1 (Old Material)
   if (v1) {
@@ -1130,6 +1275,32 @@ camFlipBtn.addEventListener("click",  flipCamera);
 /* Close on background tap */
 cameraModal.addEventListener("click", e => {
   if (e.target === cameraModal) closeCamera();
+});
+
+/* =============================================
+   FOCUS TRAPPING & GUN SCANNER AUTO-FOCUS
+============================================= */
+document.addEventListener("click", e => {
+  if (cameraModal && cameraModal.classList.contains("open")) return;
+  if (e.target.closest("button") || e.target.closest("a") || e.target.closest("input")) return;
+  if (!field1Done) {
+    qr1Input.focus();
+  } else if (!isSubmitting) {
+    qr2Input.focus();
+  }
+});
+
+document.addEventListener("keydown", e => {
+  if (cameraModal && cameraModal.classList.contains("open")) return;
+  if (document.activeElement === qr1Input || document.activeElement === qr2Input) return;
+  // If user scans while focus was lost somewhere on page
+  if (e.key && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    if (!field1Done) {
+      qr1Input.focus();
+    } else if (!isSubmitting) {
+      qr2Input.focus();
+    }
+  }
 });
 
 /* =============================================
