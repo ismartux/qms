@@ -6,10 +6,13 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_protect
-from django.db import transaction
+from django.db import transaction, connection
 from accounts.decorators import admin_required
 from core.identity.models import UserScope, Role, Department, EmployeeProfile
 from core.identity.services import generate_employee_password
+from core.identity.dcc_sync_service import sync_qms_user_to_dcc
+from core.identity.sso_service import create_dcc_sso_token
+from core.identity.permissions import has_permission
 from org.models import Plant
 
 
@@ -19,10 +22,21 @@ def login_view(request):
         return redirect("/")
 
     if request.method == "POST":
-        username = request.POST.get("username")
-        password = request.POST.get("password")
+        raw_ident = (request.POST.get("username") or "").strip()
+        password = request.POST.get("password") or ""
 
-        user = authenticate(request, username=username, password=password)
+        # Match user by username, employee_id, or email (case-insensitive)
+        from django.db.models import Q
+        matched = (
+            User.objects.filter(
+                Q(username__iexact=raw_ident) |
+                Q(employee_profile__employee_id__iexact=raw_ident) |
+                Q(email__iexact=raw_ident)
+            ).first()
+        )
+        resolved_username = matched.username if matched else raw_ident
+
+        user = authenticate(request, username=resolved_username, password=password)
 
         if user is not None:
             login(request, user)
@@ -114,10 +128,15 @@ def user_create(request):
                 user.save()
 
                 # ---- EMPLOYEE PROFILE ----
-                EmployeeProfile.objects.create(
+                profile = EmployeeProfile.objects.create(
                     user=user,
                     employee_id=employee_id,
                     plain_password=raw_password,
+                    dcc_access=("dcc_access" in request.POST),
+                    dcc_role=request.POST.get("dcc_role", "").strip(),
+                    dcc_department_code=request.POST.get("dcc_department_code", "").strip(),
+                    dcc_is_hod=("dcc_is_hod" in request.POST),
+                    dcc_is_am=("dcc_is_am" in request.POST),
                 )
 
                 # ---- USER SCOPE ----
@@ -127,6 +146,9 @@ def user_create(request):
                     department_id=request.POST.get("department"),
                     role_id=request.POST.get("role"),
                 )
+
+                # ---- SYNC TO DCC DATABASE ----
+                sync_qms_user_to_dcc(user, profile)
 
         except Exception as e:
             messages.error(request, f"Error creating user: {e}")
@@ -191,6 +213,9 @@ def reset_user_password(request, user_id):
         profile.plain_password = raw_password
         profile.save(update_fields=["plain_password"])
 
+    # Sync updated password to DCC database
+    sync_qms_user_to_dcc(user, profile)
+
     request.session["created_user_credentials"] = {
         "username": user.username,
         "password": raw_password,
@@ -210,6 +235,7 @@ def activate_user(request, user_id):
     user = get_object_or_404(User, id=user_id)
     user.is_active = True
     user.save(update_fields=["is_active"])
+    sync_qms_user_to_dcc(user)
     return JsonResponse({"success": True})
 
 
@@ -220,6 +246,7 @@ def deactivate_user(request, user_id):
     user = get_object_or_404(User, id=user_id)
     user.is_active = False
     user.save(update_fields=["is_active"])
+    sync_qms_user_to_dcc(user)
     return JsonResponse({"success": True})
 
 
@@ -263,6 +290,11 @@ def user_edit(request, user_id):
                 user.save()
 
                 profile.employee_id = new_employee_id
+                profile.dcc_access = ("dcc_access" in request.POST)
+                profile.dcc_role = request.POST.get("dcc_role", "").strip()
+                profile.dcc_department_code = request.POST.get("dcc_department_code", "").strip()
+                profile.dcc_is_hod = ("dcc_is_hod" in request.POST)
+                profile.dcc_is_am = ("dcc_is_am" in request.POST)
                 profile.save()
 
                 plant_id = request.POST.get("plant")
@@ -283,8 +315,11 @@ def user_edit(request, user_id):
                             role_id=role_id
                         )
 
-        except Exception:
-            messages.error(request, "Failed to update user. Please try again.")
+                # Sync user & DCC profile to DCC database
+                sync_qms_user_to_dcc(user, profile)
+
+        except Exception as e:
+            messages.error(request, f"Failed to update user: {e}")
             return redirect("accounts:user_edit", user_id=user.id)
 
         return redirect("accounts:admin_users")
@@ -415,7 +450,7 @@ def bulk_user_preview(request):
                     user.set_password(raw_password)
                     user.save()
 
-                    EmployeeProfile.objects.create(
+                    profile = EmployeeProfile.objects.create(
                         user=user,
                         employee_id=employee_id,
                         plain_password=raw_password,
@@ -427,6 +462,8 @@ def bulk_user_preview(request):
                         department_id=department_id,
                         role_id=role_id,
                     )
+
+                    sync_qms_user_to_dcc(user, profile)
 
                     created_users.append((user, raw_password, scope))
 
@@ -464,7 +501,16 @@ def delete_user(request, user_id):
     if user.is_superuser:
         return JsonResponse({"success": False, "message": "Cannot delete superuser."}, status=400)
 
+    username = user.username
+    employee_id = getattr(getattr(user, "employee_profile", None), "employee_id", username)
+
     user.delete()
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "UPDATE dcc.core_user SET is_active = FALSE WHERE username = %s OR employee_id = %s",
+            [username, employee_id]
+        )
 
     return JsonResponse({"success": True})
 
@@ -486,3 +532,47 @@ def reveal_user_password(request, user_id):
         return JsonResponse({"error": "Password not available"}, status=404)
 
     return JsonResponse({"password": profile.plain_password})
+
+
+# =====================================================
+# DCC SSO GATEWAY (Centralized Authentication & RBAC)
+# =====================================================
+
+@login_required
+def dcc_sso_gateway(request):
+    """
+    Seamlessly authenticates authenticated QMS users into DCC using
+    a cryptographic HMAC-SHA256 one-time SSO token.
+    Enforces strict RBAC: rejects users lacking DCC access.
+    """
+    user = request.user
+    profile = getattr(user, "employee_profile", None)
+
+    has_dcc_access = (
+        user.is_superuser or
+        (profile and profile.dcc_access) or
+        has_permission(user, "can_access_dcc")
+    )
+
+    if not has_dcc_access:
+        messages.error(
+            request,
+            "Access Denied: You do not have permissions to access Document Control Center (DCC). Please contact your administrator."
+        )
+        return redirect("/")
+
+    # Ensure user record is synced to DCC schema before token generation
+    sync_qms_user_to_dcc(user, profile)
+
+    token = create_dcc_sso_token(user)
+
+    target_tab = request.GET.get("tab", "").strip()
+    target_doc = request.GET.get("docId", "").strip()
+
+    redirect_url = f"/dcc/?sso_token={token}"
+    if target_tab:
+        redirect_url += f"&tab={target_tab}"
+    if target_doc:
+        redirect_url += f"&docId={target_doc}"
+
+    return redirect(redirect_url)

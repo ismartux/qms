@@ -14,11 +14,13 @@ from .views import (
                         bulk_user_preview,
                         delete_user,
                         reveal_user_password,
+                        dcc_sso_gateway,
                     )
 
 app_name = "accounts"
 
 urlpatterns = [
+    path("dcc-sso/", dcc_sso_gateway, name="dcc_sso"),
     path("login/", login_view, name="login"),
     path("logout/", logout_view, name="logout"),
     path("users/", user_management, name="admin_users"),

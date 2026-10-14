@@ -110,6 +110,75 @@
                 </div>
             </div>
 
+            <!-- ========================= -->
+            <!-- DCC Access & RBAC -->
+            <!-- ========================= -->
+            <div class="border-t border-gray-100 pt-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                            <i class="fas fa-file-contract text-sky-600"></i>
+                            DCC (Document Control Center) Access & RBAC
+                        </h3>
+                        <p class="text-xs text-gray-500 mt-0.5">Control whether this user can access DCC and manage their DCC role and department</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" name="dcc_access" id="dcc_access_toggle" class="sr-only peer"
+                               {% if employee_profile.dcc_access %}checked{% endif %}
+                               onchange="document.getElementById('dcc_fields_wrapper').classList.toggle('hidden', !this.checked)">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-600"></div>
+                        <span class="ml-3 text-sm font-medium text-gray-700">Grant DCC Access</span>
+                    </label>
+                </div>
+
+                <div id="dcc_fields_wrapper" class="{% if not employee_profile.dcc_access %}hidden{% endif %} pt-3 border-t border-gray-100">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">DCC Role</label>
+                            <select name="dcc_role" class="w-full rounded-lg border-gray-300 bg-white border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500">
+                                <option value="USER" {% if employee_profile.dcc_role == 'USER' %}selected{% endif %}>User / Initiator</option>
+                                <option value="ENGINEER_SUPERVISOR" {% if employee_profile.dcc_role == 'ENGINEER_SUPERVISOR' %}selected{% endif %}>Engineer / Supervisor</option>
+                                <option value="SUPERVISOR_AM" {% if employee_profile.dcc_role == 'SUPERVISOR_AM' %}selected{% endif %}>Supervisor / AM</option>
+                                <option value="DEPT_AM" {% if employee_profile.dcc_role == 'DEPT_AM' %}selected{% endif %}>Dept Assistant Manager (AM)</option>
+                                <option value="HOD" {% if employee_profile.dcc_role == 'HOD' %}selected{% endif %}>Head of Department (HOD)</option>
+                                <option value="GM" {% if employee_profile.dcc_role == 'GM' %}selected{% endif %}>General Manager (GM)</option>
+                                <option value="QA_SUPERVISOR_AM" {% if employee_profile.dcc_role == 'QA_SUPERVISOR_AM' %}selected{% endif %}>QA Supervisor / AM</option>
+                                <option value="QA_MANAGER" {% if employee_profile.dcc_role == 'QA_MANAGER' %}selected{% endif %}>QA Manager</option>
+                                <option value="SECTION_HEAD" {% if employee_profile.dcc_role == 'SECTION_HEAD' %}selected{% endif %}>Section Head</option>
+                                <option value="FACTORY_HEAD" {% if employee_profile.dcc_role == 'FACTORY_HEAD' %}selected{% endif %}>Factory Head</option>
+                                <option value="DCC_MAM" {% if employee_profile.dcc_role == 'DCC_MAM' %}selected{% endif %}>DCC Coordinator (Document Control)</option>
+                                <option value="ADMIN" {% if employee_profile.dcc_role == 'ADMIN' %}selected{% endif %}>DCC Administrator</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">DCC Department</label>
+                            <select name="dcc_department_code" class="w-full rounded-lg border-gray-300 bg-white border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500">
+                                <option value="">Select DCC Department</option>
+                                <option value="PRD" {% if employee_profile.dcc_department_code == 'PRD' %}selected{% endif %}>Production Department (PRD)</option>
+                                <option value="QA" {% if employee_profile.dcc_department_code == 'QA' %}selected{% endif %}>Quality Assurance (QA)</option>
+                                <option value="MNT" {% if employee_profile.dcc_department_code == 'MNT' %}selected{% endif %}>Maintenance & Engineering (MNT)</option>
+                                <option value="STR" {% if employee_profile.dcc_department_code == 'STR' %}selected{% endif %}>Stores & Logistics (STR)</option>
+                                <option value="DCC" {% if employee_profile.dcc_department_code == 'DCC' %}selected{% endif %}>Document Control Center (DCC)</option>
+                            </select>
+                        </div>
+
+                        <div class="flex flex-col justify-center space-y-2 pt-4">
+                            <label class="flex items-center gap-2 text-sm text-gray-700">
+                                <input type="checkbox" name="dcc_is_hod" class="h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500"
+                                       {% if employee_profile.dcc_is_hod %}checked{% endif %}>
+                                <span class="font-medium">Designated Head of Dept (HOD)</span>
+                            </label>
+                            <label class="flex items-center gap-2 text-sm text-gray-700">
+                                <input type="checkbox" name="dcc_is_am" class="h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500"
+                                       {% if employee_profile.dcc_is_am %}checked{% endif %}>
+                                <span class="font-medium">Designated Assistant Manager (AM)</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="flex justify-end gap-3 pt-6 border-t border-gray-100">
                 <button type="submit"
                     class="px-6 py-2.5 bg-sky-600 text-white font-medium rounded-lg hover:bg-sky-700 shadow-sm">

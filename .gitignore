@@ -29,3 +29,7 @@ log/
 .DS_Store
 .idea/
 .vscode/
+
+# Nested DCC repo
+dcc/
+

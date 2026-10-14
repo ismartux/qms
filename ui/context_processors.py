@@ -69,14 +69,24 @@ def admin_panel_context(request):
             request.user.is_superuser or
             has_permission(request.user, 'can_access_qr_scanner')
         )
-        
+
+        # DCC access check
+        profile = getattr(request.user, 'employee_profile', None)
+        can_access_dcc = (
+            request.user.is_superuser or
+            (profile and profile.dcc_access) or
+            has_permission(request.user, 'can_access_dcc')
+        )
+
         return {
             'is_admin_panel': is_admin_panel,
             'has_admin_access': has_admin_access,
             'can_access_qr_scanner': can_access_qr_scanner,
+            'can_access_dcc': can_access_dcc,
         }
     return {
         'is_admin_panel': False,
         'has_admin_access': False,
         'can_access_qr_scanner': False,
+        'can_access_dcc': False,
     }

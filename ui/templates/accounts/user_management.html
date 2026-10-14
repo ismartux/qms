@@ -54,6 +54,7 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plant</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">DCC Role</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                         <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
@@ -91,6 +92,18 @@
 
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {{ user.scopes.first.plant.name|default:"—" }}
+                        </td>
+
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            {% if user.employee_profile.dcc_access %}
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+                                    <i class="fas fa-file-contract text-sky-500 text-[10px]"></i>
+                                    {{ user.employee_profile.get_dcc_role_display|default:user.employee_profile.dcc_role|default:"User" }}
+                                    {% if user.employee_profile.dcc_department_code %}<span class="text-sky-500 text-[10px]">({{ user.employee_profile.dcc_department_code }})</span>{% endif %}
+                                </span>
+                            {% else %}
+                                <span class="text-xs text-gray-400">None</span>
+                            {% endif %}
                         </td>
 
                         <!-- Status -->

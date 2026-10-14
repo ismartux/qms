@@ -133,6 +133,46 @@ class EmployeeProfile(models.Model):
         help_text="Last-set plain text password — visible to superusers only",
     )
 
+    # 📄 DCC ACCESS & RBAC CONFIGURATION
+    dcc_access = models.BooleanField(
+        default=False,
+        help_text="Grants access to Document Control Center (DCC)"
+    )
+    dcc_role = models.CharField(
+        max_length=30,
+        blank=True,
+        default="",
+        choices=[
+            ('USER', 'User / Initiator'),
+            ('ENGINEER_SUPERVISOR', 'Engineer / Supervisor'),
+            ('SUPERVISOR_AM', 'Supervisor / AM'),
+            ('DEPT_AM', 'Dept Assistant Manager (AM)'),
+            ('HOD', 'Head of Department (HOD)'),
+            ('GM', 'General Manager (GM)'),
+            ('QA_SUPERVISOR_AM', 'QA Supervisor / AM'),
+            ('QA_MANAGER', 'QA Manager'),
+            ('SECTION_HEAD', 'Section Head'),
+            ('FACTORY_HEAD', 'Factory Head'),
+            ('DCC_MAM', 'DCC Coordinator (Document Control)'),
+            ('ADMIN', 'DCC Administrator'),
+        ],
+        help_text="Assigned Role in DCC Document Control Center"
+    )
+    dcc_department_code = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        help_text="DCC Department Code (PRD, QA, MNT, STR, DCC)"
+    )
+    dcc_is_hod = models.BooleanField(
+        default=False,
+        help_text="Designated Head of Department (HOD) in DCC"
+    )
+    dcc_is_am = models.BooleanField(
+        default=False,
+        help_text="Designated Assistant Manager (AM) in DCC"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

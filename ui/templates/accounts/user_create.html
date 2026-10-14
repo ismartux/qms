@@ -163,6 +163,71 @@
             </div>
         </div>
 
+        <!-- ========================= -->
+        <!-- DCC (Document Control Center) Access & RBAC -->
+        <!-- ========================= -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                        <i class="fas fa-file-contract text-sky-600"></i>
+                        DCC (Document Control Center) Access & RBAC
+                    </h3>
+                    <p class="text-xs text-gray-500 mt-0.5">Control whether this user can access DCC and their centralized DCC role & department</p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" name="dcc_access" id="dcc_access_toggle" class="sr-only peer" onchange="document.getElementById('dcc_fields_wrapper').classList.toggle('hidden', !this.checked)">
+                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-600"></div>
+                    <span class="ml-3 text-sm font-medium text-gray-700">Grant DCC Access</span>
+                </label>
+            </div>
+
+            <div id="dcc_fields_wrapper" class="hidden pt-3 border-t border-gray-100">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">DCC Role</label>
+                        <select name="dcc_role" class="w-full rounded-lg border-gray-300 bg-white border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500">
+                            <option value="USER">User / Initiator</option>
+                            <option value="ENGINEER_SUPERVISOR">Engineer / Supervisor</option>
+                            <option value="SUPERVISOR_AM">Supervisor / AM</option>
+                            <option value="DEPT_AM">Dept Assistant Manager (AM)</option>
+                            <option value="HOD">Head of Department (HOD)</option>
+                            <option value="GM">General Manager (GM)</option>
+                            <option value="QA_SUPERVISOR_AM">QA Supervisor / AM</option>
+                            <option value="QA_MANAGER">QA Manager</option>
+                            <option value="SECTION_HEAD">Section Head</option>
+                            <option value="FACTORY_HEAD">Factory Head</option>
+                            <option value="DCC_MAM">DCC Coordinator (Document Control)</option>
+                            <option value="ADMIN">DCC Administrator</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">DCC Department</label>
+                        <select name="dcc_department_code" class="w-full rounded-lg border-gray-300 bg-white border p-2.5 text-sm focus:ring-sky-500 focus:border-sky-500">
+                            <option value="">Select DCC Department</option>
+                            <option value="PRD">Production Department (PRD)</option>
+                            <option value="QA">Quality Assurance (QA)</option>
+                            <option value="MNT">Maintenance & Engineering (MNT)</option>
+                            <option value="STR">Stores & Logistics (STR)</option>
+                            <option value="DCC">Document Control Center (DCC)</option>
+                        </select>
+                    </div>
+
+                    <div class="flex flex-col justify-center space-y-2 pt-4">
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="dcc_is_hod" class="h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500">
+                            <span class="font-medium">Designated Head of Dept (HOD)</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="dcc_is_am" class="h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500">
+                            <span class="font-medium">Designated Assistant Manager (AM)</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Submit -->
         <div class="flex justify-end gap-3">
             <button type="submit"

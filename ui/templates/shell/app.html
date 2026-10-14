@@ -85,6 +85,16 @@
 							<span class="nav-text">Home</span>
 						</a>
 
+						{# DCC Portal #}
+						{% if has_admin_access or can_access_dcc %}
+						<a href="{% url 'accounts:dcc_sso' %}"
+							class="nav-item"
+							data-tooltip="DCC">
+							<i class="fas fa-file-contract"></i>
+							<span class="nav-text">DCC</span>
+						</a>
+						{% endif %}
+
 						{% include "partials/sidebar_admin.html" %}
 
 						{% else %}
@@ -98,6 +108,15 @@
 						<i class="fas fa-home"></i>
 						<span class="nav-text">Home</span>
 					</a>
+
+					{# ====== DCC (Document Control Center) ====== #}
+					{% if has_admin_access or can_access_dcc %}
+					<a href="{% url 'accounts:dcc_sso' %}"
+						class="nav-item" data-tooltip="DCC">
+						<i class="fas fa-file-contract"></i>
+						<span class="nav-text">DCC</span>
+					</a>
+					{% endif %}
 
 					{% if can_view_operator_dashboard or can_view_supervisor_dashboard or can_view_management_dashboard or is_admin %}
 					<a href="{% url 'ui:dashboard' %}"

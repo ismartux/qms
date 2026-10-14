@@ -18,6 +18,13 @@
     </div>
 
     <div class="nav-dropdown-menu">
+        {% if has_admin_access or can_access_dcc %}
+        <a href="{% url 'accounts:dcc_sso' %}"
+            class="nav-sub-item" data-tooltip="DCC Portal">
+            <i class="fas fa-file-contract"></i>
+            <span class="nav-text">DCC Portal</span>
+        </a>
+        {% endif %}
 
         <a href="{% url 'accounts:admin_users' %}"
             class="nav-sub-item {% if current_app == 'accounts' %}active{% endif %}" data-tooltip="Users">
