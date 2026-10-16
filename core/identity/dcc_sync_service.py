@@ -1,3 +1,4 @@
+import json
 import logging
 from django.db import connection
 from django.utils import timezone
@@ -67,6 +68,7 @@ def sync_qms_user_to_dcc(user, profile=None):
     is_am = bool(getattr(profile, 'dcc_is_am', False)) or (dcc_role in ['DEPT_AM', 'SUPERVISOR_AM', 'QA_SUPERVISOR_AM'])
     is_active = bool(user.is_active)
     is_staff = bool(user.is_staff or is_superuser or dcc_role == 'ADMIN')
+    dcc_roles_json = json.dumps([dcc_role] if dcc_role else [])
 
     with connection.cursor() as cursor:
         # Check if record already exists in dcc.core_user
@@ -89,6 +91,7 @@ def sync_qms_user_to_dcc(user, profile=None):
                     is_staff = %s,
                     is_superuser = %s,
                     role = %s,
+                    roles = CASE WHEN roles IS NULL OR roles = '[]'::jsonb THEN %s::jsonb ELSE roles END,
                     department_id = %s,
                     employee_id = %s,
                     is_hod = %s,
@@ -104,6 +107,7 @@ def sync_qms_user_to_dcc(user, profile=None):
                     is_staff,
                     is_superuser,
                     dcc_role,
+                    dcc_roles_json,
                     dept_id,
                     employee_id,
                     is_hod,
@@ -119,12 +123,12 @@ def sync_qms_user_to_dcc(user, profile=None):
                 INSERT INTO dcc.core_user (
                     password, username, first_name, last_name, email,
                     is_staff, is_active, is_superuser, date_joined,
-                    role, designation, phone, signature_status,
+                    role, roles, designation, phone, signature_status,
                     department_id, employee_id, is_hod, is_am
                 ) VALUES (
                     %s, %s, %s, %s, %s,
                     %s, %s, %s, %s,
-                    %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s,
                     %s, %s, %s, %s
                 )
                 """,
@@ -139,6 +143,7 @@ def sync_qms_user_to_dcc(user, profile=None):
                     is_superuser,
                     now,
                     dcc_role,
+                    dcc_roles_json,
                     '',
                     '',
                     'NOT_CONFIGURED',
