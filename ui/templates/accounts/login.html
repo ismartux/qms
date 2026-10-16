@@ -37,7 +37,24 @@
         }
     </style>
 </head>
-<body class="h-screen w-full flex items-center justify-center p-4">
+<body class="h-screen w-full flex items-center justify-center p-4 relative">
+
+    <!-- Top-Right DCC Portal Redirect Button -->
+    <div class="fixed top-4 right-4 sm:top-6 sm:right-6 z-50">
+        <a href="/dcc/" 
+           id="top-dcc-portal-btn"
+           title="Go to DCC Portal Login"
+           class="inline-flex items-center gap-3 px-4 py-2.5 bg-white/95 hover:bg-white text-slate-700 hover:text-sky-600 font-semibold text-sm rounded-xl shadow-md hover:shadow-lg border border-slate-200/90 hover:border-sky-400 backdrop-blur transition-all duration-200 group">
+            <span class="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-blue-600 text-white flex items-center justify-center font-extrabold text-xs tracking-wider shadow-sm group-hover:scale-105 transition-transform">
+                DCC
+            </span>
+            <div class="text-left leading-tight hidden xs:block">
+                <span class="block text-xs font-bold text-slate-800 group-hover:text-sky-600">DCC Portal</span>
+                <span class="block text-[10px] text-slate-400 font-normal">Document Control System</span>
+            </div>
+            <i class="fas fa-arrow-up-right-from-square text-xs text-slate-400 group-hover:text-sky-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all ml-1"></i>
+        </a>
+    </div>
 
     <div class="w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
         <!-- Header -->
@@ -111,8 +128,15 @@
                 </button>
             </form>
 
-            <div class="mt-8 text-center">
-                <p class="text-xs text-gray-500">
+            <div class="mt-6 pt-5 border-t border-gray-100 flex flex-col items-center gap-3">
+                <a href="/dcc/" 
+                   class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-sky-100 bg-sky-50/70 hover:bg-sky-100 text-sky-700 text-xs font-semibold transition-all group">
+                    <span class="w-5 h-5 rounded bg-sky-600 text-white flex items-center justify-center text-[10px] font-bold">DCC</span>
+                    <span>Sign in to Document Control Center (DCC)</span>
+                    <i class="fas fa-arrow-right text-[10px] group-hover:translate-x-1 transition-transform"></i>
+                </a>
+
+                <p class="text-xs text-gray-400 text-center">
                     &copy; 2026 QIsmartuX Enterprise. <br>
                     Secured by Industrial Grade Encryption.
                 </p>
