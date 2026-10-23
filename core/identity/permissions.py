@@ -103,3 +103,38 @@ def is_platform_admin(user):
             user.is_superuser or user.is_staff
         )
     )
+
+
+def is_qms_user(user) -> bool:
+    """
+    Checks if the user is authorized for the QMS Manufacturing Control platform.
+    """
+    if not user or not user.is_authenticated or not user.is_active:
+        return False
+    if user.is_superuser or user.is_staff:
+        return True
+    profile = getattr(user, "employee_profile", None)
+    if profile is not None and hasattr(profile, "qms_access"):
+        return bool(profile.qms_access)
+    return user.scopes.exists()
+
+
+def is_dcc_user(user) -> bool:
+    """
+    Checks if the user is authorized for the Document Control Center (DCC).
+    """
+    if not user or not user.is_authenticated or not user.is_active:
+        return False
+    if user.is_superuser:
+        return True
+    profile = getattr(user, "employee_profile", None)
+    if profile is not None:
+        return bool(getattr(profile, "dcc_access", False))
+    return False
+
+
+def has_dual_access(user) -> bool:
+    """
+    Returns True if user is authorized for BOTH QMS and DCC platforms.
+    """
+    return is_qms_user(user) and is_dcc_user(user)

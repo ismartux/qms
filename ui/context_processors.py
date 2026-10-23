@@ -57,7 +57,7 @@ def admin_panel_context(request):
         is_admin_panel = current_app in admin_apps
         
         # Check permission-based access: superuser/staff OR has the can_access_admin_panel permission
-        from core.identity.permissions import has_permission
+        from core.identity.permissions import has_permission, is_qms_user, is_dcc_user, has_dual_access
         has_admin_access = (
             request.user.is_superuser or 
             request.user.is_staff or 
@@ -70,23 +70,24 @@ def admin_panel_context(request):
             has_permission(request.user, 'can_access_qr_scanner')
         )
 
-        # DCC access check
-        profile = getattr(request.user, 'employee_profile', None)
-        can_access_dcc = (
-            request.user.is_superuser or
-            (profile and profile.dcc_access) or
-            has_permission(request.user, 'can_access_dcc')
-        )
+        # Software platform access check
+        can_access_qms = is_qms_user(request.user)
+        can_access_dcc = is_dcc_user(request.user)
+        dual_access = has_dual_access(request.user)
 
         return {
             'is_admin_panel': is_admin_panel,
             'has_admin_access': has_admin_access,
             'can_access_qr_scanner': can_access_qr_scanner,
+            'can_access_qms': can_access_qms,
             'can_access_dcc': can_access_dcc,
+            'has_dual_access': dual_access,
         }
     return {
         'is_admin_panel': False,
         'has_admin_access': False,
         'can_access_qr_scanner': False,
+        'can_access_qms': False,
         'can_access_dcc': False,
+        'has_dual_access': False,
     }

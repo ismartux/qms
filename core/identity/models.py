@@ -133,6 +133,12 @@ class EmployeeProfile(models.Model):
         help_text="Last-set plain text password — visible to superusers only",
     )
 
+    # 🏭 QMS ACCESS
+    qms_access = models.BooleanField(
+        default=True,
+        help_text="Grants access to QMS Manufacturing Control Platform"
+    )
+
     # 📄 DCC ACCESS & RBAC CONFIGURATION
     dcc_access = models.BooleanField(
         default=False,

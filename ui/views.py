@@ -37,7 +37,7 @@ from submissions.assignment_resolver import (
 )
 from django.contrib import messages
 from submissions.models import SubmissionApproval
-from core.identity.permissions import has_permission
+from core.identity.permissions import has_permission, is_qms_user, is_dcc_user, has_dual_access
 from core.workflow.states import WorkflowState
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse, HttpResponseForbidden
 
@@ -1312,7 +1312,22 @@ def main_home(request):
 
     user = request.user
 
+    # Smart Software Routing: DCC-only users should go straight to DCC
+    if is_dcc_user(user) and not is_qms_user(user):
+        return redirect("accounts:dcc_sso")
+
+    if not is_qms_user(user) and not is_dcc_user(user):
+        from django.contrib.auth import logout
+        messages.error(request, "Access Denied: Your account does not have active platform permissions.")
+        logout(request)
+        return redirect("accounts:login")
+
     context = {
+        # ===== SOFTWARE PLATFORM ACCESS =====
+        "can_access_qms": is_qms_user(user),
+        "can_access_dcc": is_dcc_user(user),
+        "has_dual_access": has_dual_access(user),
+
         # ===== QUALITY PERMISSIONS =====
         "can_fill_forms": has_permission(user, "can_fill_forms"),
         "can_view_analytics": has_permission(user, "can_view_analytics"),

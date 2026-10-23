@@ -12,13 +12,15 @@ from core.identity.models import UserScope, Role, Department, EmployeeProfile
 from core.identity.services import generate_employee_password
 from core.identity.dcc_sync_service import sync_qms_user_to_dcc
 from core.identity.sso_service import create_dcc_sso_token
-from core.identity.permissions import has_permission
+from core.identity.permissions import has_permission, is_qms_user, is_dcc_user, has_dual_access
 from org.models import Plant
 
 
 def login_view(request):
-    # Prevent logged-in users from seeing login page
+    # Prevent logged-in users from seeing login page; smart route them
     if request.user.is_authenticated:
+        if is_dcc_user(request.user) and not is_qms_user(request.user):
+            return redirect("accounts:dcc_sso")
         return redirect("/")
 
     if request.method == "POST":
@@ -39,14 +41,44 @@ def login_view(request):
         user = authenticate(request, username=resolved_username, password=password)
 
         if user is not None:
+            if not user.is_active:
+                messages.error(request, "This account is deactivated. Please contact your administrator.")
+                return render(request, "accounts/login.html")
+
             login(request, user)
-            # 🔑 RESPECT 'next' PARAMETER (from @login_required redirect)
-            # This ensures users are redirected back to the approval page
-            # after login, instead of being sent to the home page.
+
+            # Respect 'next' parameter if specifically requested
             next_url = request.POST.get("next") or request.GET.get("next")
             if next_url:
+                if "/dcc" in next_url:
+                    if is_dcc_user(user):
+                        return redirect("accounts:dcc_sso")
+                    messages.error(request, "Access Denied: You do not have permissions to access Document Control Center (DCC).")
+                    return redirect("/")
                 return redirect(next_url)
-            return redirect("/")
+
+            # Smart Routing based on Software Access:
+            # 1. DCC Only User -> opens DCC software directly via SSO
+            # 2. QMS Only User -> goes to QMS platform (/)
+            # 3. Dual User (Both) -> has full access to both software (lands on QMS with instant DCC switcher)
+            qms_ok = is_qms_user(user)
+            dcc_ok = is_dcc_user(user)
+
+            if dcc_ok and not qms_ok:
+                return redirect("accounts:dcc_sso")
+
+            if qms_ok:
+                return redirect("/")
+
+            if dcc_ok:
+                return redirect("accounts:dcc_sso")
+
+            messages.error(
+                request,
+                "Access Denied: Your account has not been provisioned for QMS or DCC access. Please contact your administrator."
+            )
+            logout(request)
+            return redirect("accounts:login")
         else:
             messages.error(request, "Invalid username or password")
 
@@ -132,6 +164,7 @@ def user_create(request):
                     user=user,
                     employee_id=employee_id,
                     plain_password=raw_password,
+                    qms_access=("qms_access" in request.POST),
                     dcc_access=("dcc_access" in request.POST),
                     dcc_role=request.POST.get("dcc_role", "").strip(),
                     dcc_department_code=request.POST.get("dcc_department_code", "").strip(),
@@ -290,6 +323,7 @@ def user_edit(request, user_id):
                 user.save()
 
                 profile.employee_id = new_employee_id
+                profile.qms_access = ("qms_access" in request.POST)
                 profile.dcc_access = ("dcc_access" in request.POST)
                 profile.dcc_role = request.POST.get("dcc_role", "").strip()
                 profile.dcc_department_code = request.POST.get("dcc_department_code", "").strip()
@@ -548,11 +582,7 @@ def dcc_sso_gateway(request):
     user = request.user
     profile = getattr(user, "employee_profile", None)
 
-    has_dcc_access = (
-        user.is_superuser or
-        (profile and profile.dcc_access) or
-        has_permission(user, "can_access_dcc")
-    )
+    has_dcc_access = is_dcc_user(user)
 
     if not has_dcc_access:
         messages.error(

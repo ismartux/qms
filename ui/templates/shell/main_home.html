@@ -284,6 +284,7 @@
   <!-- ================= DCC SECTION ======================= -->
   <!-- ===================================================== -->
 
+  {% if can_access_dcc or has_admin_access %}
   <div>
     <div class="flex items-center justify-between mb-6">
       <h2 class="text-2xl font-bold text-gray-900">
@@ -318,6 +319,7 @@
       </a>
     </div>
   </div>
+  {% endif %}
 
 
 

@@ -113,14 +113,26 @@
         </div>
 
         <!-- ========================= -->
-        <!-- Assignment & Role -->
+        <!-- QMS Access & Assignment -->
         <!-- ========================= -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h3 class="text-lg font-bold text-gray-900 mb-4">
-                Assignment & Role
-            </h3>
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                        <i class="fas fa-industry text-sky-600"></i>
+                        QMS (Manufacturing Control) Access & Role
+                    </h3>
+                    <p class="text-xs text-gray-500 mt-0.5">Control whether this user can access QMS checklists, audits, and CAPA</p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" name="qms_access" id="qms_access_toggle" checked class="sr-only peer" onchange="document.getElementById('qms_fields_wrapper').classList.toggle('hidden', !this.checked)">
+                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-600"></div>
+                    <span class="ml-3 text-sm font-medium text-gray-700">Grant QMS Access</span>
+                </label>
+            </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div id="qms_fields_wrapper" class="pt-3 border-t border-gray-100">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">
@@ -159,7 +171,6 @@
                         {% endfor %}
                     </select>
                 </div>
-
             </div>
         </div>
 
